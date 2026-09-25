@@ -1,0 +1,42 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Dependencies (áp dụng cho cả frontend, backend và root)
+**/node_modules/
+**/venv/
+**/env/
+
+# Build & Dist
+dist
+dist-ssr
+build/
+*.local
+
+# Environment variables (Cực kỳ quan trọng để bảo mật)
+.env
+.env.*
+!.env.example
+
+# Python / Django / Backend cache (nếu có dùng backend Python)
+__pycache__/
+*.py[cod]
+*$py.class
+*.sqlite3
+*.db
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
