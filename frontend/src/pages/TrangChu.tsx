@@ -1,3 +1,4 @@
+import AdminDashboard from './AdminDashboard';
 import { useState, useRef, useEffect } from 'react';
 import { Search, MapPin, Phone, Clock, Play, AlertCircle, Home, Calendar as CalendarIcon, Zap , User, Lock, Eye, Bell, Key, ArrowLeft} from 'lucide-react';
 
@@ -61,6 +62,9 @@ export default function TrangChu() {
   const [showOTP, setShowOTP] = useState<boolean>(false);
   const [showLogin, setShowLogin] = useState<boolean>(false);
   const [showPassword, setShowPassword] = useState<boolean>(false);
+  const [isAdminLoggedIn, setIsAdminLoggedIn] = useState<boolean>(false);
+  const [username, setUsername] = useState<string>('');
+  const [passwordInput, setPasswordInput] = useState<string>('');
 
   const [otpInput, setOtpInput] = useState<string>('');
   const [otpError, setOtpError] = useState<boolean>(false);
@@ -317,6 +321,10 @@ export default function TrangChu() {
     handleTabChange('booking');
     showAlert('Đặt lại vé', 'Hệ thống đã chọn lại môn ' + ticket.sport + '. Vui lòng chọn ngày và giờ thi đấu mới!');
   };
+
+  if (isAdminLoggedIn) {
+    return <AdminDashboard onLogout={() => setIsAdminLoggedIn(false)} />;
+  }
 
   return (
     <div className="flex min-h-screen flex-col bg-slate-50 text-slate-900 antialiased selection:bg-emerald-500 selection:text-white">
@@ -1031,6 +1039,8 @@ export default function TrangChu() {
                     <input 
                       type="text" 
                       placeholder="Nhập tên tài khoản" 
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value)}
                       className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-3.5 pl-12 pr-4 text-sm font-bold text-slate-900 placeholder-slate-400 outline-none focus:border-emerald-500 focus:bg-white transition"
                     />
                   </div>
@@ -1048,6 +1058,8 @@ export default function TrangChu() {
                     <input 
                       type={showPassword ? 'text' : 'password'} 
                       placeholder="••••••••" 
+                      value={passwordInput}
+                      onChange={(e) => setPasswordInput(e.target.value)}
                       className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-3.5 pl-12 pr-12 text-sm font-bold text-slate-900 placeholder-slate-400 outline-none focus:border-emerald-500 focus:bg-white transition tracking-widest"
                     />
                     <button 
@@ -1071,7 +1083,16 @@ export default function TrangChu() {
                 {/* Submit Button */}
                 <button 
                   type="button"
-                  onClick={() => showAlert('Chưa hoàn thiện', 'Tính năng đăng nhập sẽ được nối với Backend trong các phiên bản tới!')}
+                  onClick={() => {
+                  if (username === 'admin' && passwordInput === 'admin') {
+                    setIsAdminLoggedIn(true);
+                    setShowLogin(false);
+                    setUsername('');
+                    setPasswordInput('');
+                  } else {
+                    showAlert('Sai thông tin', 'Vui lòng nhập tài khoản: admin \n Mật khẩu: admin');
+                  }
+                }}
                   className="mt-4 w-full flex items-center justify-center gap-2 rounded-2xl bg-emerald-500 py-4 text-sm font-black uppercase tracking-widest text-white shadow-lg shadow-emerald-500/30 transition hover:bg-emerald-500 active:scale-95"
                 >
                   ĐĂNG NHẬP HỆ THỐNG <Zap className="w-4 h-4 fill-current" />
