@@ -21,7 +21,7 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   // My states
   const [activeTab, setActiveTab] = useState<'lich_san' | 'nhan_vien' | 'ca_truc' | 'vi_thu'>('lich_san');
   const [employees, setEmployees] = useState<Employee[]>(INITIAL_EMPLOYEES);
-  const [shifts, setShifts] = useState<ShiftRegistration[]>(INITIAL_SHIFTS);
+  const [shifts] = useState<ShiftRegistration[]>(INITIAL_SHIFTS);
   const [transactions, setTransactions] = useState<Transaction[]>(INITIAL_TRANSACTIONS);
   const [staffSubView, setStaffSubView] = useState<'list' | 'add' | 'detail'>('list');
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);

@@ -1753,12 +1753,7 @@ export default function AdminSchedulePage({ onCheckoutModeChange }: AdminSchedul
 
       </div>
 
-      <div className="h-10 bg-white border-t border-slate-200 flex items-center justify-between px-3 shrink-0 shadow-[0_-4px_10px_rgba(0,0,0,0.02)] z-30">
-        <div className="flex gap-4 items-center">
-          <div className="text-[10px] text-slate-600">Tỉ lệ lấp đầy: <span className="font-bold text-emerald-600 text-xs">88.5%</span></div>
-          <div className="text-[10px] text-slate-600">Tổng số lượt đặt: <span className="font-bold text-slate-800 text-xs">42</span></div>
-        </div>
-      </div>
+
 
       {selectedBooking && (
         <div className="absolute inset-0 z-[120] flex flex-col justify-end bg-slate-950/45 backdrop-blur-[2px]">

@@ -3,7 +3,6 @@ import {
   CalendarClock,
   Plus,
   FileSpreadsheet,
-  Trash2,
   CheckCircle2,
   X,
   Download,
@@ -28,7 +27,7 @@ export default function ShiftScheduleView({
   onAddShift,
   onDeleteShift,
 }: ShiftScheduleViewProps) {
-  const [selectedDay, setSelectedDay] = useState<string>('2026-10-01');
+  const [selectedDay] = useState<string>('2026-10-01');
   const [showAddModal, setShowAddModal] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
   const [selectedShiftForDelete, setSelectedShiftForDelete] = useState<ShiftRegistration | null>(null);
@@ -107,7 +106,7 @@ export default function ShiftScheduleView({
   ];
 
   // Get shifts for the selected date
-  const dayShifts = shifts.filter((s) => s.date === selectedDay && s.status !== 'cancelled');
+  
 
   // Submit UC-08: Add Shift
   const handleRegisterShift = (e: React.FormEvent) => {

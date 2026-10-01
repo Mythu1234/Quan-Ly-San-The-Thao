@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Menu, LogOut, Settings, AlertTriangle, Calendar, ChevronLeft, ChevronRight, LayoutGrid } from 'lucide-react';
+import { LogOut, AlertTriangle, Calendar, ChevronLeft, ChevronRight, LayoutGrid } from 'lucide-react';
 import AdminSchedulePage from '../AdminSchedulePage';
 import AdminSetupReminderPage from '../AdminSetupReminderPage';
 import ShiftScheduleView from '../../components/admin/ShiftScheduleView';

@@ -1,7 +1,8 @@
 import AdminDashboard from './AdminDashboard';
+import CustomerSchedule from '../components/CustomerSchedule';
 import EmployeeDashboard from './employee/EmployeeDashboard';
 import { useState, useRef, useEffect } from 'react';
-import { Search, MapPin, Phone, Clock, Play, AlertCircle, Home, Calendar as CalendarIcon, Zap , User, Lock, Eye, Bell, Key, ArrowLeft} from 'lucide-react';
+import { Search, MapPin, Phone, Clock, Play, AlertCircle, Home, Calendar as CalendarIcon, Zap , User, Lock, Eye, Bell, Key, ArrowLeft, LayoutGrid } from 'lucide-react';
 
 // Custom SVG Icons matching Figma design
 const ShuttlecockIcon = () => (
@@ -40,15 +41,15 @@ const VolleyballIcon = () => (
 
 export default function TrangChu() {
   // Navigation tab state
-  const [activeTab, setActiveTab] = useState<'intro' | 'booking' | 'lookup'>('booking');
+  const [activeTab, setActiveTab] = useState<'booking' | 'lookup' | 'schedule'>('booking');
 
   // Booking Form State
   const [selectedSportId, setSelectedSportId] = useState<'badminton' | 'football' | 'volleyball'>('badminton');
-  const [selectedDate, setSelectedDate] = useState<string>('Hôm nay (18/09)');
+  const [selectedDate, setSelectedDate] = useState<string>('');
   const [selectedCourt, setSelectedCourt] = useState<string>('Sân 01');
   
   // Time Selection State
-  const [selectedStartTime, setSelectedStartTime] = useState<string>('05:00');
+  const [selectedStartTime, setSelectedStartTime] = useState<string>('');
   const [selectedDuration, setSelectedDuration] = useState<number>(60); // minutes
   
   // Customer Info State
@@ -85,11 +86,9 @@ export default function TrangChu() {
   const bookingRef = useRef<HTMLDivElement>(null);
   const lookupRef = useRef<HTMLDivElement>(null);
 
-  const handleTabChange = (tab: 'intro' | 'booking' | 'lookup') => {
+  const handleTabChange = (tab: 'booking' | 'lookup' | 'schedule') => {
     setActiveTab(tab);
-    if (tab === 'intro' && introRef.current) {
-      introRef.current.scrollIntoView({ behavior: 'smooth' });
-    } else if (tab === 'booking' && bookingRef.current) {
+    if (tab === 'booking' && bookingRef.current) {
       bookingRef.current.scrollIntoView({ behavior: 'smooth' });
     } else if (tab === 'lookup' && lookupRef.current) {
       lookupRef.current.scrollIntoView({ behavior: 'smooth' });
@@ -363,14 +362,15 @@ export default function TrangChu() {
               <span>Tra cứu</span>
             </button>
             <button type="button" onClick={() => setShowLogin(true)} className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-100 border border-emerald-300 text-emerald-800 font-extrabold text-xs shadow-xs hover:bg-emerald-200 active:scale-95 transition cursor-pointer">
-              AN
-            </button>
+                <User className="w-4 h-4" strokeWidth={2.5} />
+              </button>
           </div>
         </div>
       </header>
 
       {/* ⚪ MAIN LIGHT CONTENT */}
-      <main className="flex-1 space-y-6 p-4 pb-28">
+      {activeTab !== 'schedule' && (
+<main className="flex-1 space-y-6 p-4 pb-28">
 
         {/* ======================================================== */}
         {/* 1. GIỚI THIỆU TỔ HỢP / HERO SECTION (WHITE & GREEN)      */}
@@ -620,8 +620,9 @@ export default function TrangChu() {
             </div>
 
             {/* Court sub-selector */}
-            <div>
-              <label className="mb-2 block text-[10px] font-bold uppercase text-slate-500 tracking-wider">Chọn Sân</label>
+            {selectedDate && selectedStartTime && (
+              <div className="animate-in fade-in slide-in-from-top-2 duration-300">
+                <label className="mb-2 block text-[10px] font-bold uppercase text-slate-500 tracking-wider">Chọn Sân</label>
               <div className="flex flex-wrap gap-1.5 pb-1">
                 {availableCourts.map((court) => {
                   const isCourtSelected = selectedCourt === court;
@@ -643,6 +644,7 @@ export default function TrangChu() {
                 })}
               </div>
             </div>
+              )}
 
             {/* Time Selection */}
             <div className="space-y-3 pt-2 border-t border-slate-100">
@@ -940,6 +942,10 @@ export default function TrangChu() {
         </section>
 
       </main>
+)}
+{activeTab === 'schedule' && <CustomerSchedule />}
+
+
 
 
                   {/* 🟠 MODAL XÁC THỰC OTP */}
@@ -1247,44 +1253,44 @@ export default function TrangChu() {
       {/* 🟢 FIXED MOBILE BOTTOM NAVIGATION BAR (CONSTRAINED WRAPPER) */}
       {/* ======================================================== */}
       <footer className="fixed bottom-0 left-1/2 -translate-x-1/2 z-40 w-full max-w-md border-t border-slate-200 bg-white/95 px-3 py-2.5 backdrop-blur-md shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] pb-safe">
-        <div className="flex items-center justify-around text-center">
-          <button
-            type="button"
-            onClick={() => handleTabChange('intro')}
-            className={[
-              'flex flex-col items-center gap-1 transition active:scale-95',
-              activeTab === 'intro' ? 'text-emerald-600 font-extrabold' : 'text-slate-500 hover:text-slate-800',
-            ].join(' ')}
-          >
-            <span className="text-lg"><Home className='w-5 h-5' /></span>
-            <span className="text-[10px] uppercase tracking-wider">Giới thiệu</span>
-          </button>
+          <div className="flex items-center justify-around text-center">
+            <button
+              type="button"
+              onClick={() => handleTabChange('booking')}
+              className={[
+                'flex flex-col items-center gap-1 transition active:scale-95',
+                activeTab === 'booking' ? 'text-emerald-600 font-extrabold' : 'text-slate-500 hover:text-slate-800',
+              ].join(' ')}
+            >
+              <CalendarIcon className="w-5 h-5 mb-0.5" />
+              <span className="text-[10px] uppercase tracking-wider">Đặt sân</span>
+            </button>
+  
+            <button
+              type="button"
+              onClick={() => handleTabChange('lookup')}
+              className={[
+                'flex flex-col items-center gap-1 transition active:scale-95',
+                activeTab === 'lookup' ? 'text-emerald-600 font-extrabold' : 'text-slate-500 hover:text-slate-800',
+              ].join(' ')}
+            >
+              <Search className="w-5 h-5 mb-0.5" />
+              <span className="text-[10px] uppercase tracking-wider">Tra cứu</span>
+            </button>
 
-          <button
-            type="button"
-            onClick={() => handleTabChange('booking')}
-            className={[
-              'flex flex-col items-center gap-1 transition active:scale-95',
-              activeTab === 'booking' ? 'text-emerald-600 font-extrabold' : 'text-slate-500 hover:text-slate-800',
-            ].join(' ')}
-          >
-            <CalendarIcon className="w-5 h-5 mb-0.5" />
-            <span className="text-[10px] uppercase tracking-wider">Đặt sân</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => handleTabChange('lookup')}
-            className={[
-              'flex flex-col items-center gap-1 transition active:scale-95',
-              activeTab === 'lookup' ? 'text-emerald-600 font-extrabold' : 'text-slate-500 hover:text-slate-800',
-            ].join(' ')}
-          >
-            <Search className="w-5 h-5 mb-0.5" />
-            <span className="text-[10px] uppercase tracking-wider">Tra cứu</span>
-          </button>
-        </div>
-      </footer>
+            <button
+              type="button"
+              onClick={() => handleTabChange('schedule')}
+              className={[
+                'flex flex-col items-center gap-1 transition active:scale-95',
+                activeTab === 'schedule' ? 'text-emerald-600 font-extrabold' : 'text-slate-500 hover:text-slate-800',
+              ].join(' ')}
+            >
+              <LayoutGrid className="w-5 h-5 mb-0.5" />
+              <span className="text-[10px] uppercase tracking-wider">Lịch sân</span>
+            </button>
+          </div>
+        </footer>
     </div>
   );
 }

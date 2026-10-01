@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { CalendarClock, FileSpreadsheet, Download, Search, Plus, Filter } from 'lucide-react';
+import { Search, Plus } from 'lucide-react';
 import type { Employee, ShiftRegistration } from '../../types/admin';
 
 interface AdminShiftManagerProps {
@@ -7,7 +7,7 @@ interface AdminShiftManagerProps {
   shifts: ShiftRegistration[];
 }
 
-export default function AdminShiftManager({ employees, shifts }: AdminShiftManagerProps) {
+export default function AdminShiftManager({ shifts }: AdminShiftManagerProps) {
   // Week selection state
   const [currentWeekStart, setCurrentWeekStart] = useState<Date>(new Date('2026-10-19')); // Default to match image
 

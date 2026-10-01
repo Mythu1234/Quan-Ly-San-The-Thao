@@ -1,4 +1,3 @@
-import React from 'react';
 import { Hammer } from 'lucide-react';
 import type { Transaction } from '../../types/admin';
 
@@ -7,10 +6,7 @@ interface WalletRevenueViewProps {
   onProcessRefund: (txId: string, bankRef: string) => void;
 }
 
-export default function WalletRevenueView({
-  transactions,
-  onProcessRefund,
-}: WalletRevenueViewProps) {
+export default function WalletRevenueView(_props: WalletRevenueViewProps) {
   return (
     <div className="flex-1 space-y-4 p-4 pb-28 animate-in fade-in duration-200">
       {/* 🟢 Top Badge */}
