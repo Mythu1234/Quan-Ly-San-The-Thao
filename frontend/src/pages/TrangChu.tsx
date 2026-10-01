@@ -1,4 +1,5 @@
 import AdminDashboard from './AdminDashboard';
+import EmployeeDashboard from './employee/EmployeeDashboard';
 import { useState, useRef, useEffect } from 'react';
 import { Search, MapPin, Phone, Clock, Play, AlertCircle, Home, Calendar as CalendarIcon, Zap , User, Lock, Eye, Bell, Key, ArrowLeft} from 'lucide-react';
 
@@ -63,6 +64,7 @@ export default function TrangChu() {
   const [showLogin, setShowLogin] = useState<boolean>(false);
   const [showPassword, setShowPassword] = useState<boolean>(false);
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState<boolean>(false);
+  const [isEmployeeLoggedIn, setIsEmployeeLoggedIn] = useState<boolean>(false);
   const [username, setUsername] = useState<string>('');
   const [passwordInput, setPasswordInput] = useState<string>('');
 
@@ -324,6 +326,10 @@ export default function TrangChu() {
 
   if (isAdminLoggedIn) {
     return <AdminDashboard onLogout={() => setIsAdminLoggedIn(false)} />;
+  }
+
+  if (isEmployeeLoggedIn) {
+    return <EmployeeDashboard onLogout={() => setIsEmployeeLoggedIn(false)} />;
   }
 
   return (
@@ -1089,8 +1095,13 @@ export default function TrangChu() {
                     setShowLogin(false);
                     setUsername('');
                     setPasswordInput('');
+                  } else if (username === 'nhanvien' && passwordInput === 'nhanvien') {
+                    setIsEmployeeLoggedIn(true);
+                    setShowLogin(false);
+                    setUsername('');
+                    setPasswordInput('');
                   } else {
-                    showAlert('Sai thông tin', 'Vui lòng nhập tài khoản: admin \n Mật khẩu: admin');
+                    showAlert('Sai thông tin', 'Vui lòng nhập tài khoản: admin/admin hoặc nhanvien/nhanvien');
                   }
                 }}
                   className="mt-4 w-full flex items-center justify-center gap-2 rounded-2xl bg-emerald-500 py-4 text-sm font-black uppercase tracking-widest text-white shadow-lg shadow-emerald-500/30 transition hover:bg-emerald-500 active:scale-95"
