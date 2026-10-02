@@ -1470,7 +1470,9 @@ export default function AdminSchedulePage({ onCheckoutModeChange }: AdminSchedul
                     style={{ width: leftCourtWidth }}
                   >
                     <span className="font-black text-[11px] text-slate-800 leading-tight">{court.name}</span>
-                    <span className="mt-0.5 rounded bg-slate-100 px-1.5 py-0.5 text-[8px] font-bold text-slate-500">Cầu lông</span>
+                    {courtView !== 'all' && (
+                      <span className="mt-0.5 rounded bg-slate-100 px-1.5 py-0.5 text-[8px] font-bold text-slate-500">Cầu lông</span>
+                    )}
                   </div>
                   <div className="flex h-full">
                     {timelineTimes.map((time) => (
