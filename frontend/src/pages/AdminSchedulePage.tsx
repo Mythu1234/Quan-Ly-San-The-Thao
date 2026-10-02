@@ -1360,7 +1360,7 @@ export default function AdminSchedulePage({ onCheckoutModeChange }: AdminSchedul
     <>
       <div className="flex-1 min-h-0 bg-slate-50 relative overflow-hidden flex flex-col">
         <div className="shrink-0 bg-slate-50 px-2 py-1.5">
-          <div className="flex items-center gap-1.5 overflow-x-auto whitespace-nowrap text-[9px] font-bold text-slate-600">
+          <div className="no-scrollbar flex items-center gap-1.5 overflow-x-auto whitespace-nowrap text-[9px] font-bold text-slate-600">
             <button
               type="button"
               onClick={() => setCourtView('all')}
@@ -1408,46 +1408,9 @@ export default function AdminSchedulePage({ onCheckoutModeChange }: AdminSchedul
           </div>
         </div>
 
-        <div className="mx-2 shrink-0 rounded-lg border border-indigo-100 bg-indigo-50/70 px-2 py-1.5 shadow-sm">
-          <div className="mb-1 flex items-center gap-1 text-[9px] font-black uppercase text-slate-800">
-            <Info className="h-3 w-3 text-teal-700" />
-            Chú giải trạng thái
-          </div>
-          <div className="grid grid-cols-3 gap-x-2 gap-y-1 text-[9px] font-bold text-slate-700 min-[430px]:grid-cols-4">
-            <div className="flex items-center gap-1">
-              <span className="h-2 w-2 rounded-sm bg-white ring-1 ring-slate-200" />
-              Trống
-            </div>
-            <div className="flex items-center gap-1">
-              <span className="h-2 w-2 rounded-sm bg-blue-100 ring-1 ring-blue-300" />
-              Đã đặt
-            </div>
-            <div className="flex items-center gap-1">
-              <span className="h-2 w-2 rounded-sm bg-emerald-600 ring-1 ring-emerald-500/20" />
-              Đang đá/chơi
-            </div>
-            <div className="flex items-center gap-1">
-              <span className="h-2 w-2 rounded-sm bg-slate-300 ring-1 ring-slate-300" />
-              Bảo trì
-            </div>
-            <div className="flex items-center gap-1">
-              <span className="h-2 w-2 rounded-sm bg-emerald-100/60 ring-1 ring-emerald-200/80" />
-              Khóa cố định
-            </div>
-            <div className="flex items-center gap-1">
-              <span className="h-2 w-2 rounded-sm bg-red-600" />
-              Quá giờ
-            </div>
-            <div className="flex items-center gap-1">
-              <span className="h-2 w-2 rounded-sm bg-orange-50 ring-1 ring-orange-300" />
-              Chờ duyệt hủy
-            </div>
-          </div>
-        </div>
-
         <div className="h-2 shrink-0 bg-slate-50" />
 
-        <div ref={timelineScrollRef} className="flex-1 min-h-0 overflow-auto bg-slate-50 custom-scrollbar">
+        <div ref={timelineScrollRef} className="no-scrollbar flex-1 min-h-0 overflow-auto bg-slate-50">
           <div
             className="relative select-none"
             style={{ width: leftCourtWidth + timelineTimes.length * slotWidth }}
@@ -1461,7 +1424,6 @@ export default function AdminSchedulePage({ onCheckoutModeChange }: AdminSchedul
               </div>
               <div className="flex h-full">
                 {timelineTimes.map((time) => {
-                  const isFixed = time >= '05:30' && time < '09:00';
                   const isPriority = time >= '17:30' && time < '21:00';
                   const isNight = time >= '21:00';
 
@@ -1469,9 +1431,7 @@ export default function AdminSchedulePage({ onCheckoutModeChange }: AdminSchedul
                     <div
                       key={time}
                       className={`w-[60px] shrink-0 border-r border-slate-200 flex items-center justify-center text-[10px] font-black ${
-                        isFixed
-                          ? 'text-emerald-700 bg-emerald-50/70'
-                          : isPriority
+                        isPriority
                             ? 'text-slate-900 bg-blue-50/60'
                             : isNight
                               ? 'text-orange-700 bg-orange-50/60'
@@ -1486,14 +1446,6 @@ export default function AdminSchedulePage({ onCheckoutModeChange }: AdminSchedul
             </div>
 
             <div className="relative" style={{ height: displayedCourts.length * rowHeight }}>
-              <div
-                className="absolute top-0 bottom-0 z-10 pointer-events-none border-x border-emerald-200/80 bg-emerald-100/30"
-                style={highlightBandStyle(5, 30, 9, 0)}
-              >
-                <span className="absolute left-1 top-1 rounded bg-white/90 px-1.5 py-0.5 text-[8px] font-black uppercase text-emerald-700 shadow-sm">
-                  Khóa cố định
-                </span>
-              </div>
               <div
                 className="absolute top-0 bottom-0 z-10 pointer-events-none"
                 style={{
