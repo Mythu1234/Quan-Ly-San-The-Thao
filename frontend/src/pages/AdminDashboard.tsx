@@ -1,8 +1,7 @@
 import { useState } from 'react';
-import { Menu, User as UserIcon, AlertTriangle, Calendar, ChevronLeft, ChevronRight, LogOut, Settings, LayoutGrid } from 'lucide-react';
+import { Menu, User as UserIcon, AlertTriangle, Calendar, CalendarClock, ChevronLeft, ChevronRight, LogOut, Settings, LayoutGrid, Users, Wallet, Dumbbell } from 'lucide-react';
 import AdminSchedulePage from './AdminSchedulePage';
 import AdminSetupReminderPage from './AdminSetupReminderPage';
-import AdminBottomNav from '../components/admin/AdminBottomNav';
 import AdminShiftManager from '../components/admin/AdminShiftManager';
 import StaffList from '../components/admin/StaffList';
 import AddStaffView from '../components/admin/AddStaffView';
@@ -19,7 +18,7 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   const [isSetupMode, setIsSetupMode] = useState(false);
   
   // My states
-  const [activeTab, setActiveTab] = useState<'lich_san' | 'nhan_vien' | 'ca_truc' | 'vi_thu'>('lich_san');
+  const [activeTab, setActiveTab] = useState<'lich_san' | 'nhan_vien' | 'ca_truc' | 'vi_thu' | 'co_so_vat_chat'>('lich_san');
   const [employees, setEmployees] = useState<Employee[]>(INITIAL_EMPLOYEES);
   const [shifts] = useState<ShiftRegistration[]>(INITIAL_SHIFTS);
   const [transactions, setTransactions] = useState<Transaction[]>(INITIAL_TRANSACTIONS);
@@ -55,7 +54,7 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
 
   const showScheduleControls = !isCheckoutMode && !isSetupMode;
 
-  const handleTabChange = (tabId: 'lich_san' | 'nhan_vien' | 'ca_truc' | 'vi_thu') => {
+  const handleTabChange = (tabId: 'lich_san' | 'nhan_vien' | 'ca_truc' | 'vi_thu' | 'co_so_vat_chat') => {
     setActiveTab(tabId);
     setSidebarOpen(false);
     if (tabId === 'nhan_vien') setStaffSubView('list');
@@ -88,9 +87,9 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   };
 
   return (
-    <div className="flex h-screen bg-slate-50 text-slate-900 w-full animate-in fade-in zoom-in-95 duration-300 relative overflow-hidden pb-14">
+    <div className="flex h-screen bg-slate-50 text-slate-900 w-full animate-in fade-in zoom-in-95 duration-300 relative overflow-hidden">
       {sidebarOpen && (
-        <div className="absolute inset-0 z-50 flex">
+        <div className="absolute inset-0 z-[200] flex">
           <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setSidebarOpen(false)} />
 
           <div className="relative w-64 bg-white h-full flex flex-col shadow-2xl animate-in slide-in-from-left-full duration-200">
@@ -103,7 +102,31 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                 onClick={() => handleTabChange('lich_san')}
                 className={`flex items-center gap-3 px-3 py-3 rounded-xl font-bold text-sm cursor-pointer ${activeTab === 'lich_san' ? 'bg-emerald-700 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50'}`}
               >
-                <LayoutGrid className="w-4 h-4" /> Bảng lịch sân
+                <LayoutGrid className="w-4 h-4" /> Lịch sân
+              </div>
+              <div
+                onClick={() => handleTabChange('nhan_vien')}
+                className={`flex items-center gap-3 px-3 py-3 rounded-xl font-bold text-sm cursor-pointer ${activeTab === 'nhan_vien' ? 'bg-emerald-700 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50'}`}
+              >
+                <Users className="w-4 h-4" /> Nhân viên
+              </div>
+              <div
+                onClick={() => handleTabChange('ca_truc')}
+                className={`flex items-center gap-3 px-3 py-3 rounded-xl font-bold text-sm cursor-pointer ${activeTab === 'ca_truc' ? 'bg-emerald-700 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50'}`}
+              >
+                <CalendarClock className="w-4 h-4" /> Ca trực
+              </div>
+              <div
+                onClick={() => handleTabChange('vi_thu')}
+                className={`flex items-center gap-3 px-3 py-3 rounded-xl font-bold text-sm cursor-pointer ${activeTab === 'vi_thu' ? 'bg-emerald-700 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50'}`}
+              >
+                <Wallet className="w-4 h-4" /> Ví & Thu
+              </div>
+              <div
+                onClick={() => handleTabChange('co_so_vat_chat')}
+                className={`flex items-center gap-3 px-3 py-3 rounded-xl font-bold text-sm cursor-pointer ${activeTab === 'co_so_vat_chat' ? 'bg-emerald-700 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50'}`}
+              >
+                <Dumbbell className="w-4 h-4" /> Cơ sở vật chất
               </div>
               <div className="flex items-center gap-3 text-slate-600 px-3 py-3 rounded-xl font-bold text-sm hover:bg-slate-50 cursor-pointer">
                 <Settings className="w-4 h-4" /> Cài đặt
@@ -151,7 +174,7 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
               className="bg-red-50 border-b border-red-100 px-3 py-2.5 flex gap-2 shrink-0 items-start text-left active:bg-red-100"
             >
               <AlertTriangle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
-              <p className="text-[10px] text-red-800 font-medium leading-relaxed pr-2">
+              <p className="text-[12px] text-red-800 font-medium leading-relaxed pr-2">
                 <strong className="font-bold">Nhắc nhở setup mặt sân:</strong> Cần setup chuyển đổi cụm sân 1-4 thành sân bóng chuyền BC1 trước <strong className="font-bold underline">09:30</strong>. Lịch bóng chuyền bắt đầu lúc 09:30.
               </p>
             </button>}
@@ -174,7 +197,7 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                   }}
                 >
                   <div className="flex items-center gap-2 pointer-events-none">
-                    <span className="text-[13px] font-black text-slate-800">{dateDisplay}</span>
+                    <span className="text-[15px] font-black text-slate-800">{dateDisplay}</span>
                     <Calendar className="w-4 h-4 text-slate-600 shrink-0" strokeWidth={2.5} />
                   </div>
                   <input
@@ -193,7 +216,7 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
               </div>
 
               <div className="flex gap-2 mt-1">
-                <div className="relative bg-emerald-700 text-white text-[10px] font-bold px-2.5 py-1.5 rounded flex items-center gap-1 shadow-sm shrink-0">
+                <div className="relative bg-emerald-700 text-white text-[12px] font-bold px-3 py-2 rounded flex items-center gap-1.5 shadow-sm shrink-0">
                   <LayoutGrid className="w-3 h-3" /> Dòng thời gian {intervalMode === 30 ? '30p' : '1h'}
                   <select
                     className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
@@ -260,9 +283,23 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
             />
           </div>
         )}
-      </div>
 
-      <AdminBottomNav activeTab={activeTab} onTabChange={handleTabChange} />
+        {activeTab === 'co_so_vat_chat' && (
+          <div className="flex-1 overflow-auto bg-slate-50 p-4">
+            <section className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-100">
+              <div className="flex items-center gap-3">
+                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700">
+                  <Dumbbell className="h-5 w-5" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-black text-slate-950">Cơ sở vật chất</h2>
+                  <p className="text-sm font-medium text-slate-500">Quản lý thiết bị, sân bãi và tình trạng sử dụng.</p>
+                </div>
+              </div>
+            </section>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
