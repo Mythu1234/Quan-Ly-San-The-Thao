@@ -61,6 +61,7 @@ export default function TrangChu() {
   // Order Submission State
   const [isSubmitted, setIsSubmitted] = useState<boolean>(false);
   const [showPayment, setShowPayment] = useState<boolean>(false);
+  const [paymentPercent, setPaymentPercent] = useState<50 | 100>(100);
   const [showOTP, setShowOTP] = useState<boolean>(false);
   const [showLogin, setShowLogin] = useState<boolean>(false);
   const [showPassword, setShowPassword] = useState<boolean>(false);
@@ -71,10 +72,10 @@ export default function TrangChu() {
 
   const [otpInput, setOtpInput] = useState<string>('');
   const [otpError, setOtpError] = useState<boolean>(false);
+  const [otpAction, setOtpAction] = useState<'booking' | 'cancel'>('booking');
   const [popup, setPopup] = useState<any>(null);
   const showAlert = (title: string, message: string) => setPopup({ type: 'alert', title, message });
-  const showConfirm = (title: string, message: string, onConfirm: () => void) => setPopup({ type: 'confirm', title, message, onConfirm });
-  const [orderCode, setOrderCode] = useState<string>('CX-88291');
+    const [orderCode, setOrderCode] = useState<string>('CX-88291');
 
   // Lookup Search State
   const [lookupQuery, setLookupQuery] = useState<string>('');
@@ -263,7 +264,12 @@ export default function TrangChu() {
   const handleVerifyOTP = () => {
     if (otpInput === '123456') {
       setShowOTP(false);
-      setShowPayment(true);
+      if (otpAction === 'booking') {
+        setShowPayment(true);
+      } else {
+        showAlert('Đã gửi yêu cầu hoàn tiền', 'Hệ thống đã tiếp nhận yêu cầu hủy vé.\n\nVui lòng đợi xử lý trong vòng 24h và kiểm tra trạng thái hoàn tiền tại mục Tra cứu thông tin đặt sân.');
+        setLookupResult((prev: any) => prev ? { ...prev, status: 'ĐÃ HỦY', paymentStatus: 'ĐANG XỬ LÝ HOÀN TIỀN' } : null);
+      }
     } else {
       setOtpError(true);
     }
@@ -310,10 +316,10 @@ export default function TrangChu() {
     if (ticket.hoursUntilStart <= 24) {
       showAlert('Không thể hủy vé', 'Vé của bạn sắp đến giờ thi đấu (dưới 24h). Vui lòng liên hệ chủ sân để được hỗ trợ.\n\nHotline: 0912 345 678');
     } else {
-      showConfirm('Xác nhận hủy vé', 'Bạn có chắc chắn muốn hủy vé này không? Hành động này không thể hoàn tác.', () => {
-        showAlert('Đã gửi yêu cầu hoàn tiền', 'Hệ thống đã tiếp nhận yêu cầu hủy vé.\n\nVui lòng đợi xử lý trong vòng 24h và kiểm tra trạng thái hoàn tiền tại mục Tra cứu thông tin đặt sân.');
-        setLookupResult({ ...ticket, status: 'ĐÃ HỦY', paymentStatus: 'ĐANG XỬ LÝ HOÀN TIỀN' });
-      });
+      setOtpAction('cancel');
+      setShowOTP(true);
+      setOtpInput('');
+      setOtpError(false);
     }
   };
 
@@ -1163,7 +1169,22 @@ export default function TrangChu() {
             <div className="w-12 h-1.5 bg-slate-200 rounded-full mb-4 sm:hidden"></div>
             
             <h3 className="text-lg font-black text-slate-900 uppercase tracking-wide">Thanh toán đơn hàng</h3>
-            <p className="text-xs text-slate-500 mt-1 mb-4 text-center">Quét mã VietQR bằng ứng dụng ngân hàng</p>
+              <p className="text-xs text-slate-500 mt-1 mb-4 text-center">Quét mã VietQR bằng ứng dụng ngân hàng</p>
+
+              <div className="flex bg-slate-100 p-1 rounded-xl mb-4 text-xs font-bold w-full">
+                <button 
+                  onClick={() => setPaymentPercent(100)} 
+                  className={`flex-1 py-2 rounded-lg transition-all ${paymentPercent === 100 ? 'bg-white shadow-sm text-emerald-600' : 'text-slate-500 hover:text-slate-700'}`}
+                >
+                  Thanh toán 100%
+                </button>
+                <button 
+                  onClick={() => setPaymentPercent(50)} 
+                  className={`flex-1 py-2 rounded-lg transition-all ${paymentPercent === 50 ? 'bg-white shadow-sm text-emerald-600' : 'text-slate-500 hover:text-slate-700'}`}
+                >
+                  Cọc 50%
+                </button>
+              </div>
 
             <div className="w-full rounded-2xl border-2 border-emerald-500 bg-emerald-50/50 p-5 relative overflow-hidden text-center">
               <div className="flex justify-between items-center mb-3">
@@ -1184,7 +1205,7 @@ export default function TrangChu() {
 
               <div className="mt-4 space-y-1 text-xs">
                 <p className="text-slate-500">Số tiền thanh toán:</p>
-                <p className="text-2xl font-black text-emerald-600">{formattedPrice}</p>
+                  <p className="text-2xl font-black text-emerald-600">{(paymentPercent === 100 ? totalPrice : totalPrice / 2).toLocaleString('vi-VN') + 'đ'}</p>
                 <p className="text-slate-500 mt-2">Nội dung chuyển khoản:</p>
                 <p className="font-mono font-bold text-slate-900 bg-white py-1 rounded border border-slate-200 uppercase">CX {selectedCourt.replace(/ /g, '')} {customerPhone}</p>
               </div>
@@ -1230,7 +1251,7 @@ export default function TrangChu() {
               <div className="flex justify-between"><span className="text-slate-500">Môn:</span> <span className="font-bold text-slate-900">{currentSport.name}</span></div>
               <div className="flex justify-between"><span className="text-slate-500">Sân:</span> <span className="font-bold text-emerald-600">{selectedCourt}</span></div>
               <div className="flex justify-between"><span className="text-slate-500">Khung giờ:</span> <span className="font-bold text-slate-900">{selectedDate} ({selectedSlot})</span></div>
-              <div className="flex justify-between border-t border-slate-200 pt-2"><span className="text-slate-500">Tổng thanh toán:</span> <span className="font-black text-emerald-600">{formattedPrice}</span></div>
+              <div className="flex justify-between border-t border-slate-200 pt-2"><span className="text-slate-500">Đã thanh toán {paymentPercent === 50 ? '(Cọc 50%)' : ''}:</span> <span className="font-black text-emerald-600">{(paymentPercent === 100 ? totalPrice : totalPrice / 2).toLocaleString('vi-VN')}đ</span></div>
             </div>
 
             <p className="text-[11px] text-slate-500">
