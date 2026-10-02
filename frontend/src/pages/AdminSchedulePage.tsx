@@ -51,7 +51,7 @@ export default function AdminSchedulePage({ onCheckoutModeChange }: AdminSchedul
   const timelineStartMinutes = 5 * 60;
   const timelineEndMinutes = 22 * 60 + 30;
   const slotWidth = 60;
-  const rowHeight = 52;
+  const rowHeight = 56;
   const leftCourtWidth = 80;
 
   const timelineTimes = useMemo(() => {
@@ -1360,7 +1360,7 @@ export default function AdminSchedulePage({ onCheckoutModeChange }: AdminSchedul
     <>
       <div className="flex-1 min-h-0 bg-slate-50 relative overflow-hidden flex flex-col">
         <div className="shrink-0 bg-slate-50 px-2 py-1.5">
-          <div className="no-scrollbar flex items-center gap-1.5 overflow-x-auto whitespace-nowrap text-[9px] font-bold text-slate-600">
+          <div className="no-scrollbar flex items-center gap-1.5 overflow-x-auto whitespace-nowrap text-[11px] font-bold text-slate-600">
             <button
               type="button"
               onClick={() => setCourtView('all')}
@@ -1694,11 +1694,11 @@ export default function AdminSchedulePage({ onCheckoutModeChange }: AdminSchedul
                 <ClipboardList className="h-4 w-4" />
               </div>
               <div className="min-w-0">
-                <p className="truncate text-[11px] font-black text-slate-950">Danh sách chờ duyệt</p>
-                <p className="truncate text-[9px] font-semibold text-slate-500">Yêu cầu hủy sân đang chờ xử lý</p>
+                <p className="truncate text-[13px] font-black text-slate-950">Danh sách chờ duyệt</p>
+                <p className="truncate text-[11px] font-semibold text-slate-500">Yêu cầu hủy sân đang chờ xử lý</p>
               </div>
             </div>
-            <span className="flex shrink-0 items-center gap-1 rounded-full bg-orange-100 px-2 py-0.5 text-[8px] font-black uppercase text-orange-800">
+            <span className="flex shrink-0 items-center gap-1 rounded-full bg-orange-100 px-2.5 py-1 text-[10px] font-black uppercase text-orange-800">
               <span className="h-1.5 w-1.5 rounded-full bg-orange-700" />
               {pendingCancelRequests.length} đang chờ
             </span>
