@@ -1,5 +1,6 @@
 import AdminDashboard from './AdminDashboard';
 import CustomerSchedule from '../components/CustomerSchedule';
+import PaymentCheckout from '../components/PaymentCheckout';
 import EmployeeDashboard from './employee/EmployeeDashboard';
 import { useState, useRef, useEffect } from 'react';
 import { Search, MapPin, Phone, Clock, Play, AlertCircle, Home, Calendar as CalendarIcon, Zap , User, Lock, Eye, Bell, Key, ArrowLeft, LayoutGrid } from 'lucide-react';
@@ -59,9 +60,7 @@ export default function TrangChu() {
   const [sendZalo, setSendZalo] = useState<boolean>(true);
 
   // Order Submission State
-  const [isSubmitted, setIsSubmitted] = useState<boolean>(false);
   const [showPayment, setShowPayment] = useState<boolean>(false);
-  const [paymentPercent, setPaymentPercent] = useState<50 | 100>(100);
   const [showOTP, setShowOTP] = useState<boolean>(false);
   const [showLogin, setShowLogin] = useState<boolean>(false);
   const [showPassword, setShowPassword] = useState<boolean>(false);
@@ -75,7 +74,7 @@ export default function TrangChu() {
   const [otpAction, setOtpAction] = useState<'booking' | 'cancel'>('booking');
   const [popup, setPopup] = useState<any>(null);
   const showAlert = (title: string, message: string) => setPopup({ type: 'alert', title, message });
-    const [orderCode, setOrderCode] = useState<string>('CX-88291');
+  const [orderCode] = useState<string>('CX-88291');
 
   // Lookup Search State
   const [lookupQuery, setLookupQuery] = useState<string>('');
@@ -256,30 +255,28 @@ export default function TrangChu() {
       showAlert('Thiếu thông tin', 'Vui lòng nhập đầy đủ Họ tên và Số điện thoại!');
       return;
     }
-    setShowOTP(true);
+    setOtpAction('booking');
     setOtpInput('');
     setOtpError(false);
+    setShowOTP(true);
   };
 
   const handleVerifyOTP = () => {
     if (otpInput === '123456') {
       setShowOTP(false);
+      setOtpInput('');
+      setOtpError(false);
+
       if (otpAction === 'booking') {
         setShowPayment(true);
-      } else {
-        showAlert('Đã gửi yêu cầu hoàn tiền', 'Hệ thống đã tiếp nhận yêu cầu hủy vé.\n\nVui lòng đợi xử lý trong vòng 24h và kiểm tra trạng thái hoàn tiền tại mục Tra cứu thông tin đặt sân.');
-        setLookupResult((prev: any) => prev ? { ...prev, status: 'ĐÃ HỦY', paymentStatus: 'ĐANG XỬ LÝ HOÀN TIỀN' } : null);
+        return;
       }
+
+      showAlert('Đã gửi yêu cầu hoàn tiền', 'Hệ thống đã tiếp nhận yêu cầu hủy vé.\n\nVui lòng đợi xử lý trong vòng 24h và kiểm tra trạng thái hoàn tiền tại mục Tra cứu thông tin đặt sân.');
+      setLookupResult((prev: any) => prev ? { ...prev, status: 'ĐÃ HỦY', paymentStatus: 'ĐANG XỬ LÝ HOÀN TIỀN' } : null);
     } else {
       setOtpError(true);
     }
-  };
-
-  const simulatePaymentSuccess = () => {
-    const randomCode = 'CX-' + Math.floor(10000 + Math.random() * 90000);
-    setOrderCode(randomCode);
-    setShowPayment(false);
-    setIsSubmitted(true);
   };
 
   const handleLookupSearch = (e: React.FormEvent) => {
@@ -335,6 +332,21 @@ export default function TrangChu() {
 
   if (isEmployeeLoggedIn) {
     return <EmployeeDashboard onLogout={() => setIsEmployeeLoggedIn(false)} />;
+  }
+
+  if (showPayment) {
+    return (
+      <PaymentCheckout
+        open={showPayment}
+        orderCode={orderCode}
+        customerName={customerName}
+        customerPhone={customerPhone}
+        totalAmount={1_200_000}
+        registrationMonths={6}
+        onClose={() => setShowPayment(false)}
+        onComplete={() => setShowPayment(false)}
+      />
+    );
   }
 
   return (
@@ -1161,114 +1173,6 @@ export default function TrangChu() {
           </div>
         </div>
       )}
-
-      {/* 🟡 MODAL THANH TOÁN (PAYMENT BOTTOM SHEET) */}
-      {showPayment && (
-        <div className="fixed top-0 bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md z-50 flex items-end sm:items-center justify-center bg-slate-900/60 p-0 sm:p-4 backdrop-blur-sm animate-in fade-in duration-300">
-          <div className="w-full max-w-md rounded-t-3xl sm:rounded-3xl bg-white p-6 shadow-2xl animate-in slide-in-from-bottom-8 duration-300 flex flex-col items-center">
-            <div className="w-12 h-1.5 bg-slate-200 rounded-full mb-4 sm:hidden"></div>
-            
-            <h3 className="text-lg font-black text-slate-900 uppercase tracking-wide">Thanh toán đơn hàng</h3>
-              <p className="text-xs text-slate-500 mt-1 mb-4 text-center">Quét mã VietQR bằng ứng dụng ngân hàng</p>
-
-              <div className="flex bg-slate-100 p-1 rounded-xl mb-4 text-xs font-bold w-full">
-                <button 
-                  onClick={() => setPaymentPercent(100)} 
-                  className={`flex-1 py-2 rounded-lg transition-all ${paymentPercent === 100 ? 'bg-white shadow-sm text-emerald-600' : 'text-slate-500 hover:text-slate-700'}`}
-                >
-                  Thanh toán 100%
-                </button>
-                <button 
-                  onClick={() => setPaymentPercent(50)} 
-                  className={`flex-1 py-2 rounded-lg transition-all ${paymentPercent === 50 ? 'bg-white shadow-sm text-emerald-600' : 'text-slate-500 hover:text-slate-700'}`}
-                >
-                  Cọc 50%
-                </button>
-              </div>
-
-            <div className="w-full rounded-2xl border-2 border-emerald-500 bg-emerald-50/50 p-5 relative overflow-hidden text-center">
-              <div className="flex justify-between items-center mb-3">
-                 <p className="font-extrabold text-slate-900 text-sm">MB BANK</p>
-                 <span className="rounded bg-emerald-100 px-2 py-1 text-[10px] font-black text-emerald-700">VIETQR</span>
-              </div>
-              
-              <div className="mx-auto h-40 w-40 bg-white rounded-xl p-2 border border-slate-200 shadow-sm relative flex items-center justify-center">
-                <div className="grid grid-cols-4 gap-1.5 w-full h-full p-2 bg-slate-100 rounded">
-                  {Array.from({ length: 16 }).map((_, idx) => (
-                    <div key={idx} className={'rounded ' + (idx % 3 === 0 ? 'bg-emerald-500' : 'bg-slate-800')}></div>
-                  ))}
-                </div>
-                <div className="absolute inset-0 flex items-center justify-center">
-                   <span className="bg-white text-emerald-600 px-3 py-1 font-black text-xs rounded-full shadow-md uppercase border border-emerald-100">COURTX</span>
-                </div>
-              </div>
-
-              <div className="mt-4 space-y-1 text-xs">
-                <p className="text-slate-500">Số tiền thanh toán:</p>
-                  <p className="text-2xl font-black text-emerald-600">{(paymentPercent === 100 ? totalPrice : totalPrice / 2).toLocaleString('vi-VN') + 'đ'}</p>
-                <p className="text-slate-500 mt-2">Nội dung chuyển khoản:</p>
-                <p className="font-mono font-bold text-slate-900 bg-white py-1 rounded border border-slate-200 uppercase">CX {selectedCourt.replace(/ /g, '')} {customerPhone}</p>
-              </div>
-            </div>
-
-            <div className="mt-6 flex flex-col items-center gap-2">
-               <div className="relative flex h-10 w-10 items-center justify-center">
-                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
-                 <span className="relative inline-flex h-6 w-6 rounded-full bg-emerald-500 items-center justify-center">
-                   <span className="h-2 w-2 bg-white rounded-full"></span>
-                 </span>
-               </div>
-               <p className="text-xs font-bold text-emerald-600">Đang lắng nghe giao dịch...</p>
-               <p className="text-[10px] text-slate-400">Tự động xác nhận khi có biến động số dư</p>
-            </div>
-
-            <div className="w-full mt-6 grid grid-cols-2 gap-3">
-              <button onClick={() => setShowPayment(false)} type="button" className="rounded-xl border border-slate-200 py-3 text-xs font-bold text-slate-600 hover:bg-slate-50 cursor-pointer active:scale-95">Hủy giao dịch</button>
-              <button onClick={simulatePaymentSuccess} type="button" className="rounded-xl bg-slate-900 py-3 text-xs font-bold text-white hover:bg-slate-800 cursor-pointer active:scale-95">Mô phỏng Đã CK</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ======================================================== */}
-      {/* 🔴 MODAL XÁC NHẬN ĐẶT SÂN THÀNH CÔNG                    */}
-      {/* ======================================================== */}
-      {isSubmitted && (
-        <div className="fixed top-0 bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md border-x border-slate-200 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm animate-fade-in">
-          <div className="w-full max-w-sm rounded-3xl border border-emerald-300 bg-white p-6 text-center space-y-4 shadow-2xl">
-            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 text-3xl text-emerald-600 border border-emerald-300">
-              ✓
-            </div>
-
-            <div>
-              <h3 className="text-xl font-black text-slate-900">ĐẶT SÂN THÀNH CÔNG!</h3>
-              <p className="mt-1 text-xs text-slate-600">
-                Mã đơn của bạn là <span className="font-mono font-bold text-emerald-600">{orderCode}</span>
-              </p>
-            </div>
-
-            <div className="rounded-2xl bg-slate-50 p-4 text-left text-xs space-y-2 border border-slate-200">
-              <div className="flex justify-between"><span className="text-slate-500">Môn:</span> <span className="font-bold text-slate-900">{currentSport.name}</span></div>
-              <div className="flex justify-between"><span className="text-slate-500">Sân:</span> <span className="font-bold text-emerald-600">{selectedCourt}</span></div>
-              <div className="flex justify-between"><span className="text-slate-500">Khung giờ:</span> <span className="font-bold text-slate-900">{selectedDate} ({selectedSlot})</span></div>
-              <div className="flex justify-between border-t border-slate-200 pt-2"><span className="text-slate-500">Đã thanh toán {paymentPercent === 50 ? '(Cọc 50%)' : ''}:</span> <span className="font-black text-emerald-600">{(paymentPercent === 100 ? totalPrice : totalPrice / 2).toLocaleString('vi-VN')}đ</span></div>
-            </div>
-
-            <p className="text-[11px] text-slate-500">
-              Thông tin xác nhận & vé QR đã được hệ thống gửi qua Zalo/SMS tới số <strong className="text-slate-900">{customerPhone}</strong>.
-            </p>
-
-            <button
-              type="button"
-              onClick={() => setIsSubmitted(false)}
-              className="w-full rounded-xl bg-emerald-500 py-3 text-xs font-black uppercase tracking-wider text-white hover:bg-emerald-600"
-            >
-              HOÀN TẤT & QUAY LẠI
-            </button>
-          </div>
-        </div>
-      )}
-
 
       {/* ======================================================== */}
       {/* 🟢 FIXED MOBILE BOTTOM NAVIGATION BAR (CONSTRAINED WRAPPER) */}
