@@ -357,7 +357,7 @@ export default function ShiftScheduleView({
               <div className="flex items-center gap-2">
                 <CalendarClock className="w-5 h-5 text-emerald-700" />
                 <h3 className="text-sm font-black uppercase text-slate-900">
-                  Đăng Ký Ca Trực (UC-08)
+                  Đăng Ký Ca Trực Mới
                 </h3>
               </div>
               <button
@@ -467,7 +467,7 @@ export default function ShiftScheduleView({
           <div className="w-full max-w-sm rounded-3xl bg-white p-5 shadow-2xl space-y-4 animate-in zoom-in-95 duration-150">
             <div className="flex items-center gap-2 text-rose-600 font-black text-sm uppercase">
               <ShieldAlert className="w-5 h-5" />
-              <span>Hủy / Xóa Ca Trực (UC-09)</span>
+              <span>Hủy / Xóa Ca Trực</span>
             </div>
 
             <div className="rounded-2xl bg-slate-50 p-3 border border-slate-100 text-xs space-y-1">
@@ -547,7 +547,7 @@ export default function ShiftScheduleView({
               <div className="flex items-center gap-2">
                 <FileSpreadsheet className="w-5 h-5 text-emerald-600" />
                 <h3 className="text-sm font-black uppercase text-slate-900">
-                  Xuất Bảng Phân Ca Excel (UC-10)
+                  Xuất Bảng Phân Ca (Excel)
                 </h3>
               </div>
               <button

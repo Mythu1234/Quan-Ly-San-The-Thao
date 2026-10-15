@@ -312,14 +312,14 @@ export default function StaffDetailView({
         </div>
       </div>
 
-      {/* 🟢 UC-11: XÓA NHÂN VIÊN KHỎI HỆ THỐNG */}
-      <div className="rounded-3xl border border-rose-100 bg-rose-50/40 p-4 space-y-3">
+      {/* 🔴 VÔ HIỆU HÓA HOẶC XÓA NHÂN VIÊN */}
+      <div className="rounded-3xl border border-rose-200 bg-rose-50/50 p-4 space-y-3">
         <div className="flex items-center gap-2 text-rose-800 font-bold text-xs uppercase tracking-wider">
           <AlertTriangle className="w-4 h-4 text-rose-600" />
-          <span>QUẢN TRỊ RỦI RO & NHÂN SỰ</span>
+          <span>VÔ HIỆU HÓA & XÓA NHÂN VIÊN</span>
         </div>
         <p className="text-[11px] text-slate-600 leading-relaxed font-medium">
-          Chỉ có Chủ sân (Owner) mới có quyền vô hiệu hóa và thu hồi tài khoản theo quy định Use Case UC-11.
+          Tài khoản nhân viên sẽ bị khóa quyền truy cập và gỡ bỏ khỏi toàn bộ ca trực trong tương lai. Thao tác này chỉ dành riêng cho Chủ sân (Owner).
         </p>
 
         <button
@@ -328,11 +328,11 @@ export default function StaffDetailView({
           className="w-full flex items-center justify-center gap-2 rounded-xl border border-rose-200 bg-white py-3 text-xs font-black text-rose-600 hover:bg-rose-50 transition active:scale-95 cursor-pointer shadow-2xs"
         >
           <Trash2 className="w-3.5 h-3.5" />
-          <span>XÓA NHÂN VIÊN KHỎI HỆ THỐNG (UC-11)</span>
+          <span>XÓA NHÂN VIÊN NÀY</span>
         </button>
       </div>
 
-      {/* 🔴 MODAL XÁC NHẬN XÓA NHÂN VIÊN (UC-11) */}
+      {/* 🔴 MODAL XÁC NHẬN XÓA NHÂN VIÊN */}
       {showDeleteConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="w-full max-w-sm rounded-3xl bg-white p-5 shadow-2xl space-y-4 animate-in zoom-in-95 duration-150">
@@ -341,22 +341,23 @@ export default function StaffDetailView({
               <span>Xác nhận xóa nhân viên</span>
             </div>
 
-            <div className="rounded-2xl bg-amber-50 border border-amber-200 p-3 text-xs text-amber-900 space-y-1">
-              <p className="font-bold">
-                Cảnh báo Use Case UC-11 (Bảo toàn dữ liệu):
+            <div className="rounded-2xl bg-amber-50 border border-amber-200 p-3 text-xs text-amber-900 space-y-1.5">
+              <p className="font-bold flex items-center gap-1.5 text-amber-900">
+                <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                Lưu ý quan trọng trước khi xóa:
               </p>
               <p className="text-[11px] leading-relaxed text-amber-800">
-                Tài khoản của <strong className="font-black">{employee.name}</strong> sẽ bị khóa quyền đăng nhập vĩnh viễn. Các ca trực tương lai sẽ được thu hồi thành ca trống. Lịch sử hóa đơn và sự cố cũ vẫn được bảo lưu (Soft-delete).
+                Tài khoản của <strong className="font-black text-slate-900">{employee.name}</strong> sẽ bị khóa đăng nhập ngay lập tức. Toàn bộ các ca trực trong tương lai của nhân viên này sẽ được tự động giải phóng để phân công người khác. Lịch sử làm việc cũ vẫn được lưu trữ đối soát.
               </p>
             </div>
 
             <div>
               <label className="block text-xs font-bold text-slate-800 mb-1">
-                Lý do chấm dứt công việc <span className="text-rose-500">*</span>
+                Lý do chấm dứt làm việc <span className="text-rose-500">*</span>
               </label>
               <textarea
                 rows={2}
-                placeholder="Ví dụ: Nhân viên đã hoàn tất bàn giao / xin nghỉ theo nguyện vọng..."
+                placeholder="Nhập lý do nghỉ việc (ví dụ: Hết hạn hợp đồng, chuyển công tác, xin nghỉ việc...)"
                 value={deleteReason}
                 onChange={(e) => {
                   setDeleteReason(e.target.value);
@@ -387,7 +388,7 @@ export default function StaffDetailView({
                 onClick={handleConfirmDelete}
                 className="rounded-xl bg-rose-600 hover:bg-rose-700 py-3 text-xs font-black text-white shadow-sm cursor-pointer"
               >
-                Đồng ý xóa
+                Xác nhận xóa
               </button>
             </div>
           </div>
