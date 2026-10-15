@@ -1,8 +1,8 @@
 import AdminDashboard from './AdminDashboard';
 import CustomerSchedule from '../components/CustomerSchedule';
 import EmployeeDashboard from './employee/EmployeeDashboard';
-import { useState, useRef, useEffect } from 'react';
-import { Search, MapPin, Phone, Clock, Play, AlertCircle, Home, Calendar as CalendarIcon, Zap , User, Lock, Eye, Bell, Key, ArrowLeft, LayoutGrid } from 'lucide-react';
+import { useState, useRef, useEffect, useMemo } from 'react';
+import { Search, MapPin, Phone, Clock, Play, Home, Calendar as CalendarIcon, X, Zap , User, Lock, Eye, Bell, Key, ArrowLeft, Sparkles, Award, CheckCircle2, Calculator, Trophy, Gift} from 'lucide-react';
 
 // Custom SVG Icons matching Figma design
 const ShuttlecockIcon = () => (
@@ -46,7 +46,7 @@ export default function TrangChu() {
   // Booking Form State
   const [selectedSportId, setSelectedSportId] = useState<'badminton' | 'football' | 'volleyball'>('badminton');
   const [selectedDate, setSelectedDate] = useState<string>('');
-  const [selectedCourt, setSelectedCourt] = useState<string>('Sân 01');
+  const [selectedCourt, setSelectedCourt] = useState<string>('');
   
   // Time Selection State
   const [selectedStartTime, setSelectedStartTime] = useState<string>('');
@@ -96,6 +96,31 @@ export default function TrangChu() {
     }
   };
 
+  const [showScheduleModal, setShowScheduleModal] = useState<boolean>(false);
+
+  const handleSelectSlotFromSchedule = (
+    sportId: 'badminton' | 'volleyball' | 'football',
+    courtName: string,
+    time: string,
+    dateStr: string
+  ) => {
+    setSelectedSportId(sportId);
+    setSelectedStartTime(time);
+    setSelectedCourt(courtName);
+    if (dateStr) {
+      setSelectedDate(dateStr);
+    }
+    handleTabChange('booking');
+    setTimeout(() => {
+      const summaryEl = document.getElementById('booking-summary-section');
+      if (summaryEl) {
+        summaryEl.scrollIntoView({ behavior: 'smooth' });
+      } else if (bookingRef.current) {
+        bookingRef.current.scrollIntoView({ behavior: 'smooth' });
+      }
+    }, 150);
+  };
+
   // Sports Data Definitions
   const sportsData = {
     badminton: {
@@ -120,8 +145,8 @@ export default function TrangChu() {
       title: 'Sân Bóng Đá Tiêu Chuẩn',
       description: 'Sân bóng đá cỏ nhân tạo đạt chuẩn, không gian rộng rãi. 8 sân cầu lông có thể gộp thành 1 sân bóng đá.',
       specs: ['SÂN 7 NGƯỜI', 'ĐÈN LUX 1000', 'CỎ NHÂN TẠO'],
-      pricePerHour: 300000,
-      priceLabel: '300.000đ / GIỜ',
+      pricePerHour: 200000,
+      priceLabel: '200.000đ / GIỜ',
       image: '/images/hero_arena.jpg',
       icon: FootballIcon,
       courts: [],
@@ -134,8 +159,8 @@ export default function TrangChu() {
       title: 'Sân Bóng Chuyền Tiêu Chuẩn',
       description: 'Sân bóng chuyền trong nhà mái che cao 12m, thảm thi đấu Taraflex xịn, quạt thông gió công nghiệp mát mẻ.',
       specs: ['THẢM TARAFLEX', 'MÁI CHE 12M', 'ĐÈN LUX 1000'],
-      pricePerHour: 200000,
-      priceLabel: '200.000đ / GIỜ',
+      pricePerHour: 150000,
+      priceLabel: '150.000đ / GIỜ',
       image: '/images/volleyball.jpg',
       icon: VolleyballIcon,
       courts: [],
@@ -143,6 +168,164 @@ export default function TrangChu() {
   };
 
   const currentSport = sportsData[selectedSportId];
+
+  // --- VIP / LONG-TERM BOOKING STATE & CALCULATOR ---
+  const [vipSport, setVipSport] = useState<'badminton' | 'volleyball' | 'football'>('badminton');
+  const [vipSessionsPerWeek, setVipSessionsPerWeek] = useState<number>(3);
+  const [vipHoursPerSession, setVipHoursPerSession] = useState<number>(2);
+  const [vipMonths, setVipMonths] = useState<number>(6); // Range: 3 to 12 months (max 1 year)
+  const [showVipModal, setShowVipModal] = useState<boolean>(false);
+  const [vipCustomerName, setVipCustomerName] = useState<string>('');
+  const [vipCustomerPhone, setVipCustomerPhone] = useState<string>('');
+  const [vipPreferredSchedule, setVipPreferredSchedule] = useState<string>('');
+  const [vipCustomerNote, setVipCustomerNote] = useState<string>('');
+
+  // VIP Calculator formulas
+  const vipHourlyRate = useMemo(() => {
+    return sportsData[vipSport].pricePerHour;
+  }, [vipSport]);
+
+  const vipDiscountPercent = useMemo(() => {
+    // 1 - 2 months: 0% (Gói Trải Nghiệm - Giữ cố định giờ chơi)
+    // 3 - 6 months: 10% / hour (Hạng VIP)
+    // > 6 months (7 - 12 months): 15% / hour (Hạng VIP Thượng Hạng)
+    if (vipMonths < 3) return 0;
+    return vipMonths <= 6 ? 10 : 15;
+  }, [vipMonths]);
+
+  const vipTotalWeeks = useMemo(() => {
+    return vipMonths * 4;
+  }, [vipMonths]);
+
+  const vipTotalSessions = useMemo(() => {
+    return vipSessionsPerWeek * vipTotalWeeks;
+  }, [vipSessionsPerWeek, vipTotalWeeks]);
+
+  const vipTotalHours = useMemo(() => {
+    return vipTotalSessions * vipHoursPerSession;
+  }, [vipTotalSessions, vipHoursPerSession]);
+
+  const vipBasePrice = useMemo(() => {
+    return vipTotalHours * vipHourlyRate;
+  }, [vipTotalHours, vipHourlyRate]);
+
+  const vipDiscountAmount = useMemo(() => {
+    return Math.round((vipBasePrice * vipDiscountPercent) / 100);
+  }, [vipBasePrice, vipDiscountPercent]);
+
+  const vipFinalPrice = useMemo(() => {
+    return vipBasePrice - vipDiscountAmount;
+  }, [vipBasePrice, vipDiscountAmount]);
+
+  const vipMonthlyAverage = useMemo(() => {
+    return Math.round(vipFinalPrice / vipMonths);
+  }, [vipFinalPrice, vipMonths]);
+
+  const handleVipSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!vipCustomerName.trim()) {
+      showAlert('Thiếu thông tin', 'Vui lòng nhập Họ tên hoặc Tên CLB / Doanh nghiệp đại diện!');
+      return;
+    }
+    if (!vipCustomerPhone.trim() || !/^[0-9]{9,11}$/.test(vipCustomerPhone.trim())) {
+      showAlert('Số điện thoại không hợp lệ', 'Vui lòng nhập số điện thoại hợp lệ (9 - 11 chữ số) để nhân viên liên hệ xác nhận.');
+      return;
+    }
+
+    setShowVipModal(false);
+    showAlert(
+      'Gửi yêu cầu VIP thành công! 🎉',
+      `Cảm ơn Quý khách ${vipCustomerName}!\n\nYêu cầu thuê sân cố định ${vipMonths} tháng (${sportsData[vipSport].name}) đã được hệ thống tiếp nhận.\n\nBộ phận quản lý sẽ liên hệ SĐT ${vipCustomerPhone} trong vòng 15 phút để hoàn tất ký hợp đồng và xếp lịch giữ sân cố định tại quầy.`
+    );
+
+    // Reset inputs
+    setVipCustomerName('');
+    setVipCustomerPhone('');
+    setVipPreferredSchedule('');
+    setVipCustomerNote('');
+  };
+
+  // Tab switch between: 'vip_subscription' (Hội viên 3-12 tháng) and 'event_series' (Sự kiện & Chuỗi ngày 7-14 ngày)
+  const [contractMode, setContractMode] = useState<'vip_subscription' | 'event_series'>('vip_subscription');
+
+  // --- EVENT & MULTI-DAY SERIES STATE & CALCULATOR ---
+  const [eventSport, setEventSport] = useState<'badminton' | 'volleyball' | 'football' | 'all_arena'>('badminton');
+  const [eventCourtCount, setEventCourtCount] = useState<number>(2); // For badminton: 1, 2, 4, 6 courts
+  const [eventDays, setEventDays] = useState<number>(7); // 7, 10, 14, 21, or custom slider 3 to 30 days
+  const [eventTimeSlot, setEventTimeSlot] = useState<'morning' | 'afternoon' | 'evening' | 'fullday'>('morning');
+  const [showEventModal, setShowEventModal] = useState<boolean>(false);
+  const [eventOrgName, setEventOrgName] = useState<string>('');
+  const [eventPhone, setEventPhone] = useState<string>('');
+  const [eventStartDate, setEventStartDate] = useState<string>('');
+  const [eventNotes, setEventNotes] = useState<string>('');
+
+  // Event hours per day based on slot
+  const eventHoursPerDay = useMemo(() => {
+    if (eventTimeSlot === 'morning') return 3; // 08:00 - 11:00 (3h)
+    if (eventTimeSlot === 'afternoon') return 3; // 14:00 - 17:00 (3h)
+    if (eventTimeSlot === 'evening') return 3; // 18:00 - 21:00 (3h)
+    return 8; // fullday: 08:00 - 17:00 (8h)
+  }, [eventTimeSlot]);
+
+  // Event hourly rate
+  const eventHourlyRate = useMemo(() => {
+    if (eventSport === 'badminton') return 120000 * eventCourtCount;
+    if (eventSport === 'volleyball') return 150000;
+    if (eventSport === 'football') return 200000;
+    return 500000; // all_arena (Bao trọn toàn bộ 8 ô thi đấu)
+  }, [eventSport, eventCourtCount]);
+
+  const eventTotalHours = useMemo(() => {
+    return eventDays * eventHoursPerDay;
+  }, [eventDays, eventHoursPerDay]);
+
+  const eventBasePrice = useMemo(() => {
+    return eventTotalHours * eventHourlyRate;
+  }, [eventTotalHours, eventHourlyRate]);
+
+  // Discount rule for events:
+  // Off-peak (morning / afternoon): 5% discount (hoặc 8% nếu >= 14 ngày)
+  // Peak (evening): 0% discount, but receives full free logistics gift pack
+  // Fullday: 10% discount on fullday package
+  const eventDiscountPercent = useMemo(() => {
+    if (eventTimeSlot === 'fullday') return 10;
+    if (eventTimeSlot === 'morning' || eventTimeSlot === 'afternoon') {
+      if (eventDays >= 21) return 10; // Đợt dài từ 3 tuần - 1 tháng
+      return eventDays >= 14 ? 8 : 5;
+    }
+    return 0; // evening peak: full price + free perks
+  }, [eventTimeSlot, eventDays]);
+
+  const eventDiscountAmount = useMemo(() => {
+    return Math.round((eventBasePrice * eventDiscountPercent) / 100);
+  }, [eventBasePrice, eventDiscountPercent]);
+
+  const eventFinalPrice = useMemo(() => {
+    return eventBasePrice - eventDiscountAmount;
+  }, [eventBasePrice, eventDiscountAmount]);
+
+  const handleEventSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!eventOrgName.trim()) {
+      showAlert('Thiếu thông tin', 'Vui lòng nhập Tên Đơn vị / CLB / Đại diện tổ chức sự kiện!');
+      return;
+    }
+    if (!eventPhone.trim() || !/^[0-9]{9,11}$/.test(eventPhone.trim())) {
+      showAlert('Số điện thoại không hợp lệ', 'Vui lòng nhập số điện thoại hợp lệ (9 - 11 chữ số) để điều phối viên liên hệ.');
+      return;
+    }
+
+    setShowEventModal(false);
+    showAlert(
+      'Tiếp nhận yêu cầu sự kiện thành công! 🎪',
+      `Cảm ơn Quý khách ${eventOrgName}!\n\nYêu cầu đặt chuỗi ngày / tổ chức giải (${eventDays} ngày, ${eventSport === 'all_arena' ? 'Bao trọn toàn sàn' : sportsData[eventSport as keyof typeof sportsData]?.name || 'Đa môn'}) đã được tiếp nhận.\n\nĐiều phối viên sự kiện sẽ liên hệ qua SĐT ${eventPhone} trong vòng 15 phút để kiểm tra lịch trống trên sàn và báo giá chi tiết.`
+    );
+
+    setEventOrgName('');
+    setEventPhone('');
+    setEventStartDate('');
+    setEventNotes('');
+  };
 
   // Dates list
   const availableDates = [
@@ -154,16 +337,12 @@ export default function TrangChu() {
     { label: 'Thứ 3', date: '23/09' },
   ];
 
-  // Logic for Time Generation (05:00 - 23:00, block 17:30 - 21:00)
+  // Logic for Time Generation (05:00 - 23:00)
   const generateStartTimes = () => {
     const times = [];
     for (let h = 5; h <= 22; h++) {
       for (let m of ['00', '30']) {
-        const timeVal = h + (m === '30' ? 0.5 : 0);
-        // Valid start times: <= 16.5 (so max duration can reach 17.5) OR >= 21
-        if (timeVal <= 16.5 || (timeVal >= 21 && timeVal <= 22)) {
-          times.push(`${h.toString().padStart(2, '0')}:${m}`);
-        }
+        times.push(`${h.toString().padStart(2, '0')}:${m}`);
       }
     }
     return times;
@@ -173,56 +352,89 @@ export default function TrangChu() {
     if (!startTimeStr) return [60];
     const [h, m] = startTimeStr.split(':').map(Number);
     const startVal = h + m / 60;
-    
-    let maxEndVal = 23; // close at 23:00
-    if (startVal <= 16.5) {
-      maxEndVal = 17.5; // force end before 17:30 block
-    }
-    
-    const maxDurationHours = maxEndVal - startVal;
+    const maxEndVal = 23; // close at 23:00
+    const maxDurationHours = Math.max(1, maxEndVal - startVal);
     const durations = [];
-    for (let d = 1; d <= maxDurationHours; d += 0.5) {
+    for (let d = 1; d <= maxDurationHours && d <= 5; d += 0.5) {
       durations.push(d * 60); // minutes
     }
-    return durations;
+    return durations.length > 0 ? durations : [60];
   };
 
-    // Dynamic capacity logic: 8 Badminton = 2 Volleyball = 1 Football
-  const mockBookings = [
-    { date: 'Hôm nay (18/09)', time: '17:00', sport: 'volleyball' }, // uses 4 capacity
-  ];
+  const mockScheduleBookings = useMemo(() => [
+    { startH: 8, startM: 0, endH: 10, endM: 0, courtStart: 0, courtCount: 4, sport: 'volleyball' }, // Sân 01-04
+    { startH: 9, startM: 0, endH: 10, endM: 30, courtStart: 5, courtCount: 1, sport: 'badminton' }, // Sân 06
+    { startH: 14, startM: 0, endH: 16, endM: 0, courtStart: 0, courtCount: 4, sport: 'volleyball' }, // Sân 01-04
+    { startH: 14, startM: 30, endH: 15, endM: 30, courtStart: 4, courtCount: 1, sport: 'badminton' }, // Sân 05
+    { startH: 15, startM: 0, endH: 16, endM: 0, courtStart: 5, courtCount: 1, sport: 'badminton' }, // Sân 06
+    { startH: 17, startM: 0, endH: 19, endM: 0, courtStart: 0, courtCount: 8, sport: 'football' }, // Sân 01-08
+    { startH: 19, startM: 30, endH: 21, endM: 0, courtStart: 1, courtCount: 1, sport: 'badminton' }, // Sân 02
+    { startH: 20, startM: 0, endH: 21, endM: 30, courtStart: 3, courtCount: 1, sport: 'badminton' }, // Sân 04
+  ], []);
 
-  const getAvailableCourts = (sportId: string, date: string, time: string) => {
-    let usedCapacity = 0;
-    mockBookings.forEach(b => {
-      if (b.date === date && b.time === time) {
-        if (b.sport === 'football') usedCapacity += 8;
-        if (b.sport === 'volleyball') usedCapacity += 4;
-        if (b.sport === 'badminton') usedCapacity += 1;
+  const availableCourts = useMemo(() => {
+    if (!selectedDate || !selectedStartTime) return [];
+    const [h, m] = selectedStartTime.split(':').map(Number);
+    const startMin = h * 60 + m;
+    const endMin = startMin + selectedDuration;
+
+    const isCourtOccupied = (courtIdx: number) => {
+      return mockScheduleBookings.some((b) => {
+        const bCourtEnd = b.courtStart + b.courtCount;
+        if (courtIdx < b.courtStart || courtIdx >= bCourtEnd) return false;
+        const bStart = b.startH * 60 + b.startM;
+        const bEnd = b.endH * 60 + b.endM;
+        return Math.max(startMin, bStart) < Math.min(endMin, bEnd);
+      });
+    };
+
+    const courts: string[] = [];
+    if (selectedSportId === 'football') {
+      let isAllFree = true;
+      for (let c = 0; c < 8; c++) {
+        if (isCourtOccupied(c)) {
+          isAllFree = false;
+          break;
+        }
       }
-    });
+      if (isAllFree) courts.push('Sân Bóng Đá Mini');
+    } else if (selectedSportId === 'volleyball') {
+      let isC1Free = true;
+      for (let c = 0; c <= 3; c++) {
+        if (isCourtOccupied(c)) {
+          isC1Free = false;
+          break;
+        }
+      }
+      if (isC1Free) courts.push('Sân Bóng Chuyền 1');
 
-    const available = 8 - usedCapacity;
-    const courts = [];
-    if (sportId === 'football') {
-      const count = Math.floor(available / 8);
-      for(let i=1; i<=count; i++) courts.push('Sân Bóng Đá ' + i);
-    } else if (sportId === 'volleyball') {
-      const count = Math.floor(available / 4);
-      for(let i=1; i<=count; i++) courts.push('Sân Bóng Chuyền ' + i);
+      let isC2Free = true;
+      for (let c = 4; c <= 7; c++) {
+        if (isCourtOccupied(c)) {
+          isC2Free = false;
+          break;
+        }
+      }
+      if (isC2Free) courts.push('Sân Bóng Chuyền 2');
     } else {
-      for(let i=1; i<=available; i++) courts.push('Sân Cầu Lông ' + i);
+      for (let i = 1; i <= 8; i++) {
+        if (!isCourtOccupied(i - 1)) {
+          courts.push('Sân ' + i.toString().padStart(2, '0'));
+        }
+      }
     }
-    return courts.length > 0 ? courts : ['Hết sân trống'];
-  };
-
-  const availableCourts = getAvailableCourts(selectedSportId, selectedDate, selectedStartTime);
+    return courts;
+  }, [selectedSportId, selectedDate, selectedStartTime, selectedDuration, mockScheduleBookings]);
 
   useEffect(() => {
-    if (!availableCourts.includes(selectedCourt)) {
-      setSelectedCourt(availableCourts[0]);
+    if (availableCourts.length > 0) {
+      if (!availableCourts.includes(selectedCourt)) {
+        setSelectedCourt(availableCourts[0]);
+      }
+    } else {
+      setSelectedCourt('');
     }
-  }, [selectedSportId, selectedDate, selectedStartTime, availableCourts]);
+  }, [availableCourts, selectedCourt]);
 
   const allStartTimes = generateStartTimes();
   const availableDurations = getAvailableDurations(selectedStartTime);
@@ -248,10 +460,22 @@ export default function TrangChu() {
   const durationHours = selectedDuration / 60;
   const totalPrice = currentSport.pricePerHour * durationHours;
   const formattedPrice = totalPrice.toLocaleString('vi-VN') + 'đ';
-  const selectedSlot = `${selectedStartTime} - ${getEndTime(selectedStartTime, selectedDuration)}`;
+  const selectedSlot = selectedStartTime ? `${selectedStartTime} - ${getEndTime(selectedStartTime, selectedDuration)}` : 'Chưa chọn giờ';
 
   const handleBookingSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!selectedDate) {
+      showAlert('Chưa chọn ngày', 'Vui lòng chọn ngày thi đấu ở Bước 2!');
+      return;
+    }
+    if (!selectedStartTime) {
+      showAlert('Chưa chọn giờ', 'Vui lòng chọn giờ bắt đầu ở Bước 3!');
+      return;
+    }
+    if (!selectedCourt) {
+      showAlert('Chưa chọn sân', 'Vui lòng chọn một sân khả dụng ở Bước 3!');
+      return;
+    }
     if (!customerName.trim() || !customerPhone.trim()) {
       showAlert('Thiếu thông tin', 'Vui lòng nhập đầy đủ Họ tên và Số điện thoại!');
       return;
@@ -531,6 +755,680 @@ export default function TrangChu() {
           </div>
         </section>
 
+        {/* ======================================================== */}
+        {/* 2.5 HỢP ĐỒNG KHÁCH ĐOÀN: VIP THÁNG & SỰ KIỆN CHUỖI NGÀY */}
+        {/* ======================================================== */}
+        <section className="space-y-4 pt-2">
+          {/* Main Card */}
+          <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-slate-900 to-amber-950 p-5 text-white shadow-xl border border-amber-500/30">
+            {/* Background Glow */}
+            <div className="absolute -right-16 -top-16 h-48 w-48 rounded-full bg-amber-500/10 blur-3xl pointer-events-none"></div>
+            <div className="absolute -left-16 -bottom-16 h-48 w-48 rounded-full bg-emerald-500/10 blur-3xl pointer-events-none"></div>
+
+            {/* Header Badge & Title */}
+            <div className="relative z-10">
+              <div className="inline-flex items-center gap-1.5 rounded-full bg-amber-400/20 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-amber-300 border border-amber-400/30">
+                <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                DÀNH CHO KHÁCH ĐOÀN, CLB & DOANH NGHIỆP
+              </div>
+
+              <h2 className="mt-2 text-xl font-black text-white leading-tight">
+                HỢP ĐỒNG & ĐẶT SÂN THEO GÓI
+              </h2>
+              <p className="mt-1 text-xs text-slate-300 leading-relaxed">
+                Chính sách ưu đãi và hỗ trợ vận hành riêng cho Hội viên gắn bó định kỳ hoặc Sự kiện / Giải đấu ngắn ngày.
+              </p>
+
+              {/* 2-TAB SEGMENTED CONTROLLER */}
+              <div className="mt-4 grid grid-cols-2 p-1 bg-slate-950/80 rounded-2xl border border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setContractMode('vip_subscription')}
+                  className={`flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl text-xs font-black transition-all active:scale-95 cursor-pointer ${
+                    contractMode === 'vip_subscription'
+                      ? 'bg-amber-400 text-slate-950 shadow-md'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <Award className="w-3.5 h-3.5" />
+                  <span>CỐ ĐỊNH THÁNG (1 - 12T)</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setContractMode('event_series')}
+                  className={`flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl text-xs font-black transition-all active:scale-95 cursor-pointer ${
+                    contractMode === 'event_series'
+                      ? 'bg-amber-400 text-slate-950 shadow-md'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <Trophy className="w-3.5 h-3.5" />
+                  <span>SỰ KIỆN & CHUỖI NGÀY</span>
+                </button>
+              </div>
+            </div>
+
+            {/* ======================================================== */}
+            {/* TAB 1: VIP MONTHLY SUBSCRIPTION (1 - 12 MONTHS)         */}
+            {/* ======================================================== */}
+            {contractMode === 'vip_subscription' && (
+              <div className="mt-4 space-y-4 animate-in fade-in duration-200 relative z-10">
+                {/* 3 Tier Cards */}
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="rounded-2xl bg-white/5 border border-slate-700/60 p-2.5 flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-[9px] font-black uppercase text-slate-300">Trải nghiệm</span>
+                        <span className="rounded bg-slate-800 px-1 py-0.5 text-[8px] font-bold text-slate-300">
+                          Giá chuẩn
+                        </span>
+                      </div>
+                      <p className="mt-1 text-xs font-black text-white">1 – 2 Tháng</p>
+                      <p className="text-[9px] text-slate-400 mt-0.5 leading-tight">Giữ cố định giờ vàng yêu thích.</p>
+                    </div>
+                  </div>
+
+                  <div className="rounded-2xl bg-white/5 border border-amber-400/30 p-2.5 flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-[9px] font-black uppercase text-amber-300">Hạng VIP</span>
+                        <span className="rounded bg-amber-400/20 px-1 py-0.5 text-[8px] font-extrabold text-amber-300 border border-amber-400/30">
+                          -10%/h
+                        </span>
+                      </div>
+                      <p className="mt-1 text-xs font-black text-white">3 – 6 Tháng</p>
+                      <p className="text-[9px] text-slate-400 mt-0.5 leading-tight">Hỗ trợ chia nhiều đợt đóng.</p>
+                    </div>
+                  </div>
+
+                  <div className="rounded-2xl bg-gradient-to-br from-amber-500/20 to-amber-700/10 border border-amber-400/40 p-2.5 flex flex-col justify-between relative overflow-hidden">
+                    <div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-[9px] font-black uppercase text-amber-200">VIP Vàng</span>
+                        <span className="rounded bg-amber-400 px-1 py-0.5 text-[8px] font-black text-slate-950">
+                          -15%/h
+                        </span>
+                      </div>
+                      <p className="mt-1 text-xs font-black text-white">&gt; 6 – 12T</p>
+                      <p className="text-[9px] text-amber-200/80 mt-0.5 leading-tight">Ưu tiên vị trí sân đẹp nhất.</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Interactive VIP Calculator */}
+                <div className="rounded-2xl bg-slate-950/70 p-4 border border-slate-800 space-y-4">
+                  <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
+                    <div className="flex items-center gap-1.5">
+                      <Calculator className="w-4 h-4 text-amber-400" />
+                      <span className="text-xs font-black uppercase tracking-wider text-slate-200">DỰ TOÁN CHI PHÍ & TIẾT KIỆM</span>
+                    </div>
+                    <span className="text-[10px] text-amber-400 font-bold">Tính toán nhanh</span>
+                  </div>
+
+                  {/* Step 1: Chọn môn */}
+                  <div>
+                    <label className="text-[10px] font-black uppercase tracking-wider text-slate-400 block mb-1.5">
+                      1. Chọn bộ môn:
+                    </label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {(['badminton', 'volleyball', 'football'] as const).map((sKey) => {
+                        const sp = sportsData[sKey];
+                        const active = vipSport === sKey;
+                        return (
+                          <button
+                            key={sKey}
+                            type="button"
+                            onClick={() => setVipSport(sKey)}
+                            className={`rounded-xl py-2 px-2 text-center border transition active:scale-95 flex flex-col items-center cursor-pointer ${
+                              active
+                                ? 'bg-amber-400 border-amber-300 text-slate-950 font-black shadow-md'
+                                : 'bg-slate-900 border-slate-700 text-slate-300 hover:border-slate-600 text-xs font-bold'
+                            }`}
+                          >
+                            <span className="text-xs">{sp.name}</span>
+                            <span className={`text-[9px] ${active ? 'text-slate-900' : 'text-slate-400'}`}>
+                              {sp.pricePerHour.toLocaleString('vi-VN')}đ/h
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Step 2: Tần suất & Thời lượng */}
+                  <div className="grid grid-cols-2 gap-3">
+                    {/* Buổi / Tuần */}
+                    <div>
+                      <label className="text-[10px] font-black uppercase tracking-wider text-slate-400 block mb-1.5">
+                        2. Buổi / Tuần:
+                      </label>
+                      <div className="grid grid-cols-3 gap-1">
+                        {[3, 4, 5].map((s) => (
+                          <button
+                            key={s}
+                            type="button"
+                            onClick={() => setVipSessionsPerWeek(s)}
+                            className={`rounded-lg py-1.5 text-xs font-black transition active:scale-95 cursor-pointer ${
+                              vipSessionsPerWeek === s
+                                ? 'bg-amber-400 text-slate-950'
+                                : 'bg-slate-900 text-slate-300 border border-slate-700 hover:border-slate-600'
+                            }`}
+                          >
+                            {s}b
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Giờ / Buổi */}
+                    <div>
+                      <label className="text-[10px] font-black uppercase tracking-wider text-slate-400 block mb-1.5">
+                        3. Thời lượng / Buổi:
+                      </label>
+                      <div className="grid grid-cols-3 gap-1">
+                        {[1.5, 2, 3].map((h) => (
+                          <button
+                            key={h}
+                            type="button"
+                            onClick={() => setVipHoursPerSession(h)}
+                            className={`rounded-lg py-1.5 text-xs font-black transition active:scale-95 cursor-pointer ${
+                              vipHoursPerSession === h
+                                ? 'bg-amber-400 text-slate-950'
+                                : 'bg-slate-900 text-slate-300 border border-slate-700 hover:border-slate-600'
+                            }`}
+                          >
+                            {h}h
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Step 3: Thời gian hợp đồng (1 - 12 tháng) */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                        4. Thời hạn thuê (1 đến 12 tháng):
+                      </label>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-sm font-black text-amber-400">{vipMonths} Tháng</span>
+                        {vipDiscountPercent > 0 ? (
+                          <span className="rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 text-[10px] font-black">
+                            Giảm {vipDiscountPercent}%
+                          </span>
+                        ) : (
+                          <span className="rounded-full bg-slate-800 text-slate-300 border border-slate-700 px-2 py-0.5 text-[10px] font-bold">
+                            Gói Trải Nghiệm
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Range Slider (min 1, max 12) */}
+                    <input
+                      type="range"
+                      min={1}
+                      max={12}
+                      step={1}
+                      value={vipMonths}
+                      onChange={(e) => setVipMonths(Number(e.target.value))}
+                      className="w-full accent-amber-400 h-2 bg-slate-800 rounded-lg cursor-pointer"
+                    />
+
+                    {/* Quick Select Buttons */}
+                    <div className="mt-2 grid grid-cols-5 gap-1">
+                      {[
+                        { m: 1, label: '1T' },
+                        { m: 2, label: '2T' },
+                        { m: 3, label: '3T (-10%)' },
+                        { m: 6, label: '6T (-10%)' },
+                        { m: 12, label: '12T (-15%)' },
+                      ].map((item) => (
+                        <button
+                          key={item.m}
+                          type="button"
+                          onClick={() => setVipMonths(item.m)}
+                          className={`rounded-lg py-1 text-[10px] font-black transition active:scale-95 cursor-pointer ${
+                            vipMonths === item.m
+                              ? 'bg-amber-400 text-slate-950 font-black'
+                              : 'bg-slate-900 text-slate-400 border border-slate-800 hover:text-white'
+                          }`}
+                        >
+                          {item.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Upsell Banner when vipMonths < 3 */}
+                    {vipMonths < 3 && (
+                      <div className="mt-2.5 rounded-xl bg-gradient-to-r from-amber-500/15 to-emerald-500/10 border border-amber-400/30 p-2.5 flex items-start gap-2 text-xs">
+                        <Sparkles className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
+                        <div className="flex-1">
+                          <p className="font-bold text-amber-300 text-[11px]">💡 Mẹo nâng hạng tiết kiệm:</p>
+                          <p className="text-[10px] text-slate-300 mt-0.5 leading-relaxed">
+                            Đăng ký từ 3 tháng trở lên để được nâng lên <strong className="text-amber-300">Hạng VIP</strong> và nhận chiết khấu <strong className="text-emerald-400">GIẢM NGAY 10%/giờ</strong> (tiết kiệm từ hàng trăm nghìn đến triệu đồng)!
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => setVipMonths(3)}
+                            className="mt-1 text-[11px] font-black text-amber-300 hover:text-amber-200 underline cursor-pointer"
+                          >
+                            Nâng lên gói 3 Tháng VIP (-10%) ngay →
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    <p className="mt-2 text-[10px] text-slate-400 italic">
+                      * Hợp đồng tối đa 12 tháng (1 năm). Khi hết hạn hợp đồng, quý khách được ưu tiên gia hạn cho năm kế tiếp.
+                    </p>
+                  </div>
+
+                  {/* Financial Breakdown Box */}
+                  <div className="rounded-xl bg-gradient-to-br from-amber-500/15 via-slate-900 to-emerald-500/10 border border-amber-400/30 p-3.5 space-y-2 text-xs">
+                    <div className="flex justify-between items-center text-slate-300">
+                      <span>Quy mô dự kiến:</span>
+                      <span className="font-bold text-white">~ {vipTotalSessions} buổi ({vipTotalHours} giờ thi đấu)</span>
+                    </div>
+                    <div className="flex justify-between items-center text-slate-300">
+                      <span>Giá niêm yết:</span>
+                      <span className={vipDiscountPercent > 0 ? "line-through text-slate-400 font-medium" : "font-bold text-white"}>
+                        {vipBasePrice.toLocaleString('vi-VN')}đ
+                      </span>
+                    </div>
+                    {vipDiscountPercent > 0 ? (
+                      <div className="flex justify-between items-center text-amber-300 font-bold">
+                        <span className="flex items-center gap-1">
+                          <Sparkles className="w-3.5 h-3.5" /> Chiết khấu VIP ({vipDiscountPercent}%):
+                        </span>
+                        <span>- {vipDiscountAmount.toLocaleString('vi-VN')}đ</span>
+                      </div>
+                    ) : (
+                      <div className="flex justify-between items-center text-slate-400 text-[11px]">
+                        <span>Chính sách giá:</span>
+                        <span className="text-slate-300 font-bold">Giá chuẩn (Được giữ cố định giờ vàng)</span>
+                      </div>
+                    )}
+
+                    <div className="border-t border-slate-800 pt-2 flex items-baseline justify-between">
+                      <div>
+                        <span className="text-[10px] text-slate-400 block uppercase font-bold">Tổng chi phí sau giảm:</span>
+                        <span className="text-lg font-black text-emerald-400">{vipFinalPrice.toLocaleString('vi-VN')}đ</span>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-[10px] text-slate-400 block">Trung bình hàng tháng:</span>
+                        <span className="text-xs font-bold text-amber-300">~ {vipMonthlyAverage.toLocaleString('vi-VN')}đ / tháng</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* VIP Privileges Checklist */}
+                  <div className="rounded-xl bg-slate-900/60 p-3 border border-slate-800 space-y-1.5 text-[11px] text-slate-300">
+                    <div className="flex items-center gap-2 text-emerald-400 font-bold">
+                      <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" />
+                      <span>Cố định khung giờ vàng suốt hợp đồng (không lo mất sân)</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-emerald-400 font-bold">
+                      <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" />
+                      <span>Hỗ trợ chia nhỏ nhiều đợt thanh toán linh hoạt tại quầy</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-emerald-400 font-bold">
+                      <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" />
+                      <span>Linh hoạt đổi/dời buổi khi có lịch công tác hoặc bận đột xuất</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-emerald-400 font-bold">
+                      <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" />
+                      <span>Xuất hóa đơn điện tử VAT đầy đủ cho doanh nghiệp & CLB</span>
+                    </div>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="pt-1 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowVipModal(true)}
+                      className="w-full flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 py-3 px-4 text-xs font-black uppercase tracking-wider text-slate-950 shadow-lg shadow-amber-500/20 hover:from-amber-300 hover:to-amber-400 active:scale-95 transition cursor-pointer"
+                    >
+                      <Award className="w-4 h-4" /> Đăng ký giữ lịch VIP
+                    </button>
+
+                    <a
+                      href="tel:0901234567"
+                      className="w-full flex items-center justify-center gap-2 rounded-xl bg-slate-800 hover:bg-slate-700 py-3 px-4 text-xs font-bold text-white border border-slate-700 active:scale-95 transition"
+                    >
+                      <Phone className="w-4 h-4 text-amber-400" /> Hotline VIP: 0901.234.567
+                    </a>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ======================================================== */}
+            {/* TAB 2: EVENT & MULTI-DAY SERIES                         */}
+            {/* ======================================================== */}
+            {contractMode === 'event_series' && (
+              <div className="mt-4 space-y-4 animate-in fade-in duration-200 relative z-10">
+                {/* Event Highlights */}
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div className="rounded-2xl bg-white/5 border border-amber-400/20 p-3 flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-black uppercase text-amber-300">Chuỗi ngày</span>
+                        <span className="rounded bg-emerald-500/20 px-1.5 py-0.5 text-[9px] font-black text-emerald-300 border border-emerald-500/30">
+                          7 – 14 Ngày
+                        </span>
+                      </div>
+                      <p className="mt-1 text-sm font-black text-white">Tập Huấn & Khóa Học</p>
+                      <p className="text-[10px] text-slate-400 mt-0.5">Luyện tập dồn dập, khóa giữ nguyên cụm sân suốt đợt.</p>
+                    </div>
+                  </div>
+
+                  <div className="rounded-2xl bg-gradient-to-br from-amber-500/20 to-amber-700/10 border border-amber-400/40 p-3 flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-black uppercase text-amber-200">Đại hội / Giải</span>
+                        <span className="rounded bg-amber-400 px-1.5 py-0.5 text-[9px] font-black text-slate-950">
+                          Bao Trọn Sàn
+                        </span>
+                      </div>
+                      <p className="mt-1 text-sm font-black text-white">Giải Đấu Doanh Nghiệp</p>
+                      <p className="text-[10px] text-amber-200/80 mt-0.5">Tài trợ trọn gói âm thanh, bảng điểm, còi & nước uống.</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Event Calculator Box */}
+                <div className="rounded-2xl bg-slate-950/70 p-4 border border-slate-800 space-y-4">
+                  <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
+                    <div className="flex items-center gap-1.5">
+                      <Calculator className="w-4 h-4 text-amber-400" />
+                      <span className="text-xs font-black uppercase tracking-wider text-slate-200">DỰ TOÁN SỰ KIỆN / CHUỖI NGÀY</span>
+                    </div>
+                    <span className="text-[10px] text-emerald-400 font-bold">Báo giá theo đợt</span>
+                  </div>
+
+                  {/* Step 1: Chọn quy mô & môn */}
+                  <div>
+                    <label className="text-[10px] font-black uppercase tracking-wider text-slate-400 block mb-1.5">
+                      1. Chọn môn thi đấu hoặc Bao trọn sàn:
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setEventSport('badminton')}
+                        className={`rounded-xl py-2 px-2 text-center border transition active:scale-95 flex flex-col items-center cursor-pointer ${
+                          eventSport === 'badminton'
+                            ? 'bg-amber-400 border-amber-300 text-slate-950 font-black shadow-md'
+                            : 'bg-slate-900 border-slate-700 text-slate-300 hover:border-slate-600 text-xs font-bold'
+                        }`}
+                      >
+                        <span className="text-xs font-black">Cầu Lông</span>
+                        <span className={`text-[9px] ${eventSport === 'badminton' ? 'text-slate-900 font-bold' : 'text-slate-400'}`}>
+                          120.000đ/sân/h
+                        </span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setEventSport('volleyball')}
+                        className={`rounded-xl py-2 px-2 text-center border transition active:scale-95 flex flex-col items-center cursor-pointer ${
+                          eventSport === 'volleyball'
+                            ? 'bg-amber-400 border-amber-300 text-slate-950 font-black shadow-md'
+                            : 'bg-slate-900 border-slate-700 text-slate-300 hover:border-slate-600 text-xs font-bold'
+                        }`}
+                      >
+                        <span className="text-xs font-black">Bóng Chuyền</span>
+                        <span className={`text-[9px] ${eventSport === 'volleyball' ? 'text-slate-900 font-bold' : 'text-slate-400'}`}>
+                          150.000đ/cụm/h
+                        </span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setEventSport('football')}
+                        className={`rounded-xl py-2 px-2 text-center border transition active:scale-95 flex flex-col items-center cursor-pointer ${
+                          eventSport === 'football'
+                            ? 'bg-amber-400 border-amber-300 text-slate-950 font-black shadow-md'
+                            : 'bg-slate-900 border-slate-700 text-slate-300 hover:border-slate-600 text-xs font-bold'
+                        }`}
+                      >
+                        <span className="text-xs font-black">Bóng Đá Mini</span>
+                        <span className={`text-[9px] ${eventSport === 'football' ? 'text-slate-900 font-bold' : 'text-slate-400'}`}>
+                          200.000đ/giờ (toàn sàn)
+                        </span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setEventSport('all_arena')}
+                        className={`rounded-xl py-2 px-2 text-center border transition active:scale-95 flex flex-col items-center cursor-pointer ${
+                          eventSport === 'all_arena'
+                            ? 'bg-amber-400 border-amber-300 text-slate-950 font-black shadow-md ring-2 ring-amber-300'
+                            : 'bg-slate-900 border-slate-700 text-amber-300 hover:border-slate-600 text-xs font-bold'
+                        }`}
+                      >
+                        <span className="text-xs font-black">🎪 Bao Trọn 8 Ô Sàn</span>
+                        <span className={`text-[9px] ${eventSport === 'all_arena' ? 'text-slate-900 font-bold' : 'text-amber-400'}`}>
+                          Gói Sự Kiện Toàn Sàn
+                        </span>
+                      </button>
+                    </div>
+
+                    {/* Số sân cầu lông nếu chọn cầu lông */}
+                    {eventSport === 'badminton' && (
+                      <div className="mt-2.5 flex items-center justify-between bg-slate-900 p-2 rounded-xl border border-slate-800">
+                        <span className="text-[11px] text-slate-300 font-bold">Số lượng sân thi đấu:</span>
+                        <div className="flex gap-1.5">
+                          {[1, 2, 4, 6].map((num) => (
+                            <button
+                              key={num}
+                              type="button"
+                              onClick={() => setEventCourtCount(num)}
+                              className={`px-2.5 py-1 rounded-lg text-xs font-black transition cursor-pointer ${
+                                eventCourtCount === num
+                                  ? 'bg-amber-400 text-slate-950'
+                                  : 'bg-slate-800 text-slate-400 hover:text-white'
+                              }`}
+                            >
+                              {num} sân
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Step 2: Thời lượng số ngày */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                        2. Số ngày thuê liên tiếp:
+                      </label>
+                      <span className="text-sm font-black text-amber-400">{eventDays} Ngày</span>
+                    </div>
+
+                    <input
+                      type="range"
+                      min={3}
+                      max={30}
+                      step={1}
+                      value={eventDays}
+                      onChange={(e) => setEventDays(Number(e.target.value))}
+                      className="w-full accent-amber-400 h-2 bg-slate-800 rounded-lg cursor-pointer"
+                    />
+
+                    <div className="mt-2 grid grid-cols-5 gap-1">
+                      {[
+                        { d: 7, label: '7N (1T)' },
+                        { d: 10, label: '10N' },
+                        { d: 14, label: '14N (2T)' },
+                        { d: 21, label: '21N (3T)' },
+                        { d: 30, label: '30N (1 Tháng)' },
+                      ].map((item) => (
+                        <button
+                          key={item.d}
+                          type="button"
+                          onClick={() => setEventDays(item.d)}
+                          className={`rounded-lg py-1.5 text-[10px] font-black transition active:scale-95 cursor-pointer ${
+                            eventDays === item.d
+                              ? 'bg-amber-400 text-slate-950 font-black'
+                              : 'bg-slate-900 text-slate-400 border border-slate-800 hover:text-white'
+                          }`}
+                        >
+                          {item.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Step 3: Khung giờ mỗi ngày */}
+                  <div>
+                    <label className="text-[10px] font-black uppercase tracking-wider text-slate-400 block mb-1.5">
+                      3. Khung giờ thi đấu mỗi ngày:
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setEventTimeSlot('morning')}
+                        className={`rounded-xl p-2.5 text-left border transition active:scale-95 cursor-pointer ${
+                          eventTimeSlot === 'morning'
+                            ? 'bg-amber-400/20 border-amber-400 text-white'
+                            : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-300'
+                        }`}
+                      >
+                        <div className="flex justify-between items-center">
+                          <span className="text-xs font-black text-amber-300">Buổi Sáng (3h)</span>
+                          <span className="text-[9px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded font-black">-5% Giờ Thấp Điểm</span>
+                        </div>
+                        <p className="text-[10px] text-slate-300 mt-0.5">08:00 - 11:00 hàng ngày</p>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setEventTimeSlot('afternoon')}
+                        className={`rounded-xl p-2.5 text-left border transition active:scale-95 cursor-pointer ${
+                          eventTimeSlot === 'afternoon'
+                            ? 'bg-amber-400/20 border-amber-400 text-white'
+                            : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-300'
+                        }`}
+                      >
+                        <div className="flex justify-between items-center">
+                          <span className="text-xs font-black text-amber-300">Buổi Chiều (3h)</span>
+                          <span className="text-[9px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded font-black">-5% Giờ Thấp Điểm</span>
+                        </div>
+                        <p className="text-[10px] text-slate-300 mt-0.5">14:00 - 17:00 hàng ngày</p>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setEventTimeSlot('evening')}
+                        className={`rounded-xl p-2.5 text-left border transition active:scale-95 cursor-pointer ${
+                          eventTimeSlot === 'evening'
+                            ? 'bg-amber-400/20 border-amber-400 text-white'
+                            : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-300'
+                        }`}
+                      >
+                        <div className="flex justify-between items-center">
+                          <span className="text-xs font-black text-amber-300">Buổi Tối (3h)</span>
+                          <span className="text-[9px] bg-amber-400/20 text-amber-300 px-1.5 py-0.5 rounded font-black">Giờ Vàng + Quà</span>
+                        </div>
+                        <p className="text-[10px] text-slate-300 mt-0.5">18:00 - 21:00 hàng ngày</p>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setEventTimeSlot('fullday')}
+                        className={`rounded-xl p-2.5 text-left border transition active:scale-95 cursor-pointer ${
+                          eventTimeSlot === 'fullday'
+                            ? 'bg-amber-400/20 border-amber-400 text-white'
+                            : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-300'
+                        }`}
+                      >
+                        <div className="flex justify-between items-center">
+                          <span className="text-xs font-black text-amber-300">Cả Ngày (8h)</span>
+                          <span className="text-[9px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded font-black">-10% Gói Trọn Ngày</span>
+                        </div>
+                        <p className="text-[10px] text-slate-300 mt-0.5">08:00 - 17:00 liên tục</p>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Financial Breakdown Box */}
+                  <div className="rounded-xl bg-gradient-to-br from-amber-500/15 via-slate-900 to-emerald-500/10 border border-amber-400/30 p-3.5 space-y-2 text-xs">
+                    <div className="flex justify-between items-center text-slate-300">
+                      <span>Quy mô chuỗi ngày:</span>
+                      <span className="font-bold text-white">{eventDays} ngày liên tiếp ({eventTotalHours} giờ thi đấu)</span>
+                    </div>
+                    <div className="flex justify-between items-center text-slate-300">
+                      <span>Đơn giá giờ tạm tính:</span>
+                      <span className="font-bold text-white">{eventHourlyRate.toLocaleString('vi-VN')}đ / giờ</span>
+                    </div>
+                    {eventDiscountPercent > 0 && (
+                      <div className="flex justify-between items-center text-emerald-400 font-bold">
+                        <span className="flex items-center gap-1">
+                          <Sparkles className="w-3.5 h-3.5" /> Ưu đãi giờ thấp điểm ({eventDiscountPercent}%):
+                        </span>
+                        <span>- {eventDiscountAmount.toLocaleString('vi-VN')}đ</span>
+                      </div>
+                    )}
+                    <div className="border-t border-slate-800 pt-2 flex items-baseline justify-between">
+                      <div>
+                        <span className="text-[10px] text-slate-400 block uppercase font-bold">Dự toán toàn bộ đợt:</span>
+                        <span className="text-lg font-black text-emerald-400">{eventFinalPrice.toLocaleString('vi-VN')}đ</span>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-[10px] text-slate-400 block">Đặt cọc giữ sàn:</span>
+                        <span className="text-xs font-bold text-amber-300">~ {Math.round(eventFinalPrice / 2).toLocaleString('vi-VN')}đ (50%)</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Gói quà tặng & Hậu cần tài trợ */}
+                  <div className="rounded-xl bg-slate-900/80 p-3 border border-slate-800 space-y-1.5 text-[11px] text-slate-300">
+                    <div className="flex items-center gap-1 text-amber-400 font-black text-xs uppercase mb-1">
+                      <Gift className="w-4 h-4" /> GÓI TIỆN ÍCH HẬU CẦN ĐI KÈM SỰ KIỆN:
+                    </div>
+                    <div className="flex items-center gap-2 text-emerald-400 font-bold">
+                      <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" />
+                      <span>Tặng 2 thùng nước khoáng / nước điện giải cho giải đấu</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-emerald-400 font-bold">
+                      <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" />
+                      <span>Miễn phí mượn bảng điểm lật tay, còi & áo pitch phân đội</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-emerald-400 font-bold">
+                      <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" />
+                      <span>Hỗ trợ hệ thống âm thanh loa mic khai mạc & trao giải</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-emerald-400 font-bold">
+                      <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" />
+                      <span>Khóa sàn liên tục, tránh gián đoạn các buổi tập huấn</span>
+                    </div>
+                  </div>
+
+                  {/* Action buttons */}
+                  <div className="pt-1 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowEventModal(true)}
+                      className="w-full flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 py-3 px-4 text-xs font-black uppercase tracking-wider text-slate-950 shadow-lg shadow-amber-500/20 hover:from-amber-300 hover:to-amber-400 active:scale-95 transition cursor-pointer"
+                    >
+                      <Trophy className="w-4 h-4" /> Đăng ký sự kiện / Chuỗi ngày
+                    </button>
+
+                    <a
+                      href="tel:0901234567"
+                      className="w-full flex items-center justify-center gap-2 rounded-xl bg-slate-800 hover:bg-slate-700 py-3 px-4 text-xs font-bold text-white border border-slate-700 active:scale-95 transition"
+                    >
+                      <Phone className="w-4 h-4 text-amber-400" /> Điều phối giải: 0901.234.567
+                    </a>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </section>
 
         {/* ======================================================== */}
         {/* 3. HỆ THỐNG ĐẶT SÂN TỰ ĐỘNG (LIGHT THEME)               */}
@@ -592,6 +1490,15 @@ export default function TrangChu() {
             </div>
 
             <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+              {selectedDate && !availableDates.some((item) => `${item.label} (${item.date})` === selectedDate) && (
+                <button
+                  type="button"
+                  className="flex-shrink-0 flex flex-col items-center justify-center rounded-xl px-4 py-2.5 border border-emerald-500 bg-emerald-500 text-white font-black shadow-sm"
+                >
+                  <span className="text-[10px] font-bold uppercase opacity-90">Đã chọn</span>
+                  <span className="text-xs font-black mt-0.5">{selectedDate}</span>
+                </button>
+              )}
               {availableDates.map((item) => {
                 const fullDateStr = `${item.label} (${item.date})`;
                 const isSelected = selectedDate === fullDateStr;
@@ -616,44 +1523,17 @@ export default function TrangChu() {
             </div>
           </div>
 
-          {/* ⚡ BƯỚC 3: LỰA CHỌN SÂN VÀ THỜI GIAN */}
+          {/* ⚡ BƯỚC 3: LỰA CHỌN THỜI GIAN & SÂN KHẢ DỤNG */}
           <div className="rounded-2xl border border-slate-200 bg-white p-4 space-y-4 shadow-xs">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500 text-xs font-black text-white">3</span>
-                <h3 className="text-sm font-black uppercase tracking-wider text-slate-900">CHỌN SÂN & THỜI GIAN</h3>
+                <h3 className="text-sm font-black uppercase tracking-wider text-slate-900">CHỌN THỜI GIAN & SÂN</h3>
               </div>
             </div>
 
-            {/* Court sub-selector */}
-            {selectedDate && selectedStartTime && (
-              <div className="animate-in fade-in slide-in-from-top-2 duration-300">
-                <label className="mb-2 block text-[10px] font-bold uppercase text-slate-500 tracking-wider">Chọn Sân</label>
-              <div className="flex flex-wrap gap-1.5 pb-1">
-                {availableCourts.map((court) => {
-                  const isCourtSelected = selectedCourt === court;
-                  return (
-                    <button
-                      key={court}
-                      type="button"
-                      onClick={() => setSelectedCourt(court)}
-                      className={[
-                        'rounded-lg px-3 py-1.5 text-xs font-bold transition',
-                        isCourtSelected
-                          ? 'bg-emerald-50 border border-emerald-500 text-emerald-700 font-extrabold'
-                          : 'bg-slate-50 border border-slate-200 text-slate-600 hover:border-slate-300',
-                      ].join(' ')}
-                    >
-                      {court}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-              )}
-
-            {/* Time Selection */}
-            <div className="space-y-3 pt-2 border-t border-slate-100">
+            {/* 1. Time Selection (Always at top of Step 3) */}
+            <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="mb-1.5 block text-[10px] font-bold uppercase text-slate-500 tracking-wider">Giờ Bắt Đầu</label>
@@ -662,6 +1542,7 @@ export default function TrangChu() {
                     onChange={(e) => handleStartTimeSelect(e.target.value)}
                     className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-bold text-slate-900 outline-none focus:border-emerald-500 focus:bg-white transition"
                   >
+                    <option value="">-- Chọn giờ bắt đầu --</option>
                     {allStartTimes.map(time => (
                       <option key={time} value={time}>{time}</option>
                     ))}
@@ -681,23 +1562,75 @@ export default function TrangChu() {
                 </div>
               </div>
               
-              <div className="flex items-center justify-between rounded-xl bg-emerald-50/50 p-3 border border-emerald-100">
-                <span className="text-xs font-semibold text-emerald-800">Khung giờ đã chọn:</span>
-                <span className="text-sm font-black text-emerald-600">{selectedSlot}</span>
-              </div>
+              {selectedStartTime && (
+                <div className="flex items-center justify-between rounded-xl bg-emerald-50/50 p-3 border border-emerald-100 animate-in fade-in duration-200">
+                  <span className="text-xs font-semibold text-emerald-800">Khung giờ đã chọn:</span>
+                  <span className="text-sm font-black text-emerald-600">{selectedSlot}</span>
+                </div>
+              )}
             </div>
 
-            {/* Notice Alert Box */}
-            <div className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-xs leading-5 text-amber-900 flex items-start gap-2">
-              <AlertCircle className="w-5 h-5 flex-shrink-0 text-amber-500 mt-0.5" />
-              <p>
-                <strong>Lưu ý:</strong> Khung giờ 17:30 - 21:00 hệ thống không nhận khách đặt sân do ưu tiên phục vụ khách lẻ (vãng lai).
-              </p>
-            </div>
+            {/* 2. Available Courts (Shows ONLY AFTER date & time are selected) */}
+            {!selectedDate || !selectedStartTime ? (
+              <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50/80 p-3.5 text-center text-xs text-slate-500">
+                <p className="font-semibold text-slate-600">
+                  {!selectedDate 
+                    ? "Vui lòng chọn Ngày thi đấu để tiếp tục" 
+                    : "Vui lòng chọn Giờ bắt đầu để hiển thị các sân khả dụng"}
+                </p>
+              </div>
+            ) : (
+              <div className="pt-3 border-t border-slate-100 animate-in fade-in slide-in-from-top-2 duration-300">
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-[10px] font-bold uppercase text-slate-500 tracking-wider">
+                    Sân khả dụng ({availableCourts.length} sân trống)
+                  </label>
+                  <span className="text-[10px] text-emerald-600 font-bold">
+                    {selectedSlot}
+                  </span>
+                </div>
+
+                {availableCourts.length > 0 ? (
+                  <div className="flex flex-wrap gap-2">
+                    {availableCourts.map((court) => {
+                      const isCourtSelected = selectedCourt === court;
+                      return (
+                        <button
+                          key={court}
+                          type="button"
+                          onClick={() => setSelectedCourt(court)}
+                          className={[
+                            'rounded-xl px-3.5 py-2 text-xs font-bold transition active:scale-95 flex items-center gap-1.5 cursor-pointer',
+                            isCourtSelected
+                              ? 'bg-emerald-50 border-2 border-emerald-500 text-emerald-800 font-black shadow-xs'
+                              : 'bg-white border border-slate-200 text-slate-700 hover:border-emerald-300 hover:bg-emerald-50/30',
+                          ].join(' ')}
+                        >
+                          <span className={`w-2 h-2 rounded-full ${isCourtSelected ? 'bg-emerald-500' : 'bg-slate-300'}`}></span>
+                          {court}
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="rounded-xl border border-amber-200 bg-amber-50 p-3.5 text-center text-xs text-amber-800 space-y-2">
+                    <p className="font-bold">Khung giờ này hiện đã kín sân!</p>
+                    <p className="text-[11px] text-amber-700">Vui lòng chọn giờ khác hoặc bấm nút "Xem lịch sân" ở góc dưới để tìm giờ trống.</p>
+                    <button
+                      type="button"
+                      onClick={() => setShowScheduleModal(true)}
+                      className="inline-flex items-center gap-1 rounded-lg bg-amber-600 text-white font-bold px-3 py-1.5 text-[11px] hover:bg-amber-700 active:scale-95 transition cursor-pointer"
+                    >
+                      Mở lịch sân xem giờ trống
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* ⚡ BƯỚC 4: TÓM TẮT ĐƠN ĐẶT SÂN */}
-          <div className="rounded-2xl border border-slate-200 bg-white p-4 space-y-3 shadow-xs">
+          <div id="booking-summary-section" className="rounded-2xl border border-slate-200 bg-white p-4 space-y-3 shadow-xs scroll-mt-20">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500 text-xs font-black text-white">4</span>
@@ -949,7 +1882,335 @@ export default function TrangChu() {
 
       </main>
 )}
-{activeTab === 'schedule' && <CustomerSchedule />}
+{activeTab === 'schedule' && (
+  <CustomerSchedule 
+    onSelectSlot={(sportId, courtName, time, dateStr) => {
+      handleSelectSlotFromSchedule(sportId, courtName, time, dateStr);
+    }}
+  />
+)}
+
+      {/* 🟢 FLOATING BUBBLE: XEM LỊCH SÂN NGAY TRÊN TRANG ĐẶT SÂN */}
+      {activeTab === 'booking' && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 w-full max-w-md pointer-events-none z-40 px-4 flex justify-end animate-in fade-in zoom-in-95 duration-300">
+          <button
+            type="button"
+            onClick={() => setShowScheduleModal(true)}
+            className="pointer-events-auto flex items-center gap-2 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2.5 shadow-xl shadow-emerald-950/25 border-2 border-emerald-400 active:scale-95 transition-all group cursor-pointer"
+          >
+            <span className="relative flex h-2.5 w-2.5">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-300 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-white"></span>
+            </span>
+            <CalendarIcon className="w-4 h-4 text-emerald-100 group-hover:rotate-12 transition-transform" />
+            <span className="text-xs font-black tracking-wide">Xem lịch sân</span>
+          </button>
+        </div>
+      )}
+
+      {/* 📱 MODAL BOTTOM SHEET: XEM LỊCH SÂN TRỰC TIẾP TRÊN TRANG ĐẶT SÂN */}
+      {showScheduleModal && (
+        <div className="fixed top-0 bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md z-50 flex flex-col bg-slate-50 animate-in slide-in-from-bottom-8 duration-300 shadow-2xl border-x border-slate-200 overflow-hidden">
+          {/* Header */}
+          <header className="flex items-center justify-between px-4 py-3 bg-white border-b border-slate-200 sticky top-0 z-40 shrink-0">
+            <div className="flex items-center gap-2">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700 font-bold">
+                <CalendarIcon className="w-4 h-4" />
+              </div>
+              <div>
+                <h3 className="text-xs font-black uppercase tracking-wider text-slate-900">BẢNG LỊCH SÂN</h3>
+                <p className="text-[10px] text-slate-500 font-medium">Chạm ô trống để chọn & điền form tự động</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowScheduleModal(false)}
+              className="flex items-center gap-1 rounded-full bg-slate-100 hover:bg-slate-200 px-3 py-1.5 text-xs font-bold text-slate-700 active:scale-95 transition cursor-pointer"
+            >
+              <X className="w-3.5 h-3.5" /> Đóng
+            </button>
+          </header>
+
+          {/* Schedule Content */}
+          <div className="flex-1 overflow-hidden flex flex-col">
+            <CustomerSchedule
+              isModalMode={true}
+              onSelectSlot={(sportId, courtName, time, dateStr) => {
+                handleSelectSlotFromSchedule(sportId, courtName, time, dateStr);
+                setShowScheduleModal(false);
+              }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* 👑 MODAL ĐĂNG KÝ THUÊ SÂN VIP CỐ ĐỊNH */}
+      {showVipModal && (
+        <div className="fixed top-0 bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md z-50 flex items-end sm:items-center justify-center bg-slate-900/60 p-0 sm:p-4 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="w-full max-w-md rounded-t-3xl sm:rounded-3xl bg-white p-6 shadow-2xl animate-in slide-in-from-bottom-8 duration-300 max-h-[92vh] overflow-y-auto flex flex-col border border-slate-100">
+            <div className="w-12 h-1.5 bg-slate-200 rounded-full mb-3 mx-auto sm:hidden"></div>
+
+            {/* Header */}
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-100 text-amber-700">
+                  <Award className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-slate-900 uppercase">Đăng ký giữ lịch VIP</h3>
+                  <p className="text-[10px] text-slate-500">Giữ sân cố định • Hợp đồng tối đa 1 năm</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowVipModal(false)}
+                className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 transition"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Package Summary Card */}
+            <div className="mt-4 rounded-2xl bg-gradient-to-br from-amber-50 to-emerald-50 border border-amber-200 p-3.5 space-y-1.5 text-xs">
+              <div className="flex justify-between items-center">
+                <span className="text-slate-500">Môn & Thời hạn:</span>
+                <span className="font-extrabold text-slate-900">
+                  {sportsData[vipSport].name} • {vipMonths} Tháng (Giảm {vipDiscountPercent}%)
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-slate-500">Tần suất dự kiến:</span>
+                <span className="font-bold text-slate-800">
+                  {vipSessionsPerWeek} buổi/tuần ({vipHoursPerSession}h/buổi)
+                </span>
+              </div>
+              <div className="flex justify-between items-center border-t border-amber-200/60 pt-1.5">
+                <span className="text-slate-500">Dự toán sau giảm:</span>
+                <span className="font-black text-emerald-700 text-sm">
+                  {vipFinalPrice.toLocaleString('vi-VN')}đ
+                </span>
+              </div>
+              <p className="text-[10px] text-amber-700 font-medium">
+                ✨ Tiết kiệm {vipDiscountAmount.toLocaleString('vi-VN')}đ (~ {vipMonthlyAverage.toLocaleString('vi-VN')}đ/tháng, hỗ trợ chia nhiều đợt thanh toán tại quầy).
+              </p>
+            </div>
+
+            {/* Registration Form */}
+            <form onSubmit={handleVipSubmit} className="mt-4 space-y-3.5">
+              <div>
+                <label className="block text-[11px] font-black uppercase text-slate-700 mb-1">
+                  Họ tên người đại diện / Tên CLB / Doanh nghiệp <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Ví dụ: CLB Cầu Lông Đam Mê / Nguyễn Văn A"
+                  value={vipCustomerName}
+                  onChange={(e) => setVipCustomerName(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-xs font-bold text-slate-900 placeholder-slate-400 outline-none focus:border-amber-500 focus:bg-white transition"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-black uppercase text-slate-700 mb-1">
+                  Số điện thoại liên hệ <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="tel"
+                  required
+                  placeholder="Ví dụ: 0901234567"
+                  value={vipCustomerPhone}
+                  onChange={(e) => setVipCustomerPhone(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-xs font-bold text-slate-900 placeholder-slate-400 outline-none focus:border-amber-500 focus:bg-white transition"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-black uppercase text-slate-700 mb-1">
+                  Khung giờ & Các thứ trong tuần mong muốn
+                </label>
+                <input
+                  type="text"
+                  placeholder="Ví dụ: Tối Thứ 2 - 4 - 6 từ 18:00 đến 20:00"
+                  value={vipPreferredSchedule}
+                  onChange={(e) => setVipPreferredSchedule(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-xs font-bold text-slate-900 placeholder-slate-400 outline-none focus:border-amber-500 focus:bg-white transition"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-black uppercase text-slate-700 mb-1">
+                  Ghi chú hoặc yêu cầu thanh toán nhiều đợt
+                </label>
+                <textarea
+                  rows={2}
+                  placeholder="Ví dụ: Mong muốn thanh toán làm 3 đợt, cần xuất hóa đơn VAT cho công ty..."
+                  value={vipCustomerNote}
+                  onChange={(e) => setVipCustomerNote(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-xs font-medium text-slate-900 placeholder-slate-400 outline-none focus:border-amber-500 focus:bg-white transition resize-none"
+                />
+              </div>
+
+              <div className="rounded-xl bg-slate-50 p-3 text-[10px] text-slate-500 border border-slate-200 leading-relaxed">
+                ℹ️ <strong>Quy trình xử lý VIP:</strong> Để đảm bảo mặt sân được giữ độc quyền và khóa va chạm không gian xuyên suốt chu kỳ hợp đồng, nhân viên quản lý sân sẽ kiểm tra lịch sàn và gọi điện thoại xác nhận trong vòng 15 phút, sau đó hướng dẫn ký hợp đồng trực tiếp tại quầy.
+              </div>
+
+              <div className="pt-2 grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowVipModal(false)}
+                  className="rounded-xl border border-slate-200 py-3 text-xs font-bold text-slate-600 hover:bg-slate-100 active:scale-95 transition"
+                >
+                  Hủy bỏ
+                </button>
+                <button
+                  type="submit"
+                  className="rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 py-3 text-xs font-black uppercase tracking-wider text-slate-950 shadow-md shadow-amber-500/20 hover:from-amber-300 hover:to-amber-400 active:scale-95 transition"
+                >
+                  GỬI YÊU CẦU VIP
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* 🎪 MODAL ĐĂNG KÝ SỰ KIỆN & CHUỖI NGÀY */}
+      {showEventModal && (
+        <div className="fixed top-0 bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md z-50 flex items-end sm:items-center justify-center bg-slate-900/60 p-0 sm:p-4 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="w-full max-w-md rounded-t-3xl sm:rounded-3xl bg-white p-6 shadow-2xl animate-in slide-in-from-bottom-8 duration-300 max-h-[92vh] overflow-y-auto flex flex-col border border-slate-100">
+            <div className="w-12 h-1.5 bg-slate-200 rounded-full mb-3 mx-auto sm:hidden"></div>
+
+            {/* Header */}
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-100 text-amber-700">
+                  <Trophy className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-slate-900 uppercase">Đăng ký sự kiện / Chuỗi ngày</h3>
+                  <p className="text-[10px] text-slate-500">Giữ sân dồn dập • Hỗ trợ thiết bị giải đấu</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowEventModal(false)}
+                className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 transition cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Package Summary Card */}
+            <div className="mt-4 rounded-2xl bg-gradient-to-br from-amber-50 to-emerald-50 border border-amber-200 p-3.5 space-y-1.5 text-xs">
+              <div className="flex justify-between items-center">
+                <span className="text-slate-500">Môn & Quy mô:</span>
+                <span className="font-extrabold text-slate-900">
+                  {eventSport === 'all_arena' ? 'Bao trọn 8 ô sàn' : sportsData[eventSport as keyof typeof sportsData]?.name} {eventSport === 'badminton' ? `(${eventCourtCount} sân)` : ''}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-slate-500">Thời gian chuỗi:</span>
+                <span className="font-bold text-slate-800">
+                  {eventDays} ngày liên tiếp ({eventTotalHours} giờ)
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-slate-500">Khung giờ mỗi ngày:</span>
+                <span className="font-bold text-slate-800">
+                  {eventTimeSlot === 'morning' ? 'Sáng (08:00 - 11:00)' : eventTimeSlot === 'afternoon' ? 'Chiều (14:00 - 17:00)' : eventTimeSlot === 'evening' ? 'Tối (18:00 - 21:00)' : 'Cả ngày (08:00 - 17:00)'}
+                </span>
+              </div>
+              <div className="flex justify-between items-center border-t border-amber-200/60 pt-1.5">
+                <span className="text-slate-500">Dự toán toàn đợt:</span>
+                <span className="font-black text-emerald-700 text-sm">
+                  {eventFinalPrice.toLocaleString('vi-VN')}đ
+                </span>
+              </div>
+              <p className="text-[10px] text-amber-700 font-medium">
+                🎁 Tặng kèm: 2 thùng nước khoáng + miễn phí mượn bảng điểm lật tay + còi + loa mic trao giải.
+              </p>
+            </div>
+
+            {/* Registration Form */}
+            <form onSubmit={handleEventSubmit} className="mt-4 space-y-3.5">
+              <div>
+                <label className="block text-[11px] font-black uppercase text-slate-700 mb-1">
+                  Tên Đơn vị / CLB / Doanh nghiệp / Ban tổ chức <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Ví dụ: Công ty Cổ phần ABC / Ban tổ chức giải Cúp Mùa Thu"
+                  value={eventOrgName}
+                  onChange={(e) => setEventOrgName(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-xs font-bold text-slate-900 placeholder-slate-400 outline-none focus:border-amber-500 focus:bg-white transition"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-black uppercase text-slate-700 mb-1">
+                  Số điện thoại người đại diện liên hệ <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="tel"
+                  required
+                  placeholder="Ví dụ: 0901234567"
+                  value={eventPhone}
+                  onChange={(e) => setEventPhone(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-xs font-bold text-slate-900 placeholder-slate-400 outline-none focus:border-amber-500 focus:bg-white transition"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-black uppercase text-slate-700 mb-1">
+                  Ngày dự kiến bắt đầu đợt thi đấu
+                </label>
+                <input
+                  type="text"
+                  placeholder="Ví dụ: Bắt đầu từ Thứ Hai ngày 20/10/2026"
+                  value={eventStartDate}
+                  onChange={(e) => setEventStartDate(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-xs font-bold text-slate-900 placeholder-slate-400 outline-none focus:border-amber-500 focus:bg-white transition"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-black uppercase text-slate-700 mb-1">
+                  Yêu cầu hậu cần đặc biệt & ghi chú
+                </label>
+                <textarea
+                  rows={2}
+                  placeholder="Ví dụ: Cần hỗ trợ 2 trọng tài bắt chính, hỗ trợ vị trí căng backdrop giải đấu, cần xuất hóa đơn VAT..."
+                  value={eventNotes}
+                  onChange={(e) => setEventNotes(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-xs font-medium text-slate-900 placeholder-slate-400 outline-none focus:border-amber-500 focus:bg-white transition resize-none"
+                />
+              </div>
+
+              <div className="rounded-xl bg-slate-50 p-3 text-[10px] text-slate-500 border border-slate-200 leading-relaxed">
+                ℹ️ <strong>Quy trình xử lý sự kiện:</strong> Vì thuê dồn dập {eventDays} ngày liên tiếp có thể trùng một vài ô sân lẻ đã có khách đặt trước, điều phối viên sẽ kiểm tra sơ đồ sàn trên hệ thống và gọi lại cho quý khách trong vòng 15 phút để chốt cụm sân và thủ tục đặt cọc 50%.
+              </div>
+
+              <div className="pt-2 grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowEventModal(false)}
+                  className="rounded-xl border border-slate-200 py-3 text-xs font-bold text-slate-600 hover:bg-slate-100 active:scale-95 transition cursor-pointer"
+                >
+                  Hủy bỏ
+                </button>
+                <button
+                  type="submit"
+                  className="rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 py-3 text-xs font-black uppercase tracking-wider text-slate-950 shadow-md shadow-amber-500/20 hover:from-amber-300 hover:to-amber-400 active:scale-95 transition cursor-pointer"
+                >
+                  GỬI YÊU CẦU SỰ KIỆN
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
 
 
@@ -1269,49 +2530,6 @@ export default function TrangChu() {
         </div>
       )}
 
-
-      {/* ======================================================== */}
-      {/* 🟢 FIXED MOBILE BOTTOM NAVIGATION BAR (CONSTRAINED WRAPPER) */}
-      {/* ======================================================== */}
-      <footer className="fixed bottom-0 left-1/2 -translate-x-1/2 z-40 w-full max-w-md border-t border-slate-200 bg-white/95 px-3 py-2.5 backdrop-blur-md shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] pb-safe">
-          <div className="flex items-center justify-around text-center">
-            <button
-              type="button"
-              onClick={() => handleTabChange('booking')}
-              className={[
-                'flex flex-col items-center gap-1 transition active:scale-95',
-                activeTab === 'booking' ? 'text-emerald-600 font-extrabold' : 'text-slate-500 hover:text-slate-800',
-              ].join(' ')}
-            >
-              <CalendarIcon className="w-5 h-5 mb-0.5" />
-              <span className="text-[10px] uppercase tracking-wider">Đặt sân</span>
-            </button>
-  
-            <button
-              type="button"
-              onClick={() => handleTabChange('lookup')}
-              className={[
-                'flex flex-col items-center gap-1 transition active:scale-95',
-                activeTab === 'lookup' ? 'text-emerald-600 font-extrabold' : 'text-slate-500 hover:text-slate-800',
-              ].join(' ')}
-            >
-              <Search className="w-5 h-5 mb-0.5" />
-              <span className="text-[10px] uppercase tracking-wider">Tra cứu</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => handleTabChange('schedule')}
-              className={[
-                'flex flex-col items-center gap-1 transition active:scale-95',
-                activeTab === 'schedule' ? 'text-emerald-600 font-extrabold' : 'text-slate-500 hover:text-slate-800',
-              ].join(' ')}
-            >
-              <LayoutGrid className="w-5 h-5 mb-0.5" />
-              <span className="text-[10px] uppercase tracking-wider">Lịch sân</span>
-            </button>
-          </div>
-        </footer>
     </div>
   );
 }
