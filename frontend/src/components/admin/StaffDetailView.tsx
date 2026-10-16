@@ -13,22 +13,21 @@ import {
   Trash2,
   AlertTriangle,
   Shield,
-  BadgeCheck,
 } from 'lucide-react';
 import type { Employee } from '../../types/admin';
 
 interface StaffDetailViewProps {
   employee: Employee;
-  onAssignShift: (emp: Employee) => void;
   onViewSchedule: () => void;
   onDeleteEmployee: (empId: string, empName: string) => void;
+  onEditEmployee: (emp: Employee) => void;
 }
 
 export default function StaffDetailView({
   employee,
-  onAssignShift,
   onViewSchedule,
   onDeleteEmployee,
+  onEditEmployee,
 }: StaffDetailViewProps) {
   const [copiedField, setCopiedField] = useState<'phone' | 'email' | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -59,26 +58,22 @@ export default function StaffDetailView({
     <div className="flex-1 space-y-4 p-4 pb-28 animate-in fade-in duration-200">
       {/* 🟢 Profile Card */}
       <div className="flex flex-col items-center rounded-3xl border border-slate-200 bg-white p-6 text-center shadow-2xs">
-        {/* Avatar with verified badge */}
+        {/* Avatar with status indicator */}
         <div className="relative mb-3">
-          <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-emerald-700 text-white font-black text-2xl shadow-md overflow-hidden">
-            {employee.avatarImage ? (
-              <img
-                src={employee.avatarImage}
-                alt={employee.name}
-                className="h-full w-full object-cover"
-                onError={(e) => {
-                  (e.currentTarget as HTMLElement).style.display = 'none';
-                }}
-              />
-            ) : null}
-            <span className={employee.avatarImage ? 'hidden' : 'block'}>
-              {employee.avatarText}
-            </span>
+          <div
+            className={[
+              'flex h-20 w-20 items-center justify-center rounded-3xl font-black text-2xl border shadow-2xs',
+              employee.avatarBg || 'bg-blue-100 text-blue-800 border-blue-300',
+            ].join(' ')}
+          >
+            <span>{employee.avatarText}</span>
           </div>
-          <div className="absolute -bottom-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full bg-emerald-600 text-white shadow-md border-2 border-white">
-            <BadgeCheck className="w-4 h-4 fill-emerald-600 text-white" />
-          </div>
+          <span
+            className={[
+              'absolute -bottom-1 -right-1 h-5 w-5 rounded-full border-2 border-white',
+              employee.status === 'active' ? 'bg-emerald-500' : 'bg-slate-400',
+            ].join(' ')}
+          />
         </div>
 
         {/* Name, Role & Status */}
@@ -94,7 +89,7 @@ export default function StaffDetailView({
         <div className="mt-5 grid grid-cols-2 gap-3 w-full">
           <button
             type="button"
-            onClick={() => alert(`Chỉnh sửa thông tin của ${employee.name}`)}
+            onClick={() => onEditEmployee(employee)}
             className="flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 py-3 text-xs font-black text-slate-700 hover:bg-slate-100 active:scale-95 transition cursor-pointer"
           >
             <Pencil className="w-3.5 h-3.5" />
@@ -103,11 +98,11 @@ export default function StaffDetailView({
 
           <button
             type="button"
-            onClick={() => onAssignShift(employee)}
-            className="flex items-center justify-center gap-2 rounded-xl bg-[#1b4d3e] hover:bg-[#143d31] py-3 text-xs font-black text-white shadow-sm active:scale-95 transition cursor-pointer"
+            onClick={onViewSchedule}
+            className="flex items-center justify-center gap-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 py-3 text-xs font-black text-white shadow-sm shadow-emerald-500/20 active:scale-95 transition cursor-pointer"
           >
             <Calendar className="w-3.5 h-3.5" />
-            <span>Phân ca</span>
+            <span>Xem lịch trực</span>
           </button>
         </div>
       </div>
@@ -147,7 +142,7 @@ export default function StaffDetailView({
         <button
           type="button"
           onClick={onViewSchedule}
-          className="flex w-full items-center justify-end gap-1 text-xs font-bold text-[#1b4d3e] hover:underline pt-1 cursor-pointer"
+          className="flex w-full items-center justify-end gap-1 text-xs font-bold text-emerald-600 hover:underline pt-1 cursor-pointer"
         >
           <span>Xem lịch làm việc</span>
           <ArrowRight className="w-3.5 h-3.5" />
@@ -157,7 +152,7 @@ export default function StaffDetailView({
       {/* 🟢 THÔNG TIN NHÂN VIÊN */}
       <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-2xs space-y-3">
         <div className="flex items-center gap-2">
-          <div className="h-3.5 w-1 rounded-full bg-[#1b4d3e]" />
+          <div className="h-3.5 w-1 rounded-full bg-emerald-500" />
           <span className="text-xs font-black uppercase tracking-wider text-slate-800">
             THÔNG TIN NHÂN VIÊN
           </span>
@@ -259,7 +254,7 @@ export default function StaffDetailView({
       <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-2xs space-y-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="h-3.5 w-1 rounded-full bg-[#1b4d3e]" />
+            <div className="h-3.5 w-1 rounded-full bg-emerald-500" />
             <span className="text-xs font-black uppercase tracking-wider text-slate-800">
               LỊCH TRỰC 5 NGÀY TỚI
             </span>
@@ -312,14 +307,14 @@ export default function StaffDetailView({
         </div>
       </div>
 
-      {/* 🔴 VÔ HIỆU HÓA HOẶC XÓA NHÂN VIÊN */}
+      {/* 🔴 VÔ HIỆU HÓA NHÂN VIÊN */}
       <div className="rounded-3xl border border-rose-200 bg-rose-50/50 p-4 space-y-3">
         <div className="flex items-center gap-2 text-rose-800 font-bold text-xs uppercase tracking-wider">
           <AlertTriangle className="w-4 h-4 text-rose-600" />
-          <span>VÔ HIỆU HÓA & XÓA NHÂN VIÊN</span>
+          <span>VÔ HIỆU HÓA NHÂN VIÊN</span>
         </div>
         <p className="text-[11px] text-slate-600 leading-relaxed font-medium">
-          Tài khoản nhân viên sẽ bị khóa quyền truy cập và gỡ bỏ khỏi toàn bộ ca trực trong tương lai. Thao tác này chỉ dành riêng cho Chủ sân (Owner).
+          Tài khoản nhân viên sẽ bị khóa quyền truy cập và gỡ bỏ khỏi toàn bộ ca trực trong tương lai.
         </p>
 
         <button
@@ -328,23 +323,23 @@ export default function StaffDetailView({
           className="w-full flex items-center justify-center gap-2 rounded-xl border border-rose-200 bg-white py-3 text-xs font-black text-rose-600 hover:bg-rose-50 transition active:scale-95 cursor-pointer shadow-2xs"
         >
           <Trash2 className="w-3.5 h-3.5" />
-          <span>XÓA NHÂN VIÊN NÀY</span>
+          <span>VÔ HIỆU HÓA NHÂN VIÊN</span>
         </button>
       </div>
 
-      {/* 🔴 MODAL XÁC NHẬN XÓA NHÂN VIÊN */}
+      {/* 🔴 MODAL XÁC NHẬN VÔ HIỆU HÓA NHÂN VIÊN */}
       {showDeleteConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="w-full max-w-sm rounded-3xl bg-white p-5 shadow-2xl space-y-4 animate-in zoom-in-95 duration-150">
             <div className="flex items-center gap-2 text-rose-600 font-black text-sm uppercase">
               <Shield className="w-5 h-5" />
-              <span>Xác nhận xóa nhân viên</span>
+              <span>Xác nhận vô hiệu hóa</span>
             </div>
 
             <div className="rounded-2xl bg-amber-50 border border-amber-200 p-3 text-xs text-amber-900 space-y-1.5">
               <p className="font-bold flex items-center gap-1.5 text-amber-900">
                 <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
-                Lưu ý quan trọng trước khi xóa:
+                Lưu ý quan trọng:
               </p>
               <p className="text-[11px] leading-relaxed text-amber-800">
                 Tài khoản của <strong className="font-black text-slate-900">{employee.name}</strong> sẽ bị khóa đăng nhập ngay lập tức. Toàn bộ các ca trực trong tương lai của nhân viên này sẽ được tự động giải phóng để phân công người khác. Lịch sử làm việc cũ vẫn được lưu trữ đối soát.
@@ -353,11 +348,11 @@ export default function StaffDetailView({
 
             <div>
               <label className="block text-xs font-bold text-slate-800 mb-1">
-                Lý do chấm dứt làm việc <span className="text-rose-500">*</span>
+                Lý do vô hiệu hóa <span className="text-rose-500">*</span>
               </label>
               <textarea
                 rows={2}
-                placeholder="Nhập lý do nghỉ việc (ví dụ: Hết hạn hợp đồng, chuyển công tác, xin nghỉ việc...)"
+                placeholder="Nhập lý do (ví dụ: Hết hạn hợp đồng, chuyển công tác, xin nghỉ việc...)"
                 value={deleteReason}
                 onChange={(e) => {
                   setDeleteReason(e.target.value);
@@ -388,7 +383,7 @@ export default function StaffDetailView({
                 onClick={handleConfirmDelete}
                 className="rounded-xl bg-rose-600 hover:bg-rose-700 py-3 text-xs font-black text-white shadow-sm cursor-pointer"
               >
-                Xác nhận xóa
+                Xác nhận vô hiệu hóa
               </button>
             </div>
           </div>

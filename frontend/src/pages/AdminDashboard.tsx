@@ -2,10 +2,11 @@ import { useState } from 'react';
 import { Menu, User as UserIcon, AlertTriangle, Calendar, CalendarClock, ChevronLeft, ChevronRight, LogOut, Settings, LayoutGrid, Users, Wallet, Dumbbell } from 'lucide-react';
 import AdminSchedulePage from './AdminSchedulePage';
 import AdminSetupReminderPage from './AdminSetupReminderPage';
-import AdminShiftManager from '../components/admin/AdminShiftManager';
+import ShiftScheduleView from '../components/admin/ShiftScheduleView';
 import StaffList from '../components/admin/StaffList';
 import AddStaffView from '../components/admin/AddStaffView';
 import StaffDetailView from '../components/admin/StaffDetailView';
+import EditStaffView from '../components/admin/EditStaffView';
 import WalletRevenueView from '../components/admin/WalletRevenueView';
 import type { Employee, ShiftRegistration, Transaction } from '../types/admin';
 import { INITIAL_EMPLOYEES, INITIAL_SHIFTS, INITIAL_TRANSACTIONS } from '../types/admin';
@@ -20,9 +21,9 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   // My states
   const [activeTab, setActiveTab] = useState<'lich_san' | 'nhan_vien' | 'ca_truc' | 'vi_thu' | 'co_so_vat_chat'>('lich_san');
   const [employees, setEmployees] = useState<Employee[]>(INITIAL_EMPLOYEES);
-  const [shifts] = useState<ShiftRegistration[]>(INITIAL_SHIFTS);
+  const [shifts, setShifts] = useState<ShiftRegistration[]>(INITIAL_SHIFTS);
   const [transactions, setTransactions] = useState<Transaction[]>(INITIAL_TRANSACTIONS);
-  const [staffSubView, setStaffSubView] = useState<'list' | 'add' | 'detail'>('list');
+  const [staffSubView, setStaffSubView] = useState<'list' | 'add' | 'detail' | 'edit'>('list');
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
 
   const handlePrevDay = () => {
@@ -64,6 +65,15 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   const handleAddNewStaff = () => setStaffSubView('add');
   const handleSelectEmployee = (emp: Employee) => {
     setSelectedEmployee(emp);
+    setStaffSubView('detail');
+  };
+  const handleEditEmployee = (emp: Employee) => {
+    setSelectedEmployee(emp);
+    setStaffSubView('edit');
+  };
+  const handleUpdateEmployee = (updatedEmp: Employee) => {
+    setEmployees(employees.map(e => (e.id === updatedEmp.id ? updatedEmp : e)));
+    setSelectedEmployee(updatedEmp);
     setStaffSubView('detail');
   };
   const handleSaveEmployee = (emp: Omit<Employee, 'id'>) => {
@@ -258,9 +268,16 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
             {staffSubView === 'detail' && selectedEmployee && (
               <StaffDetailView
                 employee={selectedEmployee}
-                onAssignShift={() => setActiveTab('ca_truc')}
                 onViewSchedule={() => setActiveTab('ca_truc')}
                 onDeleteEmployee={handleDeleteEmployee}
+                onEditEmployee={handleEditEmployee}
+              />
+            )}
+            {staffSubView === 'edit' && selectedEmployee && (
+              <EditStaffView
+                employee={selectedEmployee}
+                onBack={() => setStaffSubView('detail')}
+                onSaveEmployee={handleUpdateEmployee}
               />
             )}
           </div>
@@ -268,9 +285,16 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
 
         {activeTab === 'ca_truc' && (
           <div className="flex-1 overflow-auto bg-slate-50 relative custom-scrollbar">
-            <AdminShiftManager
+            <ShiftScheduleView
               employees={employees}
               shifts={shifts}
+              onAddShift={(newShift) => setShifts((prev) => [...prev, newShift])}
+              onDeleteShift={(shiftId, reason) => {
+                setShifts((prev) =>
+                  prev.map((s) => (s.id === shiftId ? { ...s, status: 'cancelled', cancelReason: reason } : s))
+                );
+              }}
+              isAdmin={true}
             />
           </div>
         )}
