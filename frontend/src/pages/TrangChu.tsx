@@ -1,8 +1,10 @@
 import AdminDashboard from './AdminDashboard';
 import CustomerSchedule from '../components/CustomerSchedule';
 import EmployeeDashboard from './employee/EmployeeDashboard';
+import VipCustomerDashboard from './VipCustomerDashboard';
+import { addBookingRequest } from '../types/bookingRequest';
 import { useState, useRef, useEffect, useMemo } from 'react';
-import { Search, MapPin, Phone, Clock, Play, Home, Calendar as CalendarIcon, X, Zap , User, Lock, Eye, Bell, Key, ArrowLeft, Sparkles, Award, CheckCircle2, Calculator, Trophy, Gift} from 'lucide-react';
+import { Search, MapPin, Phone, Clock, Play, Home, Calendar as CalendarIcon, X, Zap , User, Lock, Eye, Bell, Key, ArrowLeft, Award, Trophy } from 'lucide-react';
 
 // Custom SVG Icons matching Figma design
 const ShuttlecockIcon = () => (
@@ -67,6 +69,7 @@ export default function TrangChu() {
   const [showPassword, setShowPassword] = useState<boolean>(false);
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState<boolean>(false);
   const [isEmployeeLoggedIn, setIsEmployeeLoggedIn] = useState<boolean>(false);
+  const [isVipLoggedIn, setIsVipLoggedIn] = useState<boolean>(false);
   const [username, setUsername] = useState<string>('');
   const [passwordInput, setPasswordInput] = useState<string>('');
 
@@ -232,6 +235,43 @@ export default function TrangChu() {
       return;
     }
 
+    // Save to shared booking requests for Admin
+    const now = new Date();
+    const dateStr = `${now.getDate().toString().padStart(2, '0')}/${(now.getMonth() + 1).toString().padStart(2, '0')} ${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+    const randomCode = `YC-VIP-${Date.now().toString().slice(-4)}`;
+
+    addBookingRequest({
+      id: `REQ-${Date.now()}`,
+      code: randomCode,
+      customerName: vipCustomerName.trim(),
+      phone: vipCustomerPhone.trim(),
+      customerType: 'vip_monthly',
+      customerTypeLabel: `Hội viên VIP (${vipMonths} Tháng)`,
+      sport: vipSport,
+      sportLabel: sportsData[vipSport].name,
+      courtDetails: 'Sân 01 & Sân 02',
+      preferredSchedule: vipPreferredSchedule.trim() || `${vipSessionsPerWeek} buổi/tuần`,
+      preferredTime: `${vipHoursPerSession}h/buổi`,
+      durationMonths: vipMonths,
+      source: 'website',
+      sourceLabel: 'Từ Website',
+      notes: vipCustomerNote.trim() || `Khách gửi yêu cầu gói VIP ${vipMonths} tháng từ Trang chủ.`,
+      totalPrice: vipBasePrice,
+      discountPercent: vipDiscountPercent,
+      discountAmount: vipDiscountAmount,
+      finalPrice: vipFinalPrice,
+      paymentMode: 'installments',
+      paymentModeLabel: 'Chia nhiều đợt',
+      paidAmount: 0,
+      remainingDue: vipFinalPrice,
+      paymentStatus: 'unpaid',
+      paymentStatusLabel: 'Chưa đóng',
+      status: 'pending',
+      statusLabel: 'Chờ liên hệ',
+      createdAt: dateStr,
+      contactLogs: []
+    });
+
     setShowVipModal(false);
     showAlert(
       'Gửi yêu cầu VIP thành công! 🎉',
@@ -314,6 +354,43 @@ export default function TrangChu() {
       showAlert('Số điện thoại không hợp lệ', 'Vui lòng nhập số điện thoại hợp lệ (9 - 11 chữ số) để điều phối viên liên hệ.');
       return;
     }
+
+    // Save to shared booking requests for Admin
+    const now = new Date();
+    const dateStr = `${now.getDate().toString().padStart(2, '0')}/${(now.getMonth() + 1).toString().padStart(2, '0')} ${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+    const randomCode = `YC-SK-${Date.now().toString().slice(-4)}`;
+
+    addBookingRequest({
+      id: `REQ-${Date.now()}`,
+      code: randomCode,
+      customerName: eventOrgName.trim(),
+      phone: eventPhone.trim(),
+      customerType: 'event_series',
+      customerTypeLabel: `Sự kiện (${eventDays} Ngày)`,
+      sport: eventSport === 'all_arena' ? 'football' : (eventSport as any),
+      sportLabel: eventSport === 'all_arena' ? 'Bao trọn 8 ô sàn' : sportsData[eventSport as keyof typeof sportsData]?.name || 'Đa môn',
+      courtDetails: eventSport === 'all_arena' ? 'Toàn bộ 8 ô sàn' : eventSport === 'badminton' ? `${eventCourtCount} Sân` : 'Cụm sân tiêu chuẩn',
+      preferredSchedule: eventStartDate.trim() || `${eventDays} ngày liên tiếp`,
+      preferredTime: eventTimeSlot === 'morning' ? '08:00 - 11:00 (Sáng)' : eventTimeSlot === 'afternoon' ? '14:00 - 17:00 (Chiều)' : eventTimeSlot === 'evening' ? '18:00 - 21:00 (Tối)' : '08:00 - 17:00 (Cả ngày)',
+      eventDays: eventDays,
+      source: 'website',
+      sourceLabel: 'Từ Website',
+      notes: eventNotes.trim() || `Khách gửi yêu cầu chuỗi sự kiện ${eventDays} ngày từ Trang chủ.`,
+      totalPrice: eventBasePrice,
+      discountPercent: eventDiscountPercent,
+      discountAmount: eventDiscountAmount,
+      finalPrice: eventFinalPrice,
+      paymentMode: 'deposit_50',
+      paymentModeLabel: 'Cọc 50%',
+      paidAmount: 0,
+      remainingDue: eventFinalPrice,
+      paymentStatus: 'unpaid',
+      paymentStatusLabel: 'Chưa đóng',
+      status: 'pending',
+      statusLabel: 'Chờ liên hệ',
+      createdAt: dateStr,
+      contactLogs: []
+    });
 
     setShowEventModal(false);
     showAlert(
@@ -561,6 +638,10 @@ export default function TrangChu() {
     return <EmployeeDashboard onLogout={() => setIsEmployeeLoggedIn(false)} />;
   }
 
+  if (isVipLoggedIn) {
+    return <VipCustomerDashboard onLogout={() => setIsVipLoggedIn(false)} />;
+  }
+
   return (
     <div className="flex min-h-screen flex-col bg-slate-50 text-slate-900 antialiased selection:bg-emerald-500 selection:text-white">
       
@@ -758,672 +839,166 @@ export default function TrangChu() {
         {/* ======================================================== */}
         {/* 2.5 HỢP ĐỒNG KHÁCH ĐOÀN: VIP THÁNG & SỰ KIỆN CHUỖI NGÀY */}
         {/* ======================================================== */}
-        <section className="space-y-4 pt-2">
-          {/* Main Card */}
-          <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-slate-900 to-amber-950 p-5 text-white shadow-xl border border-amber-500/30">
-            {/* Background Glow */}
-            <div className="absolute -right-16 -top-16 h-48 w-48 rounded-full bg-amber-500/10 blur-3xl pointer-events-none"></div>
-            <div className="absolute -left-16 -bottom-16 h-48 w-48 rounded-full bg-emerald-500/10 blur-3xl pointer-events-none"></div>
-
-            {/* Header Badge & Title */}
-            <div className="relative z-10">
-              <div className="inline-flex items-center gap-1.5 rounded-full bg-amber-400/20 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-amber-300 border border-amber-400/30">
-                <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                DÀNH CHO KHÁCH ĐOÀN, CLB & DOANH NGHIỆP
-              </div>
-
-              <h2 className="mt-2 text-xl font-black text-white leading-tight">
-                HỢP ĐỒNG & ĐẶT SÂN THEO GÓI
+        <section className="space-y-3 pt-2">
+          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-xs">
+            {/* Header */}
+            <div className="border-b border-slate-100 pb-3">
+              <span className="inline-block rounded-md bg-amber-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-amber-800 border border-amber-200">
+                Chính sách khách đoàn & hội viên
+              </span>
+              <h2 className="mt-1.5 text-base font-black text-slate-900 uppercase tracking-tight">
+                Hợp đồng & Đặt sân theo gói
               </h2>
-              <p className="mt-1 text-xs text-slate-300 leading-relaxed">
+              <p className="mt-0.5 text-xs text-slate-500">
                 Chính sách ưu đãi và hỗ trợ vận hành riêng cho Hội viên gắn bó định kỳ hoặc Sự kiện / Giải đấu ngắn ngày.
               </p>
-
-              {/* 2-TAB SEGMENTED CONTROLLER */}
-              <div className="mt-4 grid grid-cols-2 p-1 bg-slate-950/80 rounded-2xl border border-slate-800">
-                <button
-                  type="button"
-                  onClick={() => setContractMode('vip_subscription')}
-                  className={`flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl text-xs font-black transition-all active:scale-95 cursor-pointer ${
-                    contractMode === 'vip_subscription'
-                      ? 'bg-amber-400 text-slate-950 shadow-md'
-                      : 'text-slate-400 hover:text-white'
-                  }`}
-                >
-                  <Award className="w-3.5 h-3.5" />
-                  <span>CỐ ĐỊNH THÁNG (1 - 12T)</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setContractMode('event_series')}
-                  className={`flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl text-xs font-black transition-all active:scale-95 cursor-pointer ${
-                    contractMode === 'event_series'
-                      ? 'bg-amber-400 text-slate-950 shadow-md'
-                      : 'text-slate-400 hover:text-white'
-                  }`}
-                >
-                  <Trophy className="w-3.5 h-3.5" />
-                  <span>SỰ KIỆN & CHUỖI NGÀY</span>
-                </button>
-              </div>
             </div>
 
-            {/* ======================================================== */}
-            {/* TAB 1: VIP MONTHLY SUBSCRIPTION (1 - 12 MONTHS)         */}
-            {/* ======================================================== */}
+            {/* Segmented Controller (2 Tabs) - Clean, no icons */}
+            <div className="mt-3 grid grid-cols-2 p-1 bg-slate-100 rounded-2xl">
+              <button
+                type="button"
+                onClick={() => setContractMode('vip_subscription')}
+                className={`py-2 px-3 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                  contractMode === 'vip_subscription'
+                    ? 'bg-white text-slate-900 shadow-xs'
+                    : 'text-slate-500 hover:text-slate-900'
+                }`}
+              >
+                Cố định tháng (1 - 12T)
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setContractMode('event_series')}
+                className={`py-2 px-3 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                  contractMode === 'event_series'
+                    ? 'bg-white text-slate-900 shadow-xs'
+                    : 'text-slate-500 hover:text-slate-900'
+                }`}
+              >
+                Sự kiện & Chuỗi ngày (7 - 14N)
+              </button>
+            </div>
+
+            {/* TAB 1: VIP MONTHLY SUBSCRIPTION */}
             {contractMode === 'vip_subscription' && (
-              <div className="mt-4 space-y-4 animate-in fade-in duration-200 relative z-10">
-                {/* 3 Tier Cards */}
+              <div className="mt-4 space-y-3 animate-in fade-in duration-150">
+                {/* 3 Tier Cards - Compact & Clean */}
                 <div className="grid grid-cols-3 gap-2">
-                  <div className="rounded-2xl bg-white/5 border border-slate-700/60 p-2.5 flex flex-col justify-between">
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 flex flex-col justify-between">
                     <div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-[9px] font-black uppercase text-slate-300">Trải nghiệm</span>
-                        <span className="rounded bg-slate-800 px-1 py-0.5 text-[8px] font-bold text-slate-300">
-                          Giá chuẩn
-                        </span>
-                      </div>
-                      <p className="mt-1 text-xs font-black text-white">1 – 2 Tháng</p>
-                      <p className="text-[9px] text-slate-400 mt-0.5 leading-tight">Giữ cố định giờ vàng yêu thích.</p>
+                      <div className="text-[10px] font-bold uppercase text-slate-500">1 – 2 Tháng</div>
+                      <div className="mt-1 text-xs font-black text-slate-800">Giá chuẩn</div>
+                      <p className="mt-1 text-[11px] text-slate-500 leading-tight">Giữ cố định giờ vàng yêu thích</p>
                     </div>
                   </div>
 
-                  <div className="rounded-2xl bg-white/5 border border-amber-400/30 p-2.5 flex flex-col justify-between">
+                  <div className="rounded-2xl border border-amber-300 bg-amber-50/80 p-3 flex flex-col justify-between">
                     <div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-[9px] font-black uppercase text-amber-300">Hạng VIP</span>
-                        <span className="rounded bg-amber-400/20 px-1 py-0.5 text-[8px] font-extrabold text-amber-300 border border-amber-400/30">
-                          -10%/h
-                        </span>
-                      </div>
-                      <p className="mt-1 text-xs font-black text-white">3 – 6 Tháng</p>
-                      <p className="text-[9px] text-slate-400 mt-0.5 leading-tight">Hỗ trợ chia nhiều đợt đóng.</p>
+                      <div className="text-[10px] font-black uppercase text-amber-700">3 – 6 Tháng</div>
+                      <div className="mt-1 text-xs font-black text-amber-900">Giảm 10%/giờ</div>
+                      <p className="mt-1 text-[11px] text-amber-800 leading-tight">Hạng VIP • Chia nhiều đợt đóng</p>
                     </div>
                   </div>
 
-                  <div className="rounded-2xl bg-gradient-to-br from-amber-500/20 to-amber-700/10 border border-amber-400/40 p-2.5 flex flex-col justify-between relative overflow-hidden">
+                  <div className="rounded-2xl border border-amber-400 bg-amber-100 p-3 flex flex-col justify-between">
                     <div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-[9px] font-black uppercase text-amber-200">VIP Vàng</span>
-                        <span className="rounded bg-amber-400 px-1 py-0.5 text-[8px] font-black text-slate-950">
-                          -15%/h
-                        </span>
-                      </div>
-                      <p className="mt-1 text-xs font-black text-white">&gt; 6 – 12T</p>
-                      <p className="text-[9px] text-amber-200/80 mt-0.5 leading-tight">Ưu tiên vị trí sân đẹp nhất.</p>
+                      <div className="text-[10px] font-black uppercase text-amber-800">&gt; 6 – 12 Tháng</div>
+                      <div className="mt-1 text-xs font-black text-amber-950">Giảm 15%/giờ</div>
+                      <p className="mt-1 text-[11px] text-amber-900 leading-tight">VIP Thượng hạng • Ưu tiên vị trí sân</p>
                     </div>
                   </div>
                 </div>
 
-                {/* Interactive VIP Calculator */}
-                <div className="rounded-2xl bg-slate-950/70 p-4 border border-slate-800 space-y-4">
-                  <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
-                    <div className="flex items-center gap-1.5">
-                      <Calculator className="w-4 h-4 text-amber-400" />
-                      <span className="text-xs font-black uppercase tracking-wider text-slate-200">DỰ TOÁN CHI PHÍ & TIẾT KIỆM</span>
-                    </div>
-                    <span className="text-[10px] text-amber-400 font-bold">Tính toán nhanh</span>
+                {/* Policies & Benefits list */}
+                <div className="rounded-2xl bg-slate-50 border border-slate-200 p-3.5 space-y-2 text-xs text-slate-600">
+                  <div className="flex items-start gap-2">
+                    <span className="text-emerald-600 font-black">•</span>
+                    <span><strong>Khóa sân độc quyền:</strong> Giữ cố định khung giờ trong tuần suốt kỳ hạn hợp đồng, không lo trùng lịch hay mất sân.</span>
                   </div>
-
-                  {/* Step 1: Chọn môn */}
-                  <div>
-                    <label className="text-[10px] font-black uppercase tracking-wider text-slate-400 block mb-1.5">
-                      1. Chọn bộ môn:
-                    </label>
-                    <div className="grid grid-cols-3 gap-2">
-                      {(['badminton', 'volleyball', 'football'] as const).map((sKey) => {
-                        const sp = sportsData[sKey];
-                        const active = vipSport === sKey;
-                        return (
-                          <button
-                            key={sKey}
-                            type="button"
-                            onClick={() => setVipSport(sKey)}
-                            className={`rounded-xl py-2 px-2 text-center border transition active:scale-95 flex flex-col items-center cursor-pointer ${
-                              active
-                                ? 'bg-amber-400 border-amber-300 text-slate-950 font-black shadow-md'
-                                : 'bg-slate-900 border-slate-700 text-slate-300 hover:border-slate-600 text-xs font-bold'
-                            }`}
-                          >
-                            <span className="text-xs">{sp.name}</span>
-                            <span className={`text-[9px] ${active ? 'text-slate-900' : 'text-slate-400'}`}>
-                              {sp.pricePerHour.toLocaleString('vi-VN')}đ/h
-                            </span>
-                          </button>
-                        );
-                      })}
-                    </div>
+                  <div className="flex items-start gap-2">
+                    <span className="text-emerald-600 font-black">•</span>
+                    <span><strong>Thanh toán linh hoạt:</strong> Tự do thỏa thuận chia tổng số tiền thành nhiều đợt thanh toán trực tiếp tại quầy.</span>
                   </div>
-
-                  {/* Step 2: Tần suất & Thời lượng */}
-                  <div className="grid grid-cols-2 gap-3">
-                    {/* Buổi / Tuần */}
-                    <div>
-                      <label className="text-[10px] font-black uppercase tracking-wider text-slate-400 block mb-1.5">
-                        2. Buổi / Tuần:
-                      </label>
-                      <div className="grid grid-cols-3 gap-1">
-                        {[3, 4, 5].map((s) => (
-                          <button
-                            key={s}
-                            type="button"
-                            onClick={() => setVipSessionsPerWeek(s)}
-                            className={`rounded-lg py-1.5 text-xs font-black transition active:scale-95 cursor-pointer ${
-                              vipSessionsPerWeek === s
-                                ? 'bg-amber-400 text-slate-950'
-                                : 'bg-slate-900 text-slate-300 border border-slate-700 hover:border-slate-600'
-                            }`}
-                          >
-                            {s}b
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Giờ / Buổi */}
-                    <div>
-                      <label className="text-[10px] font-black uppercase tracking-wider text-slate-400 block mb-1.5">
-                        3. Thời lượng / Buổi:
-                      </label>
-                      <div className="grid grid-cols-3 gap-1">
-                        {[1.5, 2, 3].map((h) => (
-                          <button
-                            key={h}
-                            type="button"
-                            onClick={() => setVipHoursPerSession(h)}
-                            className={`rounded-lg py-1.5 text-xs font-black transition active:scale-95 cursor-pointer ${
-                              vipHoursPerSession === h
-                                ? 'bg-amber-400 text-slate-950'
-                                : 'bg-slate-900 text-slate-300 border border-slate-700 hover:border-slate-600'
-                            }`}
-                          >
-                            {h}h
-                          </button>
-                        ))}
-                      </div>
-                    </div>
+                  <div className="flex items-start gap-2">
+                    <span className="text-emerald-600 font-black">•</span>
+                    <span><strong>Đặc quyền đổi dời buổi:</strong> Hỗ trợ xin dời buổi thi đấu khi bận đột xuất; xuất đầy đủ hóa đơn điện tử VAT cho CLB & Doanh nghiệp.</span>
                   </div>
+                </div>
 
-                  {/* Step 3: Thời gian hợp đồng (1 - 12 tháng) */}
-                  <div>
-                    <div className="flex items-center justify-between mb-1.5">
-                      <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">
-                        4. Thời hạn thuê (1 đến 12 tháng):
-                      </label>
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-sm font-black text-amber-400">{vipMonths} Tháng</span>
-                        {vipDiscountPercent > 0 ? (
-                          <span className="rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 text-[10px] font-black">
-                            Giảm {vipDiscountPercent}%
-                          </span>
-                        ) : (
-                          <span className="rounded-full bg-slate-800 text-slate-300 border border-slate-700 px-2 py-0.5 text-[10px] font-bold">
-                            Gói Trải Nghiệm
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Range Slider (min 1, max 12) */}
-                    <input
-                      type="range"
-                      min={1}
-                      max={12}
-                      step={1}
-                      value={vipMonths}
-                      onChange={(e) => setVipMonths(Number(e.target.value))}
-                      className="w-full accent-amber-400 h-2 bg-slate-800 rounded-lg cursor-pointer"
-                    />
-
-                    {/* Quick Select Buttons */}
-                    <div className="mt-2 grid grid-cols-5 gap-1">
-                      {[
-                        { m: 1, label: '1T' },
-                        { m: 2, label: '2T' },
-                        { m: 3, label: '3T (-10%)' },
-                        { m: 6, label: '6T (-10%)' },
-                        { m: 12, label: '12T (-15%)' },
-                      ].map((item) => (
-                        <button
-                          key={item.m}
-                          type="button"
-                          onClick={() => setVipMonths(item.m)}
-                          className={`rounded-lg py-1 text-[10px] font-black transition active:scale-95 cursor-pointer ${
-                            vipMonths === item.m
-                              ? 'bg-amber-400 text-slate-950 font-black'
-                              : 'bg-slate-900 text-slate-400 border border-slate-800 hover:text-white'
-                          }`}
-                        >
-                          {item.label}
-                        </button>
-                      ))}
-                    </div>
-
-                    {/* Upsell Banner when vipMonths < 3 */}
-                    {vipMonths < 3 && (
-                      <div className="mt-2.5 rounded-xl bg-gradient-to-r from-amber-500/15 to-emerald-500/10 border border-amber-400/30 p-2.5 flex items-start gap-2 text-xs">
-                        <Sparkles className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
-                        <div className="flex-1">
-                          <p className="font-bold text-amber-300 text-[11px]">💡 Mẹo nâng hạng tiết kiệm:</p>
-                          <p className="text-[10px] text-slate-300 mt-0.5 leading-relaxed">
-                            Đăng ký từ 3 tháng trở lên để được nâng lên <strong className="text-amber-300">Hạng VIP</strong> và nhận chiết khấu <strong className="text-emerald-400">GIẢM NGAY 10%/giờ</strong> (tiết kiệm từ hàng trăm nghìn đến triệu đồng)!
-                          </p>
-                          <button
-                            type="button"
-                            onClick={() => setVipMonths(3)}
-                            className="mt-1 text-[11px] font-black text-amber-300 hover:text-amber-200 underline cursor-pointer"
-                          >
-                            Nâng lên gói 3 Tháng VIP (-10%) ngay →
-                          </button>
-                        </div>
-                      </div>
-                    )}
-
-                    <p className="mt-2 text-[10px] text-slate-400 italic">
-                      * Hợp đồng tối đa 12 tháng (1 năm). Khi hết hạn hợp đồng, quý khách được ưu tiên gia hạn cho năm kế tiếp.
-                    </p>
-                  </div>
-
-                  {/* Financial Breakdown Box */}
-                  <div className="rounded-xl bg-gradient-to-br from-amber-500/15 via-slate-900 to-emerald-500/10 border border-amber-400/30 p-3.5 space-y-2 text-xs">
-                    <div className="flex justify-between items-center text-slate-300">
-                      <span>Quy mô dự kiến:</span>
-                      <span className="font-bold text-white">~ {vipTotalSessions} buổi ({vipTotalHours} giờ thi đấu)</span>
-                    </div>
-                    <div className="flex justify-between items-center text-slate-300">
-                      <span>Giá niêm yết:</span>
-                      <span className={vipDiscountPercent > 0 ? "line-through text-slate-400 font-medium" : "font-bold text-white"}>
-                        {vipBasePrice.toLocaleString('vi-VN')}đ
-                      </span>
-                    </div>
-                    {vipDiscountPercent > 0 ? (
-                      <div className="flex justify-between items-center text-amber-300 font-bold">
-                        <span className="flex items-center gap-1">
-                          <Sparkles className="w-3.5 h-3.5" /> Chiết khấu VIP ({vipDiscountPercent}%):
-                        </span>
-                        <span>- {vipDiscountAmount.toLocaleString('vi-VN')}đ</span>
-                      </div>
-                    ) : (
-                      <div className="flex justify-between items-center text-slate-400 text-[11px]">
-                        <span>Chính sách giá:</span>
-                        <span className="text-slate-300 font-bold">Giá chuẩn (Được giữ cố định giờ vàng)</span>
-                      </div>
-                    )}
-
-                    <div className="border-t border-slate-800 pt-2 flex items-baseline justify-between">
-                      <div>
-                        <span className="text-[10px] text-slate-400 block uppercase font-bold">Tổng chi phí sau giảm:</span>
-                        <span className="text-lg font-black text-emerald-400">{vipFinalPrice.toLocaleString('vi-VN')}đ</span>
-                      </div>
-                      <div className="text-right">
-                        <span className="text-[10px] text-slate-400 block">Trung bình hàng tháng:</span>
-                        <span className="text-xs font-bold text-amber-300">~ {vipMonthlyAverage.toLocaleString('vi-VN')}đ / tháng</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* VIP Privileges Checklist */}
-                  <div className="rounded-xl bg-slate-900/60 p-3 border border-slate-800 space-y-1.5 text-[11px] text-slate-300">
-                    <div className="flex items-center gap-2 text-emerald-400 font-bold">
-                      <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" />
-                      <span>Cố định khung giờ vàng suốt hợp đồng (không lo mất sân)</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-emerald-400 font-bold">
-                      <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" />
-                      <span>Hỗ trợ chia nhỏ nhiều đợt thanh toán linh hoạt tại quầy</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-emerald-400 font-bold">
-                      <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" />
-                      <span>Linh hoạt đổi/dời buổi khi có lịch công tác hoặc bận đột xuất</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-emerald-400 font-bold">
-                      <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" />
-                      <span>Xuất hóa đơn điện tử VAT đầy đủ cho doanh nghiệp & CLB</span>
-                    </div>
-                  </div>
-
-                  {/* Actions */}
-                  <div className="pt-1 grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setShowVipModal(true)}
-                      className="w-full flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 py-3 px-4 text-xs font-black uppercase tracking-wider text-slate-950 shadow-lg shadow-amber-500/20 hover:from-amber-300 hover:to-amber-400 active:scale-95 transition cursor-pointer"
-                    >
-                      <Award className="w-4 h-4" /> Đăng ký giữ lịch VIP
-                    </button>
-
-                    <a
-                      href="tel:0901234567"
-                      className="w-full flex items-center justify-center gap-2 rounded-xl bg-slate-800 hover:bg-slate-700 py-3 px-4 text-xs font-bold text-white border border-slate-700 active:scale-95 transition"
-                    >
-                      <Phone className="w-4 h-4 text-amber-400" /> Hotline VIP: 0901.234.567
-                    </a>
-                  </div>
+                {/* Actions */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setShowVipModal(true)}
+                    className="w-full rounded-xl bg-emerald-600 py-3 px-4 text-xs font-black uppercase tracking-wider text-white hover:bg-emerald-700 active:scale-95 transition text-center cursor-pointer shadow-sm"
+                  >
+                    Đăng ký giữ lịch cố định
+                  </button>
+                  <a
+                    href="tel:0901234567"
+                    className="w-full rounded-xl border border-slate-300 bg-white py-3 px-4 text-xs font-bold text-slate-700 hover:bg-slate-50 active:scale-95 transition text-center"
+                  >
+                    Hotline tư vấn: 0901.234.567
+                  </a>
                 </div>
               </div>
             )}
 
-            {/* ======================================================== */}
-            {/* TAB 2: EVENT & MULTI-DAY SERIES                         */}
-            {/* ======================================================== */}
+            {/* TAB 2: EVENT & MULTI-DAY SERIES */}
             {contractMode === 'event_series' && (
-              <div className="mt-4 space-y-4 animate-in fade-in duration-200 relative z-10">
-                {/* Event Highlights */}
-                <div className="grid grid-cols-2 gap-2.5">
-                  <div className="rounded-2xl bg-white/5 border border-amber-400/20 p-3 flex flex-col justify-between">
+              <div className="mt-4 space-y-3 animate-in fade-in duration-150">
+                {/* 2 Packages - Compact & Clean */}
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 flex flex-col justify-between">
                     <div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-[10px] font-black uppercase text-amber-300">Chuỗi ngày</span>
-                        <span className="rounded bg-emerald-500/20 px-1.5 py-0.5 text-[9px] font-black text-emerald-300 border border-emerald-500/30">
-                          7 – 14 Ngày
-                        </span>
-                      </div>
-                      <p className="mt-1 text-sm font-black text-white">Tập Huấn & Khóa Học</p>
-                      <p className="text-[10px] text-slate-400 mt-0.5">Luyện tập dồn dập, khóa giữ nguyên cụm sân suốt đợt.</p>
+                      <div className="text-[10px] font-bold uppercase text-slate-500">Chuỗi 7 – 30 Ngày</div>
+                      <div className="mt-1 text-xs font-black text-slate-800">Tập huấn & Khóa học</div>
+                      <p className="mt-1 text-[11px] text-slate-500 leading-tight">Khóa giữ nguyên cụm sân liên tục suốt đợt</p>
                     </div>
                   </div>
 
-                  <div className="rounded-2xl bg-gradient-to-br from-amber-500/20 to-amber-700/10 border border-amber-400/40 p-3 flex flex-col justify-between">
+                  <div className="rounded-2xl border border-emerald-300 bg-emerald-50/80 p-3 flex flex-col justify-between">
                     <div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-[10px] font-black uppercase text-amber-200">Đại hội / Giải</span>
-                        <span className="rounded bg-amber-400 px-1.5 py-0.5 text-[9px] font-black text-slate-950">
-                          Bao Trọn Sàn
-                        </span>
-                      </div>
-                      <p className="mt-1 text-sm font-black text-white">Giải Đấu Doanh Nghiệp</p>
-                      <p className="text-[10px] text-amber-200/80 mt-0.5">Tài trợ trọn gói âm thanh, bảng điểm, còi & nước uống.</p>
+                      <div className="text-[10px] font-black uppercase text-emerald-700">Giải đấu / Đại hội</div>
+                      <div className="mt-1 text-xs font-black text-emerald-900">Bao trọn 8 ô sàn</div>
+                      <p className="mt-1 text-[11px] text-emerald-800 leading-tight">Phục vụ giải thể thao phong trào doanh nghiệp</p>
                     </div>
                   </div>
                 </div>
 
-                {/* Event Calculator Box */}
-                <div className="rounded-2xl bg-slate-950/70 p-4 border border-slate-800 space-y-4">
-                  <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
-                    <div className="flex items-center gap-1.5">
-                      <Calculator className="w-4 h-4 text-amber-400" />
-                      <span className="text-xs font-black uppercase tracking-wider text-slate-200">DỰ TOÁN SỰ KIỆN / CHUỖI NGÀY</span>
-                    </div>
-                    <span className="text-[10px] text-emerald-400 font-bold">Báo giá theo đợt</span>
+                {/* Policies & Benefits list */}
+                <div className="rounded-2xl bg-slate-50 border border-slate-200 p-3.5 space-y-2 text-xs text-slate-600">
+                  <div className="flex items-start gap-2">
+                    <span className="text-emerald-600 font-black">•</span>
+                    <span><strong>Ưu đãi giờ thấp điểm:</strong> Chiết khấu 5% – 10% khi thuê khung giờ sáng, chiều hoặc thuê trọn ngày.</span>
                   </div>
-
-                  {/* Step 1: Chọn quy mô & môn */}
-                  <div>
-                    <label className="text-[10px] font-black uppercase tracking-wider text-slate-400 block mb-1.5">
-                      1. Chọn môn thi đấu hoặc Bao trọn sàn:
-                    </label>
-                    <div className="grid grid-cols-2 gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setEventSport('badminton')}
-                        className={`rounded-xl py-2 px-2 text-center border transition active:scale-95 flex flex-col items-center cursor-pointer ${
-                          eventSport === 'badminton'
-                            ? 'bg-amber-400 border-amber-300 text-slate-950 font-black shadow-md'
-                            : 'bg-slate-900 border-slate-700 text-slate-300 hover:border-slate-600 text-xs font-bold'
-                        }`}
-                      >
-                        <span className="text-xs font-black">Cầu Lông</span>
-                        <span className={`text-[9px] ${eventSport === 'badminton' ? 'text-slate-900 font-bold' : 'text-slate-400'}`}>
-                          120.000đ/sân/h
-                        </span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => setEventSport('volleyball')}
-                        className={`rounded-xl py-2 px-2 text-center border transition active:scale-95 flex flex-col items-center cursor-pointer ${
-                          eventSport === 'volleyball'
-                            ? 'bg-amber-400 border-amber-300 text-slate-950 font-black shadow-md'
-                            : 'bg-slate-900 border-slate-700 text-slate-300 hover:border-slate-600 text-xs font-bold'
-                        }`}
-                      >
-                        <span className="text-xs font-black">Bóng Chuyền</span>
-                        <span className={`text-[9px] ${eventSport === 'volleyball' ? 'text-slate-900 font-bold' : 'text-slate-400'}`}>
-                          150.000đ/cụm/h
-                        </span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => setEventSport('football')}
-                        className={`rounded-xl py-2 px-2 text-center border transition active:scale-95 flex flex-col items-center cursor-pointer ${
-                          eventSport === 'football'
-                            ? 'bg-amber-400 border-amber-300 text-slate-950 font-black shadow-md'
-                            : 'bg-slate-900 border-slate-700 text-slate-300 hover:border-slate-600 text-xs font-bold'
-                        }`}
-                      >
-                        <span className="text-xs font-black">Bóng Đá Mini</span>
-                        <span className={`text-[9px] ${eventSport === 'football' ? 'text-slate-900 font-bold' : 'text-slate-400'}`}>
-                          200.000đ/giờ (toàn sàn)
-                        </span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => setEventSport('all_arena')}
-                        className={`rounded-xl py-2 px-2 text-center border transition active:scale-95 flex flex-col items-center cursor-pointer ${
-                          eventSport === 'all_arena'
-                            ? 'bg-amber-400 border-amber-300 text-slate-950 font-black shadow-md ring-2 ring-amber-300'
-                            : 'bg-slate-900 border-slate-700 text-amber-300 hover:border-slate-600 text-xs font-bold'
-                        }`}
-                      >
-                        <span className="text-xs font-black">🎪 Bao Trọn 8 Ô Sàn</span>
-                        <span className={`text-[9px] ${eventSport === 'all_arena' ? 'text-slate-900 font-bold' : 'text-amber-400'}`}>
-                          Gói Sự Kiện Toàn Sàn
-                        </span>
-                      </button>
-                    </div>
-
-                    {/* Số sân cầu lông nếu chọn cầu lông */}
-                    {eventSport === 'badminton' && (
-                      <div className="mt-2.5 flex items-center justify-between bg-slate-900 p-2 rounded-xl border border-slate-800">
-                        <span className="text-[11px] text-slate-300 font-bold">Số lượng sân thi đấu:</span>
-                        <div className="flex gap-1.5">
-                          {[1, 2, 4, 6].map((num) => (
-                            <button
-                              key={num}
-                              type="button"
-                              onClick={() => setEventCourtCount(num)}
-                              className={`px-2.5 py-1 rounded-lg text-xs font-black transition cursor-pointer ${
-                                eventCourtCount === num
-                                  ? 'bg-amber-400 text-slate-950'
-                                  : 'bg-slate-800 text-slate-400 hover:text-white'
-                              }`}
-                            >
-                              {num} sân
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
+                  <div className="flex items-start gap-2">
+                    <span className="text-emerald-600 font-black">•</span>
+                    <span><strong>Tài trợ thiết bị hậu cần:</strong> Miễn phí mượn bảng điểm lật tay, còi, áo pitch phân đội, hỗ trợ hệ thống loa mic trao giải.</span>
                   </div>
-
-                  {/* Step 2: Thời lượng số ngày */}
-                  <div>
-                    <div className="flex items-center justify-between mb-1.5">
-                      <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">
-                        2. Số ngày thuê liên tiếp:
-                      </label>
-                      <span className="text-sm font-black text-amber-400">{eventDays} Ngày</span>
-                    </div>
-
-                    <input
-                      type="range"
-                      min={3}
-                      max={30}
-                      step={1}
-                      value={eventDays}
-                      onChange={(e) => setEventDays(Number(e.target.value))}
-                      className="w-full accent-amber-400 h-2 bg-slate-800 rounded-lg cursor-pointer"
-                    />
-
-                    <div className="mt-2 grid grid-cols-5 gap-1">
-                      {[
-                        { d: 7, label: '7N (1T)' },
-                        { d: 10, label: '10N' },
-                        { d: 14, label: '14N (2T)' },
-                        { d: 21, label: '21N (3T)' },
-                        { d: 30, label: '30N (1 Tháng)' },
-                      ].map((item) => (
-                        <button
-                          key={item.d}
-                          type="button"
-                          onClick={() => setEventDays(item.d)}
-                          className={`rounded-lg py-1.5 text-[10px] font-black transition active:scale-95 cursor-pointer ${
-                            eventDays === item.d
-                              ? 'bg-amber-400 text-slate-950 font-black'
-                              : 'bg-slate-900 text-slate-400 border border-slate-800 hover:text-white'
-                          }`}
-                        >
-                          {item.label}
-                        </button>
-                      ))}
-                    </div>
+                  <div className="flex items-start gap-2">
+                    <span className="text-emerald-600 font-black">•</span>
+                    <span><strong>Hỗ trợ vận hành:</strong> Tặng nước khoáng cho đoàn; điều phối viên hỗ trợ kỹ thuật và bố trí mặt sàn xuyên suốt giải.</span>
                   </div>
+                </div>
 
-                  {/* Step 3: Khung giờ mỗi ngày */}
-                  <div>
-                    <label className="text-[10px] font-black uppercase tracking-wider text-slate-400 block mb-1.5">
-                      3. Khung giờ thi đấu mỗi ngày:
-                    </label>
-                    <div className="grid grid-cols-2 gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setEventTimeSlot('morning')}
-                        className={`rounded-xl p-2.5 text-left border transition active:scale-95 cursor-pointer ${
-                          eventTimeSlot === 'morning'
-                            ? 'bg-amber-400/20 border-amber-400 text-white'
-                            : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-300'
-                        }`}
-                      >
-                        <div className="flex justify-between items-center">
-                          <span className="text-xs font-black text-amber-300">Buổi Sáng (3h)</span>
-                          <span className="text-[9px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded font-black">-5% Giờ Thấp Điểm</span>
-                        </div>
-                        <p className="text-[10px] text-slate-300 mt-0.5">08:00 - 11:00 hàng ngày</p>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => setEventTimeSlot('afternoon')}
-                        className={`rounded-xl p-2.5 text-left border transition active:scale-95 cursor-pointer ${
-                          eventTimeSlot === 'afternoon'
-                            ? 'bg-amber-400/20 border-amber-400 text-white'
-                            : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-300'
-                        }`}
-                      >
-                        <div className="flex justify-between items-center">
-                          <span className="text-xs font-black text-amber-300">Buổi Chiều (3h)</span>
-                          <span className="text-[9px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded font-black">-5% Giờ Thấp Điểm</span>
-                        </div>
-                        <p className="text-[10px] text-slate-300 mt-0.5">14:00 - 17:00 hàng ngày</p>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => setEventTimeSlot('evening')}
-                        className={`rounded-xl p-2.5 text-left border transition active:scale-95 cursor-pointer ${
-                          eventTimeSlot === 'evening'
-                            ? 'bg-amber-400/20 border-amber-400 text-white'
-                            : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-300'
-                        }`}
-                      >
-                        <div className="flex justify-between items-center">
-                          <span className="text-xs font-black text-amber-300">Buổi Tối (3h)</span>
-                          <span className="text-[9px] bg-amber-400/20 text-amber-300 px-1.5 py-0.5 rounded font-black">Giờ Vàng + Quà</span>
-                        </div>
-                        <p className="text-[10px] text-slate-300 mt-0.5">18:00 - 21:00 hàng ngày</p>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => setEventTimeSlot('fullday')}
-                        className={`rounded-xl p-2.5 text-left border transition active:scale-95 cursor-pointer ${
-                          eventTimeSlot === 'fullday'
-                            ? 'bg-amber-400/20 border-amber-400 text-white'
-                            : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-300'
-                        }`}
-                      >
-                        <div className="flex justify-between items-center">
-                          <span className="text-xs font-black text-amber-300">Cả Ngày (8h)</span>
-                          <span className="text-[9px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded font-black">-10% Gói Trọn Ngày</span>
-                        </div>
-                        <p className="text-[10px] text-slate-300 mt-0.5">08:00 - 17:00 liên tục</p>
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Financial Breakdown Box */}
-                  <div className="rounded-xl bg-gradient-to-br from-amber-500/15 via-slate-900 to-emerald-500/10 border border-amber-400/30 p-3.5 space-y-2 text-xs">
-                    <div className="flex justify-between items-center text-slate-300">
-                      <span>Quy mô chuỗi ngày:</span>
-                      <span className="font-bold text-white">{eventDays} ngày liên tiếp ({eventTotalHours} giờ thi đấu)</span>
-                    </div>
-                    <div className="flex justify-between items-center text-slate-300">
-                      <span>Đơn giá giờ tạm tính:</span>
-                      <span className="font-bold text-white">{eventHourlyRate.toLocaleString('vi-VN')}đ / giờ</span>
-                    </div>
-                    {eventDiscountPercent > 0 && (
-                      <div className="flex justify-between items-center text-emerald-400 font-bold">
-                        <span className="flex items-center gap-1">
-                          <Sparkles className="w-3.5 h-3.5" /> Ưu đãi giờ thấp điểm ({eventDiscountPercent}%):
-                        </span>
-                        <span>- {eventDiscountAmount.toLocaleString('vi-VN')}đ</span>
-                      </div>
-                    )}
-                    <div className="border-t border-slate-800 pt-2 flex items-baseline justify-between">
-                      <div>
-                        <span className="text-[10px] text-slate-400 block uppercase font-bold">Dự toán toàn bộ đợt:</span>
-                        <span className="text-lg font-black text-emerald-400">{eventFinalPrice.toLocaleString('vi-VN')}đ</span>
-                      </div>
-                      <div className="text-right">
-                        <span className="text-[10px] text-slate-400 block">Đặt cọc giữ sàn:</span>
-                        <span className="text-xs font-bold text-amber-300">~ {Math.round(eventFinalPrice / 2).toLocaleString('vi-VN')}đ (50%)</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Gói quà tặng & Hậu cần tài trợ */}
-                  <div className="rounded-xl bg-slate-900/80 p-3 border border-slate-800 space-y-1.5 text-[11px] text-slate-300">
-                    <div className="flex items-center gap-1 text-amber-400 font-black text-xs uppercase mb-1">
-                      <Gift className="w-4 h-4" /> GÓI TIỆN ÍCH HẬU CẦN ĐI KÈM SỰ KIỆN:
-                    </div>
-                    <div className="flex items-center gap-2 text-emerald-400 font-bold">
-                      <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" />
-                      <span>Tặng 2 thùng nước khoáng / nước điện giải cho giải đấu</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-emerald-400 font-bold">
-                      <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" />
-                      <span>Miễn phí mượn bảng điểm lật tay, còi & áo pitch phân đội</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-emerald-400 font-bold">
-                      <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" />
-                      <span>Hỗ trợ hệ thống âm thanh loa mic khai mạc & trao giải</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-emerald-400 font-bold">
-                      <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" />
-                      <span>Khóa sàn liên tục, tránh gián đoạn các buổi tập huấn</span>
-                    </div>
-                  </div>
-
-                  {/* Action buttons */}
-                  <div className="pt-1 grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setShowEventModal(true)}
-                      className="w-full flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 py-3 px-4 text-xs font-black uppercase tracking-wider text-slate-950 shadow-lg shadow-amber-500/20 hover:from-amber-300 hover:to-amber-400 active:scale-95 transition cursor-pointer"
-                    >
-                      <Trophy className="w-4 h-4" /> Đăng ký sự kiện / Chuỗi ngày
-                    </button>
-
-                    <a
-                      href="tel:0901234567"
-                      className="w-full flex items-center justify-center gap-2 rounded-xl bg-slate-800 hover:bg-slate-700 py-3 px-4 text-xs font-bold text-white border border-slate-700 active:scale-95 transition"
-                    >
-                      <Phone className="w-4 h-4 text-amber-400" /> Điều phối giải: 0901.234.567
-                    </a>
-                  </div>
+                {/* Actions */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setShowEventModal(true)}
+                    className="w-full rounded-xl bg-emerald-600 py-3 px-4 text-xs font-black uppercase tracking-wider text-white hover:bg-emerald-700 active:scale-95 transition text-center cursor-pointer shadow-sm"
+                  >
+                    Đăng ký tổ chức sự kiện
+                  </button>
+                  <a
+                    href="tel:0901234567"
+                    className="w-full rounded-xl border border-slate-300 bg-white py-3 px-4 text-xs font-bold text-slate-700 hover:bg-slate-50 active:scale-95 transition text-center"
+                  >
+                    Hotline tư vấn: 0901.234.567
+                  </a>
                 </div>
               </div>
             )}
@@ -1997,6 +1572,74 @@ export default function TrangChu() {
 
             {/* Registration Form */}
             <form onSubmit={handleVipSubmit} className="mt-4 space-y-3.5">
+              {/* Select Sport & Duration in VIP Modal */}
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-[11px] font-black uppercase text-slate-700 mb-1">
+                    Bộ môn thi đấu
+                  </label>
+                  <select
+                    value={vipSport}
+                    onChange={(e) => setVipSport(e.target.value as any)}
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-900 outline-none focus:border-amber-500 focus:bg-white transition"
+                  >
+                    <option value="badminton">Cầu Lông (120k/h)</option>
+                    <option value="volleyball">Bóng Chuyền (150k/h)</option>
+                    <option value="football">Bóng Đá Mini (200k/h)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-black uppercase text-slate-700 mb-1">
+                    Gói thời hạn thuê
+                  </label>
+                  <select
+                    value={vipMonths}
+                    onChange={(e) => setVipMonths(Number(e.target.value))}
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-900 outline-none focus:border-amber-500 focus:bg-white transition"
+                  >
+                    <option value={1}>1 Tháng (Giá chuẩn)</option>
+                    <option value={2}>2 Tháng (Giá chuẩn)</option>
+                    <option value={3}>3 Tháng (Giảm 10% VIP)</option>
+                    <option value={6}>6 Tháng (Giảm 10% VIP)</option>
+                    <option value={12}>12 Tháng (Giảm 15% VIP)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-[11px] font-black uppercase text-slate-700 mb-1">
+                    Tần suất buổi / tuần
+                  </label>
+                  <select
+                    value={vipSessionsPerWeek}
+                    onChange={(e) => setVipSessionsPerWeek(Number(e.target.value))}
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-900 outline-none focus:border-amber-500 focus:bg-white transition"
+                  >
+                    <option value={2}>2 buổi / tuần</option>
+                    <option value={3}>3 buổi / tuần</option>
+                    <option value={4}>4 buổi / tuần</option>
+                    <option value={5}>5 buổi / tuần</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-black uppercase text-slate-700 mb-1">
+                    Thời lượng mỗi buổi
+                  </label>
+                  <select
+                    value={vipHoursPerSession}
+                    onChange={(e) => setVipHoursPerSession(Number(e.target.value))}
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-900 outline-none focus:border-amber-500 focus:bg-white transition"
+                  >
+                    <option value={1.5}>1.5 giờ / buổi</option>
+                    <option value={2}>2.0 giờ / buổi</option>
+                    <option value={3}>3.0 giờ / buổi</option>
+                  </select>
+                </div>
+              </div>
+
               <div>
                 <label className="block text-[11px] font-black uppercase text-slate-700 mb-1">
                   Họ tên người đại diện / Tên CLB / Doanh nghiệp <span className="text-red-500">*</span>
@@ -2134,6 +1777,77 @@ export default function TrangChu() {
 
             {/* Registration Form */}
             <form onSubmit={handleEventSubmit} className="mt-4 space-y-3.5">
+              {/* Select Event Sport & Duration */}
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-[11px] font-black uppercase text-slate-700 mb-1">
+                    Môn hoặc Toàn sàn
+                  </label>
+                  <select
+                    value={eventSport}
+                    onChange={(e) => setEventSport(e.target.value as any)}
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-900 outline-none focus:border-amber-500 focus:bg-white transition"
+                  >
+                    <option value="badminton">Cầu Lông</option>
+                    <option value="volleyball">Bóng Chuyền</option>
+                    <option value="football">Bóng Đá Mini</option>
+                    <option value="all_arena">Bao trọn 8 ô sàn</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-black uppercase text-slate-700 mb-1">
+                    Số ngày liên tiếp
+                  </label>
+                  <select
+                    value={eventDays}
+                    onChange={(e) => setEventDays(Number(e.target.value))}
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-900 outline-none focus:border-amber-500 focus:bg-white transition"
+                  >
+                    <option value={7}>7 ngày (1 tuần)</option>
+                    <option value={10}>10 ngày</option>
+                    <option value={14}>14 ngày (2 tuần)</option>
+                    <option value={21}>21 ngày (3 tuần)</option>
+                    <option value={30}>30 ngày (1 tháng)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-[11px] font-black uppercase text-slate-700 mb-1">
+                    Khung giờ mỗi ngày
+                  </label>
+                  <select
+                    value={eventTimeSlot}
+                    onChange={(e) => setEventTimeSlot(e.target.value as any)}
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-900 outline-none focus:border-amber-500 focus:bg-white transition"
+                  >
+                    <option value="morning">Sáng 08:00 - 11:00 (-5%)</option>
+                    <option value="afternoon">Chiều 14:00 - 17:00 (-5%)</option>
+                    <option value="evening">Tối 18:00 - 21:00 (Giờ vàng)</option>
+                    <option value="fullday">Cả ngày 08:00 - 17:00 (-10%)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-black uppercase text-slate-700 mb-1">
+                    Số sân (nếu Cầu Lông)
+                  </label>
+                  <select
+                    value={eventCourtCount}
+                    onChange={(e) => setEventCourtCount(Number(e.target.value))}
+                    disabled={eventSport !== 'badminton'}
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-900 outline-none focus:border-amber-500 focus:bg-white transition disabled:opacity-50"
+                  >
+                    <option value={1}>1 sân cơ sở</option>
+                    <option value={2}>2 sân</option>
+                    <option value={4}>4 sân</option>
+                    <option value={6}>6 sân</option>
+                  </select>
+                </div>
+              </div>
+
               <div>
                 <label className="block text-[11px] font-black uppercase text-slate-700 mb-1">
                   Tên Đơn vị / CLB / Doanh nghiệp / Ban tổ chức <span className="text-red-500">*</span>
@@ -2296,15 +2010,60 @@ export default function TrangChu() {
             </h2>
             
             {/* Banner */}
-            <div className="mt-5 flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-2 shadow-sm">
+            <div className="mt-5 flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
               <div className="flex h-10 w-12 items-center justify-center rounded-xl bg-slate-900 text-white flex-shrink-0">
                 <Key className="w-5 h-5" />
               </div>
-              <p className="text-sm font-bold text-slate-800">Dành cho chủ sân và nhân viên tại sân</p>
+              <div>
+                <p className="text-xs font-bold text-slate-800">Cổng đăng nhập hệ thống</p>
+                <p className="text-[10px] text-slate-500">Khách VIP • Ban Quản lý • Nhân viên trực ca</p>
+              </div>
+            </div>
+
+            {/* Quick Demo Login Credentials Pills */}
+            <div className="mt-3 space-y-1.5">
+              <p className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Chọn nhanh tài khoản mẫu để trải nghiệm:</p>
+              <div className="grid grid-cols-3 gap-1.5 text-xs">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setUsername('vip');
+                    setPasswordInput('vip');
+                  }}
+                  className="rounded-xl border border-amber-300 bg-amber-50 p-2 text-center text-amber-900 hover:bg-amber-100 active:scale-95 transition cursor-pointer"
+                >
+                  <span className="block font-black text-[11px] text-amber-800">Khách VIP</span>
+                  <span className="text-[9px] text-amber-600 font-mono">vip / vip</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setUsername('admin');
+                    setPasswordInput('admin');
+                  }}
+                  className="rounded-xl border border-slate-300 bg-slate-100 p-2 text-center text-slate-900 hover:bg-slate-200 active:scale-95 transition cursor-pointer"
+                >
+                  <span className="block font-black text-[11px] text-slate-800">Quản lý</span>
+                  <span className="text-[9px] text-slate-500 font-mono">admin / admin</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setUsername('nhanvien');
+                    setPasswordInput('nhanvien');
+                  }}
+                  className="rounded-xl border border-emerald-300 bg-emerald-50 p-2 text-center text-emerald-900 hover:bg-emerald-100 active:scale-95 transition cursor-pointer"
+                >
+                  <span className="block font-black text-[11px] text-emerald-800">Nhân viên</span>
+                  <span className="text-[9px] text-emerald-600 font-mono">nhanvien</span>
+                </button>
+              </div>
             </div>
 
             {/* Form Card */}
-            <div className="mt-6 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="mt-4 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
               <div className="space-y-4">
                 {/* Username */}
                 <div>
@@ -2317,7 +2076,7 @@ export default function TrangChu() {
                     </div>
                     <input 
                       type="text" 
-                      placeholder="Nhập tên tài khoản" 
+                      placeholder="Nhập tên tài khoản (vip / admin / nhanvien)" 
                       value={username}
                       onChange={(e) => setUsername(e.target.value)}
                       className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-3.5 pl-12 pr-4 text-sm font-bold text-slate-900 placeholder-slate-400 outline-none focus:border-emerald-500 focus:bg-white transition"
@@ -2373,11 +2132,16 @@ export default function TrangChu() {
                     setShowLogin(false);
                     setUsername('');
                     setPasswordInput('');
+                  } else if ((username === 'vip' || username === 'khachvip') && (passwordInput === 'vip' || passwordInput === '123456')) {
+                    setIsVipLoggedIn(true);
+                    setShowLogin(false);
+                    setUsername('');
+                    setPasswordInput('');
                   } else {
-                    showAlert('Sai thông tin', 'Vui lòng nhập tài khoản: admin/admin hoặc nhanvien/nhanvien');
+                    showAlert('Sai thông tin đăng nhập', 'Vui lòng chọn tài khoản mẫu phía trên hoặc nhập:\n• Khách VIP: vip / vip (hoặc khachvip / 123456)\n• Quản lý: admin / admin\n• Nhân viên: nhanvien / nhanvien');
                   }
                 }}
-                  className="mt-4 w-full flex items-center justify-center gap-2 rounded-2xl bg-emerald-500 py-4 text-sm font-black uppercase tracking-widest text-white shadow-lg shadow-emerald-500/30 transition hover:bg-emerald-500 active:scale-95"
+                  className="mt-4 w-full flex items-center justify-center gap-2 rounded-2xl bg-emerald-500 py-4 text-sm font-black uppercase tracking-widest text-white shadow-lg shadow-emerald-500/30 transition hover:bg-emerald-600 active:scale-95 cursor-pointer"
                 >
                   ĐĂNG NHẬP HỆ THỐNG <Zap className="w-4 h-4 fill-current" />
                 </button>
