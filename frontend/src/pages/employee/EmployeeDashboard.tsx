@@ -29,8 +29,8 @@ export default function EmployeeDashboard({ onLogout }: { onLogout: () => void }
     setShifts([...shifts, newShift]);
   };
 
-  const handleDeleteShift = (id: string) => {
-    setShifts(shifts.map(s => s.id === id ? { ...s, status: 'cancelled', cancelReason: 'Nhân viên hủy' } : s));
+  const handleDeleteShift = (id: string, reason?: string) => {
+    setShifts(shifts.map(s => s.id === id ? { ...s, status: 'cancelled', cancelReason: reason || 'Nhân viên hủy' } : s));
   };
 
   // Helper functions for lich_san tab

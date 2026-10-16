@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import {
   X,
-  Camera,
   User,
   Phone,
   Mail,
@@ -13,10 +12,8 @@ import {
   SlidersHorizontal,
   CheckCircle2,
   Circle,
-  Info,
   UserPlus,
   RotateCcw,
-  Sparkles,
 } from 'lucide-react';
 import type { Employee } from '../../types/admin';
 
@@ -26,9 +23,6 @@ interface AddStaffViewProps {
 }
 
 export default function AddStaffView({ onBack, onSaveEmployee }: AddStaffViewProps) {
-  const [activeTab, setActiveTab] = useState<'create' | 'template'>('create');
-
-  // Form states
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
@@ -49,25 +43,6 @@ export default function AddStaffView({ onBack, onSaveEmployee }: AddStaffViewPro
     setStatus('active');
     setAvatarText('');
     setErrorMessage(null);
-  };
-
-  // Load sample template (Chỉnh sửa (Mẫu))
-  const handleLoadTemplate = () => {
-    setActiveTab('template');
-    setFullName('Lê Hoàng Cường');
-    setPhone('0915 889 900');
-    setEmail('cuong.le@courtx.vn');
-    setPassword('CourtX@2026');
-    setConfirmPassword('CourtX@2026');
-    setStatus('active');
-    setAvatarText('HC');
-    setErrorMessage(null);
-  };
-
-  // Switch to clean create mode
-  const handleSwitchCreate = () => {
-    setActiveTab('create');
-    handleReset();
   };
 
   // Compute initials for avatar
@@ -117,13 +92,22 @@ export default function AddStaffView({ onBack, onSaveEmployee }: AddStaffViewPro
         .toUpperCase() ||
       'NV';
 
+    const bgList = [
+      'bg-blue-100 text-blue-800 border-blue-300',
+      'bg-emerald-100 text-emerald-800 border-emerald-300',
+      'bg-indigo-100 text-indigo-800 border-indigo-300',
+      'bg-amber-100 text-amber-800 border-amber-300',
+      'bg-purple-100 text-purple-800 border-purple-300',
+    ];
+    const pickedBg = bgList[Math.floor(Math.random() * bgList.length)];
+
     const newEmp: Employee = {
       id: `NV${Date.now().toString().slice(-4)}`,
       name: fullName.trim(),
       phone: phone.trim(),
       email: email.trim() || `${initials.toLowerCase()}@courtx.vn`,
       avatarText: initials,
-      avatarBg: 'bg-emerald-100 text-emerald-800 border-emerald-300',
+      avatarBg: pickedBg,
       status,
       role: 'Nhân viên vận hành sân COURTX',
       joinDate: new Date().toLocaleDateString('vi-VN'),
@@ -179,51 +163,24 @@ export default function AddStaffView({ onBack, onSaveEmployee }: AddStaffViewPro
         </button>
       </div>
 
-      {/* 🟢 Top Tab Switcher */}
-      <div className="grid grid-cols-2 rounded-2xl bg-slate-100 p-1">
-        <button
-          type="button"
-          onClick={handleSwitchCreate}
-          className={[
-            'rounded-xl py-2 text-xs font-bold transition cursor-pointer',
-            activeTab === 'create'
-              ? 'bg-white text-slate-900 shadow-2xs font-black'
-              : 'text-slate-500 hover:text-slate-800',
-          ].join(' ')}
-        >
-          Thêm mới
-        </button>
-        <button
-          type="button"
-          onClick={handleLoadTemplate}
-          className={[
-            'flex items-center justify-center gap-1.5 rounded-xl py-2 text-xs font-bold transition cursor-pointer',
-            activeTab === 'template'
-              ? 'bg-white text-slate-900 shadow-2xs font-black'
-              : 'text-slate-500 hover:text-slate-800',
-          ].join(' ')}
-        >
-          <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-          <span>Chỉnh sửa (Mẫu)</span>
-        </button>
-      </div>
 
-      {/* 🟢 Avatar Upload Section */}
+
+      {/* 🟢 Avatar Preview Section */}
       <div className="flex flex-col items-center justify-center py-2">
         <div className="relative">
-          <div className="flex h-20 w-20 flex-col items-center justify-center rounded-3xl border-2 border-dashed border-emerald-300 bg-emerald-50/60 text-emerald-800 shadow-2xs">
-            {avatarText ? (
-              <span className="text-xl font-black">{avatarText}</span>
-            ) : (
-              <UserPlus className="w-8 h-8 stroke-[1.8] text-emerald-700" />
-            )}
+          <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-blue-200 bg-blue-100 text-blue-700 font-black text-xl shadow-2xs">
+            <span>{avatarText || 'NV'}</span>
           </div>
-          <div className="absolute -bottom-1 -right-1 flex h-7 w-7 items-center justify-center rounded-full bg-[#1b4d3e] text-white shadow-md border-2 border-white">
-            <Camera className="w-3.5 h-3.5 stroke-[2.2]" />
-          </div>
+          <span
+            className={[
+              'absolute -bottom-0.5 -right-0.5 h-4 w-4 rounded-full border-2 border-white',
+              status === 'active' ? 'bg-emerald-500' : 'bg-slate-400',
+            ].join(' ')}
+          />
         </div>
-        <span className="mt-2.5 text-xs font-bold text-slate-800">Thêm ảnh đại diện</span>
-        <span className="text-[10px] text-slate-400">Định dạng JPG, PNG (Tối đa 3MB)</span>
+        <span className="mt-2 text-xs font-bold text-slate-800">
+          {fullName.trim() || 'Nhân viên mới'}
+        </span>
       </div>
 
       {/* Error alert if any */}
@@ -418,19 +375,12 @@ export default function AddStaffView({ onBack, onSaveEmployee }: AddStaffViewPro
           </div>
         </div>
 
-        {/* Info Banner */}
-        <div className="flex gap-2.5 rounded-2xl bg-indigo-50/60 border border-indigo-100 p-3.5">
-          <Info className="w-4 h-4 text-indigo-600 shrink-0 mt-0.5" />
-          <p className="text-[11px] text-slate-600 leading-relaxed font-medium">
-            Vai trò mặc định là <strong className="text-slate-900 font-bold">Nhân viên</strong>.
-            Quyền hạn bao gồm: nhận lịch đặt sân, check-in vận động viên và hỗ trợ khách tại quầy.
-          </p>
-        </div>
+
 
         {/* Submit Button */}
         <button
           type="submit"
-          className="w-full flex items-center justify-center gap-2 rounded-2xl bg-[#1b4d3e] hover:bg-[#143d31] py-4 text-xs font-black uppercase tracking-wider text-white shadow-md shadow-emerald-950/15 transition active:scale-95 cursor-pointer"
+          className="w-full flex items-center justify-center gap-2 rounded-2xl bg-emerald-500 hover:bg-emerald-600 py-4 text-xs font-black uppercase tracking-wider text-white shadow-lg shadow-emerald-500/25 transition active:scale-95 cursor-pointer"
         >
           <UserPlus className="w-4 h-4 stroke-[2.2]" />
           <span>+ THÊM NHÂN VIÊN</span>
