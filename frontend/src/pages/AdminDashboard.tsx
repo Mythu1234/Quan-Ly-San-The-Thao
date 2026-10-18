@@ -8,8 +8,9 @@ import AddStaffView from '../components/admin/AddStaffView';
 import StaffDetailView from '../components/admin/StaffDetailView';
 import EditStaffView from '../components/admin/EditStaffView';
 import WalletRevenueView from '../components/admin/WalletRevenueView';
-import type { Employee, ShiftRegistration, Transaction } from '../types/admin';
-import { INITIAL_EMPLOYEES, INITIAL_SHIFTS, INITIAL_TRANSACTIONS } from '../types/admin';
+import FacilityManagementView from '../components/admin/FacilityManagementView';
+import type { Employee, ShiftRegistration, Transaction, FacilityEquipment, CourtStatusItem, FacilityIncident } from '../types/admin';
+import { INITIAL_EMPLOYEES, INITIAL_SHIFTS, INITIAL_TRANSACTIONS, INITIAL_EQUIPMENT, INITIAL_COURT_STATUSES, INITIAL_INCIDENTS } from '../types/admin';
 
 export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -23,6 +24,9 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   const [employees, setEmployees] = useState<Employee[]>(INITIAL_EMPLOYEES);
   const [shifts, setShifts] = useState<ShiftRegistration[]>(INITIAL_SHIFTS);
   const [transactions, setTransactions] = useState<Transaction[]>(INITIAL_TRANSACTIONS);
+  const [equipments, setEquipments] = useState<FacilityEquipment[]>(INITIAL_EQUIPMENT);
+  const [courtStatuses, setCourtStatuses] = useState<CourtStatusItem[]>(INITIAL_COURT_STATUSES);
+  const [incidents, setIncidents] = useState<FacilityIncident[]>(INITIAL_INCIDENTS);
   const [staffSubView, setStaffSubView] = useState<'list' | 'add' | 'detail' | 'edit'>('list');
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
 
@@ -94,6 +98,107 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   };
   const handleProcessRefund = (id: string) => {
     setTransactions(transactions.map(t => t.id === id ? { ...t, status: 'refunded', statusLabel: 'Đã hoàn tiền' } : t));
+  };
+
+  // Facility handlers
+  const handleAddEquipment = (newEq: FacilityEquipment) => {
+    setEquipments([newEq, ...equipments]);
+  };
+
+  const handleUpdateEquipmentLocation = (equipmentCode: string, newLocation: string) => {
+    setEquipments(equipments.map(eq => eq.code === equipmentCode ? { ...eq, currentLocation: newLocation } : eq));
+  };
+
+  const handleToggleCourtLock = (courtId: string, isLocked: boolean, reason?: string) => {
+    setCourtStatuses(courtStatuses.map(c => c.id === courtId ? {
+      ...c,
+      isLocked,
+      lockReason: isLocked ? (reason || 'Bảo trì kỹ thuật') : undefined,
+      lockedAt: isLocked ? 'Vừa xong' : undefined,
+    } : c));
+  };
+
+  const handleSubmitIncident = (newIncident: FacilityIncident, lockCourt: boolean) => {
+    setIncidents([newIncident, ...incidents]);
+    if (lockCourt && newIncident.courtId) {
+      handleToggleCourtLock(newIncident.courtId, true, newIncident.title);
+    }
+  };
+
+  const handleUpdateIncidentStatus = (incidentId: string, newStatus: 'cho_xu_ly' | 'dang_sua_chua' | 'da_khac_phuc', unlockCourt?: boolean) => {
+    setIncidents(incidents.map(i => {
+      if (i.id === incidentId) {
+        return {
+          ...i,
+          status: newStatus,
+          statusLabel: newStatus === 'da_khac_phuc' ? 'Đã khắc phục' : newStatus === 'dang_sua_chua' ? 'Đang sửa chữa' : 'Chờ xử lý',
+          isCourtLocked: newStatus !== 'da_khac_phuc' ? i.isCourtLocked : false,
+        };
+      }
+      return i;
+    }));
+
+    if (unlockCourt) {
+      const targetInc = incidents.find(i => i.id === incidentId);
+      if (targetInc?.courtId) {
+        handleToggleCourtLock(targetInc.courtId, false);
+      }
+    }
+  };
+
+  // Trả thiết bị về kho chung khi check-out hoặc điều phối
+  const handleReturnToWarehouse = (equipmentCode: string) => {
+    setEquipments(prev => prev.map(eq => eq.code === equipmentCode ? {
+      ...eq,
+      currentLocation: 'Kho chung',
+      status: 'san_sang',
+      statusLabel: 'Sẵn sàng',
+      healthRate: 'Sẵn sàng điều phối',
+      assignedBookingCode: undefined,
+      assignedTimeSlot: undefined,
+      assignedCustomer: undefined,
+      assignedCourt: undefined,
+    } : eq));
+  };
+
+  // Ghi nhận ca đặt sân cho thiết bị
+  const handleAssignBookingToEquipment = (
+    equipmentCode: string,
+    courtName: string,
+    timeSlot: string,
+    bookingCode: string,
+    customerName: string
+  ) => {
+    setEquipments(prev => prev.map(eq => eq.code === equipmentCode ? {
+      ...eq,
+      currentLocation: courtName,
+      status: 'dang_su_dung',
+      statusLabel: 'Đang sử dụng',
+      assignedBookingCode: bookingCode || 'BK-8491',
+      assignedTimeSlot: timeSlot || '06:00 - 07:30',
+      assignedCustomer: customerName || 'Khách đặt sân',
+      assignedCourt: courtName,
+    } : eq));
+  };
+
+  // Tự động thu hồi thiết bị của sân về Kho chung khi Check-out sân
+  const handleCheckoutCourtEquipment = (courtName: string, _timeSlot?: string) => {
+    setEquipments(prev => prev.map(eq => {
+      if (eq.currentLocation === courtName || eq.assignedCourt === courtName) {
+        return {
+          ...eq,
+          currentLocation: 'Kho chung',
+          status: 'san_sang',
+          statusLabel: 'Sẵn sàng',
+          healthRate: 'Sẵn sàng điều phối (Đã thu hồi về kho)',
+          assignedBookingCode: undefined,
+          assignedTimeSlot: undefined,
+          assignedCustomer: undefined,
+          assignedCourt: undefined,
+        };
+      }
+      return eq;
+    }));
   };
 
   return (
@@ -243,7 +348,10 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
             {isSetupMode ? (
               <AdminSetupReminderPage onBack={() => setIsSetupMode(false)} />
             ) : (
-              <AdminSchedulePage onCheckoutModeChange={setIsCheckoutMode} />
+              <AdminSchedulePage
+                onCheckoutModeChange={setIsCheckoutMode}
+                onBookingCheckout={handleCheckoutCourtEquipment}
+              />
             )}
           </>
         )}
@@ -289,9 +397,22 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
               employees={employees}
               shifts={shifts}
               onAddShift={(newShift) => setShifts((prev) => [...prev, newShift])}
-              onDeleteShift={(shiftId, reason) => {
+              onAddMultipleShifts={(newShifts) => setShifts((prev) => [...prev, ...newShifts])}
+              onDeleteMultipleShifts={(shiftIds, permanent, reason) => {
                 setShifts((prev) =>
-                  prev.map((s) => (s.id === shiftId ? { ...s, status: 'cancelled', cancelReason: reason } : s))
+                  permanent
+                    ? prev.filter((s) => !shiftIds.includes(s.id))
+                    : prev.map((s) => (shiftIds.includes(s.id) ? { ...s, status: 'cancelled', cancelReason: reason } : s))
+                );
+              }}
+              onUpdateShift={(updatedShift) => {
+                setShifts((prev) => prev.map((s) => (s.id === updatedShift.id ? updatedShift : s)));
+              }}
+              onDeleteShift={(shiftId, reason, permanent) => {
+                setShifts((prev) =>
+                  permanent
+                    ? prev.filter((s) => s.id !== shiftId)
+                    : prev.map((s) => (s.id === shiftId ? { ...s, status: 'cancelled', cancelReason: reason } : s))
                 );
               }}
               isAdmin={true}
@@ -309,18 +430,19 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
         )}
 
         {activeTab === 'co_so_vat_chat' && (
-          <div className="flex-1 overflow-auto bg-slate-50 p-4">
-            <section className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-100">
-              <div className="flex items-center gap-3">
-                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700">
-                  <Dumbbell className="h-5 w-5" />
-                </div>
-                <div>
-                  <h2 className="text-lg font-black text-slate-950">Cơ sở vật chất</h2>
-                  <p className="text-sm font-medium text-slate-500">Quản lý thiết bị, sân bãi và tình trạng sử dụng.</p>
-                </div>
-              </div>
-            </section>
+          <div className="flex-1 overflow-auto bg-slate-50 relative custom-scrollbar">
+            <FacilityManagementView
+              equipments={equipments}
+              courts={courtStatuses}
+              incidents={incidents}
+              onAddEquipment={handleAddEquipment}
+              onUpdateEquipmentLocation={handleUpdateEquipmentLocation}
+              onToggleCourtLock={handleToggleCourtLock}
+              onSubmitIncident={handleSubmitIncident}
+              onUpdateIncidentStatus={handleUpdateIncidentStatus}
+              onReturnToWarehouse={handleReturnToWarehouse}
+              onAssignBookingToEquipment={handleAssignBookingToEquipment}
+            />
           </div>
         )}
       </div>
