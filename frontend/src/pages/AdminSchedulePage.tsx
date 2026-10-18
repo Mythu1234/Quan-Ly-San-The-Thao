@@ -31,9 +31,10 @@ const baseBooking: BookingDetail = {
 
 type AdminSchedulePageProps = {
   onCheckoutModeChange?: (isCheckoutMode: boolean) => void;
+  onBookingCheckout?: (court: string, time?: string) => void;
 };
 
-export default function AdminSchedulePage({ onCheckoutModeChange }: AdminSchedulePageProps) {
+export default function AdminSchedulePage({ onCheckoutModeChange, onBookingCheckout }: AdminSchedulePageProps) {
   const timelineScrollRef = useRef<HTMLDivElement>(null);
   const [selectedBooking, setSelectedBooking] = useState<BookingDetail | null>(null);
   const [checkinBooking, setCheckinBooking] = useState<BookingDetail | null>(null);
@@ -1344,13 +1345,14 @@ export default function AdminSchedulePage({ onCheckoutModeChange }: AdminSchedul
         <button
           type="button"
           onClick={() => {
+            onBookingCheckout?.(checkoutBooking.court, checkoutBooking.time);
             setCheckoutBooking(null);
             onCheckoutModeChange?.(false);
           }}
-          className="mb-4 flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-emerald-700 text-[14px] font-black text-white shadow-lg active:scale-[0.99]"
+          className="mb-4 flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-emerald-700 text-[14px] font-black text-white shadow-lg active:scale-[0.99] cursor-pointer"
         >
           <CheckCircle2 className="h-5 w-5" />
-          Xác nhận thu {amountDue} & Hoàn tất Check-out
+          Xác nhận thu {amountDue} & Hoàn tất Check-out (Thu hồi thiết bị về kho)
         </button>
       </div>
     );

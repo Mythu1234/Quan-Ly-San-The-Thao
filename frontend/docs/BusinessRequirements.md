@@ -137,6 +137,10 @@ Nghiệp vụ dành cho các Khách hàng Doanh nghiệp, Câu lạc bộ hoặc
 5. **Ghi nhận sự cố hư hỏng (Incident Reporting):**
    * Phiếu báo cáo sự cố hư hỏng (`bao_cao_su_co`) liên kết trực tiếp với `ma_thiet_bi` để chỉ rõ đích danh tài sản bị hỏng.
    * Khi sự cố được ghi nhận ở mức "Khẩn cấp", hệ thống tự động gợi ý kích hoạt khóa bảo trì ô sân liên quan.
+6. **Cơ chế Tự động thu hồi thiết bị khi Check-out sân (Automatic Equipment Recall):**
+   * Khi khách đặt sân và nhận thiết bị phục vụ trận đấu (cột lưới, bóng, bảng điểm...), các thiết bị này được gán vào sân và khung giờ tương ứng.
+   * Khi nhân viên/chủ sân thực hiện thao tác **Check-out sân** (hoàn tất trận đấu và thanh toán hóa đơn), hệ thống **tự động thu hồi toàn bộ thiết bị đang gắn với sân đó về Kho chung**, chuyển trạng thái về `san_sang`.
+   * Giao diện quản lý CSVC **không có nút thu hồi thủ công từng thiết bị riêng lẻ**, đảm bảo dữ liệu vòng đời thiết bị được đồng bộ tự động và thống nhất 100% với chu trình đặt & trả sân.
 
 ---
 
@@ -173,8 +177,8 @@ Hệ thống thiết lập bảng vai trò (`vai_tro`) chuẩn hóa với 4 nhó
    * Báo cáo sự cố hỏng hóc trang thiết bị, cập nhật nhật ký bảo trì.
 3. **Khách hàng VIP (VIP Customer - `VIP`):**
    * Khách hàng đăng ký gói thuê cố định từ 3 tháng trở lên, hưởng ưu đãi chiết khấu 10% - 15% trên đơn giá thuê.
-   * Được hỗ trợ chia đợt thanh toán linh hoạt và ưu tiên giữ chỗ khung giờ đẹp.
+   * Được hỗ trợ chia đợt thanh toán linh hoạt.
 4. **Khách hàng thường (Customer - `CUSTOMER`):**
    * Đăng ký tài khoản, tra cứu tình trạng sân trống theo thời gian thực.
-   * Đặt sân trực tuyến, thanh toán cọc 50% hoặc 100% qua VietQR.
+   * Đặt sân trực tuyến, thanh toán cọc 50% hoặc 100% qua QR ngân hàng/ quẹt thẻ hoặc trả theo nhiều kỳ.
    * Xem lịch sử đặt chỗ, chủ động hủy vé trước 24 giờ.
