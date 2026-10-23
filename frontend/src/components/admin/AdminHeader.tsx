@@ -34,7 +34,7 @@ export default function AdminHeader({
           </div>
 
           <div className="flex items-center gap-2">
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#1b4d3e] text-white shadow-xs">
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-500 text-white shadow-xs">
               <UserIcon className="w-5 h-5 stroke-[2.2]" />
             </div>
           </div>
@@ -75,7 +75,7 @@ export default function AdminHeader({
 
           <div
             title="Tài khoản Quản trị viên"
-            className="flex h-8 w-8 items-center justify-center rounded-full bg-[#1b4d3e] text-white shadow-xs"
+            className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-500 text-white shadow-xs"
           >
             <UserIcon className="w-4 h-4 stroke-[2.2]" />
           </div>

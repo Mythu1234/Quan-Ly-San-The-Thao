@@ -1,14 +1,18 @@
-import { useState } from 'react';
-import { Menu, User as UserIcon, AlertTriangle, Calendar, CalendarClock, ChevronLeft, ChevronRight, LogOut, Settings, LayoutGrid, Users, Wallet, Dumbbell } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { Menu, User as UserIcon, AlertTriangle, Calendar, CalendarClock, ChevronLeft, ChevronRight, LogOut, Settings, LayoutGrid, Users, Wallet, Dumbbell, ClipboardList } from 'lucide-react';
 import AdminSchedulePage from './AdminSchedulePage';
 import AdminSetupReminderPage from './AdminSetupReminderPage';
-import AdminShiftManager from '../components/admin/AdminShiftManager';
+import AdminBookingRequestsView from '../components/admin/AdminBookingRequestsView';
+import ShiftScheduleView from '../components/admin/ShiftScheduleView';
 import StaffList from '../components/admin/StaffList';
 import AddStaffView from '../components/admin/AddStaffView';
 import StaffDetailView from '../components/admin/StaffDetailView';
+import EditStaffView from '../components/admin/EditStaffView';
 import WalletRevenueView from '../components/admin/WalletRevenueView';
-import type { Employee, ShiftRegistration, Transaction } from '../types/admin';
-import { INITIAL_EMPLOYEES, INITIAL_SHIFTS, INITIAL_TRANSACTIONS } from '../types/admin';
+import FacilityManagementView from '../components/admin/FacilityManagementView';
+import { getStoredBookingRequests } from '../types/bookingRequest';
+import type { Employee, ShiftRegistration, Transaction, FacilityEquipment, CourtStatusItem, FacilityIncident } from '../types/admin';
+import { INITIAL_EMPLOYEES, INITIAL_SHIFTS, INITIAL_TRANSACTIONS, INITIAL_EQUIPMENT, INITIAL_COURT_STATUSES, INITIAL_INCIDENTS } from '../types/admin';
 
 export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -18,11 +22,14 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   const [isSetupMode, setIsSetupMode] = useState(false);
   
   // My states
-  const [activeTab, setActiveTab] = useState<'lich_san' | 'nhan_vien' | 'ca_truc' | 'vi_thu' | 'co_so_vat_chat'>('lich_san');
+  const [activeTab, setActiveTab] = useState<'lich_san' | 'yeu_cau_dat_san' | 'nhan_vien' | 'ca_truc' | 'vi_thu' | 'co_so_vat_chat'>('lich_san');
   const [employees, setEmployees] = useState<Employee[]>(INITIAL_EMPLOYEES);
-  const [shifts] = useState<ShiftRegistration[]>(INITIAL_SHIFTS);
+  const [shifts, setShifts] = useState<ShiftRegistration[]>(INITIAL_SHIFTS);
   const [transactions, setTransactions] = useState<Transaction[]>(INITIAL_TRANSACTIONS);
-  const [staffSubView, setStaffSubView] = useState<'list' | 'add' | 'detail'>('list');
+  const [equipments, setEquipments] = useState<FacilityEquipment[]>(INITIAL_EQUIPMENT);
+  const [courtStatuses, setCourtStatuses] = useState<CourtStatusItem[]>(INITIAL_COURT_STATUSES);
+  const [incidents, setIncidents] = useState<FacilityIncident[]>(INITIAL_INCIDENTS);
+  const [staffSubView, setStaffSubView] = useState<'list' | 'add' | 'detail' | 'edit'>('list');
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
 
   const handlePrevDay = () => {
@@ -54,7 +61,15 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
 
   const showScheduleControls = !isCheckoutMode && !isSetupMode;
 
-  const handleTabChange = (tabId: 'lich_san' | 'nhan_vien' | 'ca_truc' | 'vi_thu' | 'co_so_vat_chat') => {
+  const pendingRequestsCount = useMemo(() => {
+    try {
+      return getStoredBookingRequests().filter(r => r.status === 'pending').length;
+    } catch {
+      return 0;
+    }
+  }, [activeTab]);
+
+  const handleTabChange = (tabId: 'lich_san' | 'yeu_cau_dat_san' | 'nhan_vien' | 'ca_truc' | 'vi_thu' | 'co_so_vat_chat') => {
     setActiveTab(tabId);
     setSidebarOpen(false);
     if (tabId === 'nhan_vien') setStaffSubView('list');
@@ -64,6 +79,15 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   const handleAddNewStaff = () => setStaffSubView('add');
   const handleSelectEmployee = (emp: Employee) => {
     setSelectedEmployee(emp);
+    setStaffSubView('detail');
+  };
+  const handleEditEmployee = (emp: Employee) => {
+    setSelectedEmployee(emp);
+    setStaffSubView('edit');
+  };
+  const handleUpdateEmployee = (updatedEmp: Employee) => {
+    setEmployees(employees.map(e => (e.id === updatedEmp.id ? updatedEmp : e)));
+    setSelectedEmployee(updatedEmp);
     setStaffSubView('detail');
   };
   const handleSaveEmployee = (emp: Omit<Employee, 'id'>) => {
@@ -86,6 +110,107 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
     setTransactions(transactions.map(t => t.id === id ? { ...t, status: 'refunded', statusLabel: 'Đã hoàn tiền' } : t));
   };
 
+  // Facility handlers
+  const handleAddEquipment = (newEq: FacilityEquipment) => {
+    setEquipments([newEq, ...equipments]);
+  };
+
+  const handleUpdateEquipmentLocation = (equipmentCode: string, newLocation: string) => {
+    setEquipments(equipments.map(eq => eq.code === equipmentCode ? { ...eq, currentLocation: newLocation } : eq));
+  };
+
+  const handleToggleCourtLock = (courtId: string, isLocked: boolean, reason?: string) => {
+    setCourtStatuses(courtStatuses.map(c => c.id === courtId ? {
+      ...c,
+      isLocked,
+      lockReason: isLocked ? (reason || 'Bảo trì kỹ thuật') : undefined,
+      lockedAt: isLocked ? 'Vừa xong' : undefined,
+    } : c));
+  };
+
+  const handleSubmitIncident = (newIncident: FacilityIncident, lockCourt: boolean) => {
+    setIncidents([newIncident, ...incidents]);
+    if (lockCourt && newIncident.courtId) {
+      handleToggleCourtLock(newIncident.courtId, true, newIncident.title);
+    }
+  };
+
+  const handleUpdateIncidentStatus = (incidentId: string, newStatus: 'cho_xu_ly' | 'dang_sua_chua' | 'da_khac_phuc', unlockCourt?: boolean) => {
+    setIncidents(incidents.map(i => {
+      if (i.id === incidentId) {
+        return {
+          ...i,
+          status: newStatus,
+          statusLabel: newStatus === 'da_khac_phuc' ? 'Đã khắc phục' : newStatus === 'dang_sua_chua' ? 'Đang sửa chữa' : 'Chờ xử lý',
+          isCourtLocked: newStatus !== 'da_khac_phuc' ? i.isCourtLocked : false,
+        };
+      }
+      return i;
+    }));
+
+    if (unlockCourt) {
+      const targetInc = incidents.find(i => i.id === incidentId);
+      if (targetInc?.courtId) {
+        handleToggleCourtLock(targetInc.courtId, false);
+      }
+    }
+  };
+
+  // Trả thiết bị về kho chung khi check-out hoặc điều phối
+  const handleReturnToWarehouse = (equipmentCode: string) => {
+    setEquipments(prev => prev.map(eq => eq.code === equipmentCode ? {
+      ...eq,
+      currentLocation: 'Kho chung',
+      status: 'san_sang',
+      statusLabel: 'Sẵn sàng',
+      healthRate: 'Sẵn sàng điều phối',
+      assignedBookingCode: undefined,
+      assignedTimeSlot: undefined,
+      assignedCustomer: undefined,
+      assignedCourt: undefined,
+    } : eq));
+  };
+
+  // Ghi nhận ca đặt sân cho thiết bị
+  const handleAssignBookingToEquipment = (
+    equipmentCode: string,
+    courtName: string,
+    timeSlot: string,
+    bookingCode: string,
+    customerName: string
+  ) => {
+    setEquipments(prev => prev.map(eq => eq.code === equipmentCode ? {
+      ...eq,
+      currentLocation: courtName,
+      status: 'dang_su_dung',
+      statusLabel: 'Đang sử dụng',
+      assignedBookingCode: bookingCode || 'BK-8491',
+      assignedTimeSlot: timeSlot || '06:00 - 07:30',
+      assignedCustomer: customerName || 'Khách đặt sân',
+      assignedCourt: courtName,
+    } : eq));
+  };
+
+  // Tự động thu hồi thiết bị của sân về Kho chung khi Check-out sân
+  const handleCheckoutCourtEquipment = (courtName: string, _timeSlot?: string) => {
+    setEquipments(prev => prev.map(eq => {
+      if (eq.currentLocation === courtName || eq.assignedCourt === courtName) {
+        return {
+          ...eq,
+          currentLocation: 'Kho chung',
+          status: 'san_sang',
+          statusLabel: 'Sẵn sàng',
+          healthRate: 'Sẵn sàng điều phối (Đã thu hồi về kho)',
+          assignedBookingCode: undefined,
+          assignedTimeSlot: undefined,
+          assignedCustomer: undefined,
+          assignedCourt: undefined,
+        };
+      }
+      return eq;
+    }));
+  };
+
   return (
     <div className="flex h-screen bg-slate-50 text-slate-900 w-full animate-in fade-in zoom-in-95 duration-300 relative overflow-hidden">
       {sidebarOpen && (
@@ -103,6 +228,19 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                 className={`flex items-center gap-3 px-3 py-3 rounded-xl font-bold text-sm cursor-pointer ${activeTab === 'lich_san' ? 'bg-emerald-700 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50'}`}
               >
                 <LayoutGrid className="w-4 h-4" /> Lịch sân
+              </div>
+              <div 
+                onClick={() => handleTabChange('yeu_cau_dat_san')}
+                className={`flex items-center justify-between px-3 py-3 rounded-xl font-bold text-sm cursor-pointer ${activeTab === 'yeu_cau_dat_san' ? 'bg-emerald-700 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50'}`}
+              >
+                <div className="flex items-center gap-3">
+                  <ClipboardList className="w-4 h-4" /> Yêu cầu đặt sân
+                </div>
+                {pendingRequestsCount > 0 && (
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${activeTab === 'yeu_cau_dat_san' ? 'bg-white text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
+                    {pendingRequestsCount} chờ
+                  </span>
+                )}
               </div>
               <div
                 onClick={() => handleTabChange('nhan_vien')}
@@ -149,18 +287,46 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
 
       <div className="flex-1 flex flex-col w-full h-full overflow-hidden">
         <header className="h-12 bg-white border-b border-slate-200 flex items-center justify-between px-2 shrink-0 z-30 shadow-sm relative">
-          <button onClick={() => setSidebarOpen(true)} className="w-10 h-10 flex items-center justify-center text-emerald-700 active:scale-95 bg-emerald-50 rounded-lg">
-            <Menu className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-2">
+            <button onClick={() => setSidebarOpen(true)} className="w-10 h-10 flex items-center justify-center text-emerald-700 active:scale-95 bg-emerald-50 rounded-lg">
+              <Menu className="w-5 h-5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => handleTabChange('yeu_cau_dat_san')}
+              className={`hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition active:scale-95 cursor-pointer ${
+                activeTab === 'yeu_cau_dat_san'
+                  ? 'bg-emerald-700 text-white shadow-xs'
+                  : 'bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100'
+              }`}
+            >
+              <ClipboardList className="w-3.5 h-3.5" />
+              <span>Tiếp nhận yêu cầu {pendingRequestsCount > 0 ? `(${pendingRequestsCount})` : ''}</span>
+            </button>
+          </div>
           <div className="flex flex-col items-center">
             <span className="font-black text-slate-800 tracking-tight uppercase text-sm">COURTX HUB</span>
             <span className="text-[9px] text-emerald-600 font-bold flex items-center gap-1">
               <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div> Đang mở cửa
             </span>
           </div>
-          <button onClick={onLogout} className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 active:scale-95 hover:bg-red-50 hover:text-red-600 transition">
-            <LogOut className="w-4 h-4" />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => handleTabChange('yeu_cau_dat_san')}
+              className={`sm:hidden flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-bold transition active:scale-95 cursor-pointer ${
+                activeTab === 'yeu_cau_dat_san'
+                  ? 'bg-emerald-700 text-white shadow-xs'
+                  : 'bg-amber-100 text-amber-800'
+              }`}
+            >
+              <ClipboardList className="w-3 h-3" />
+              <span>Yêu cầu {pendingRequestsCount > 0 ? `(${pendingRequestsCount})` : ''}</span>
+            </button>
+            <button onClick={onLogout} className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 active:scale-95 hover:bg-red-50 hover:text-red-600 transition">
+              <LogOut className="w-4 h-4" />
+            </button>
+          </div>
         </header>
 
         {activeTab === 'lich_san' && (
@@ -233,9 +399,16 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
             {isSetupMode ? (
               <AdminSetupReminderPage onBack={() => setIsSetupMode(false)} />
             ) : (
-              <AdminSchedulePage onCheckoutModeChange={setIsCheckoutMode} />
+              <AdminSchedulePage
+                onCheckoutModeChange={setIsCheckoutMode}
+                onBookingCheckout={handleCheckoutCourtEquipment}
+              />
             )}
           </>
+        )}
+
+        {activeTab === 'yeu_cau_dat_san' && (
+          <AdminBookingRequestsView />
         )}
 
         {activeTab === 'nhan_vien' && (
@@ -258,9 +431,16 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
             {staffSubView === 'detail' && selectedEmployee && (
               <StaffDetailView
                 employee={selectedEmployee}
-                onAssignShift={() => setActiveTab('ca_truc')}
                 onViewSchedule={() => setActiveTab('ca_truc')}
                 onDeleteEmployee={handleDeleteEmployee}
+                onEditEmployee={handleEditEmployee}
+              />
+            )}
+            {staffSubView === 'edit' && selectedEmployee && (
+              <EditStaffView
+                employee={selectedEmployee}
+                onBack={() => setStaffSubView('detail')}
+                onSaveEmployee={handleUpdateEmployee}
               />
             )}
           </div>
@@ -268,9 +448,29 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
 
         {activeTab === 'ca_truc' && (
           <div className="flex-1 overflow-auto bg-slate-50 relative custom-scrollbar">
-            <AdminShiftManager
+            <ShiftScheduleView
               employees={employees}
               shifts={shifts}
+              onAddShift={(newShift) => setShifts((prev) => [...prev, newShift])}
+              onAddMultipleShifts={(newShifts) => setShifts((prev) => [...prev, ...newShifts])}
+              onDeleteMultipleShifts={(shiftIds, permanent, reason) => {
+                setShifts((prev) =>
+                  permanent
+                    ? prev.filter((s) => !shiftIds.includes(s.id))
+                    : prev.map((s) => (shiftIds.includes(s.id) ? { ...s, status: 'cancelled', cancelReason: reason } : s))
+                );
+              }}
+              onUpdateShift={(updatedShift) => {
+                setShifts((prev) => prev.map((s) => (s.id === updatedShift.id ? updatedShift : s)));
+              }}
+              onDeleteShift={(shiftId, reason, permanent) => {
+                setShifts((prev) =>
+                  permanent
+                    ? prev.filter((s) => s.id !== shiftId)
+                    : prev.map((s) => (s.id === shiftId ? { ...s, status: 'cancelled', cancelReason: reason } : s))
+                );
+              }}
+              isAdmin={true}
             />
           </div>
         )}
@@ -285,18 +485,19 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
         )}
 
         {activeTab === 'co_so_vat_chat' && (
-          <div className="flex-1 overflow-auto bg-slate-50 p-4">
-            <section className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-100">
-              <div className="flex items-center gap-3">
-                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700">
-                  <Dumbbell className="h-5 w-5" />
-                </div>
-                <div>
-                  <h2 className="text-lg font-black text-slate-950">Cơ sở vật chất</h2>
-                  <p className="text-sm font-medium text-slate-500">Quản lý thiết bị, sân bãi và tình trạng sử dụng.</p>
-                </div>
-              </div>
-            </section>
+          <div className="flex-1 overflow-auto bg-slate-50 relative custom-scrollbar">
+            <FacilityManagementView
+              equipments={equipments}
+              courts={courtStatuses}
+              incidents={incidents}
+              onAddEquipment={handleAddEquipment}
+              onUpdateEquipmentLocation={handleUpdateEquipmentLocation}
+              onToggleCourtLock={handleToggleCourtLock}
+              onSubmitIncident={handleSubmitIncident}
+              onUpdateIncidentStatus={handleUpdateIncidentStatus}
+              onReturnToWarehouse={handleReturnToWarehouse}
+              onAssignBookingToEquipment={handleAssignBookingToEquipment}
+            />
           </div>
         )}
       </div>

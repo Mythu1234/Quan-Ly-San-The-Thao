@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Search, Plus } from 'lucide-react';
+import { Search } from 'lucide-react';
 import type { Employee, ShiftRegistration } from '../../types/admin';
 
 interface AdminShiftManagerProps {
@@ -51,14 +51,6 @@ export default function AdminShiftManager({ shifts }: AdminShiftManagerProps) {
     { id: 'Ca 2', name: 'Ca 2 (Chiều)', time: '12:00 - 18:00 (6h)', color: 'text-blue-700', bg: 'bg-blue-50', border: 'border-blue-200' },
     { id: 'Ca 3', name: 'Ca 3 (Tối)', time: '18:00 - 23:00 (5h)', color: 'text-amber-700', bg: 'bg-amber-50', border: 'border-amber-200' },
   ];
-
-  const [assignedCells, setAssignedCells] = useState<Record<string, boolean>>({});
-
-  const handleAssignClick = (shiftId: string, date: string) => {
-    if (window.confirm(`Xác nhận phân công bạn vào ${shiftId} ngày ${date}?`)) {
-      setAssignedCells(prev => ({ ...prev, [`${shiftId}-${date}`]: true }));
-    }
-  };
 
   return (
     <div className="flex-1 p-2 sm:p-4 lg:p-6 space-y-6 pb-28 bg-white min-h-screen w-full max-w-full min-w-0 overflow-hidden">
@@ -180,8 +172,7 @@ export default function AdminShiftManager({ shifts }: AdminShiftManagerProps) {
                   const isPast = dayDate < today; 
                   const isToday = day.isToday;
                   const cellShifts = shifts.filter(s => s.date === day.date && s.shiftType === shiftRow.id);
-                  const isNewlyAssigned = assignedCells[`${shiftRow.id}-${day.date}`];
-                  const hasMyShift = (isToday && shiftRow.id === 'Ca 1') || isNewlyAssigned; // Mocking "Tôi"
+                  const hasMyShift = isToday && shiftRow.id === 'Ca 1';
                   
                   return (
                     <td key={`${shiftRow.id}-${day.date}`} className={['p-2 border-b border-r border-slate-200 align-top h-24 relative group', isToday ? 'bg-emerald-50/30' : 'bg-white'].join(' ')}>
@@ -198,12 +189,10 @@ export default function AdminShiftManager({ shifts }: AdminShiftManagerProps) {
                         </div>
                       ) : (
                         <div 
-                          onClick={() => handleAssignClick(shiftRow.id, day.label)}
-                          className="w-full h-full border border-dashed border-emerald-300 rounded-lg p-2 bg-emerald-50/50 flex flex-col items-center justify-center text-center cursor-pointer hover:bg-emerald-100 hover:border-emerald-400 transition min-h-[70px]"
+                          className="w-full h-full border border-dashed border-slate-200 rounded-lg p-2 bg-slate-50/50 flex flex-col items-center justify-center text-center min-h-[70px]"
                         >
-                          <Plus className="w-4 h-4 text-emerald-600 mb-1" />
-                          <span className="text-xs font-bold text-emerald-700">+ Phân công</span>
-                          <span className="text-[10px] text-emerald-600/80 mt-0.5">Đang trống</span>
+                          <span className="text-xs font-bold text-slate-400">Trống ca</span>
+                          <span className="text-[10px] text-slate-400 mt-0.5">Chờ NV đăng ký</span>
                         </div>
                       )}
                     </td>
@@ -217,11 +206,10 @@ export default function AdminShiftManager({ shifts }: AdminShiftManagerProps) {
 
       <div className="flex items-center justify-between pt-2">
         <div className="flex items-center gap-2 text-xs text-slate-500 font-medium">
-          <span className="w-4 h-4 flex items-center justify-center border border-slate-300 rounded text-[10px] text-slate-400 font-bold">+</span>
-          Nhân viên click vào nút [+] tại các ca trống để đăng ký nhận ca trực. Lịch đăng ký sẽ được tự động ghi nhận vào hệ thống.
+          Lịch trực do nhân viên chủ động đăng ký trực tiếp và được tự động ghi nhận vào hệ thống (không cần duyệt). Chủ sân theo dõi lịch tổng thể.
         </div>
         <div className="text-sm font-bold text-slate-800">
-          Nguyễn Văn An (NV-048)
+          Ban Quản Lý COURTX
         </div>
       </div>
     </div>
