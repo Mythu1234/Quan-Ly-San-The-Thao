@@ -476,7 +476,7 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
         )}
 
         {activeTab === 'vi_thu' && (
-          <div className="flex-1 overflow-auto bg-slate-50 relative custom-scrollbar">
+          <div className="flex-1 overflow-y-auto overflow-x-hidden bg-slate-50 relative custom-scrollbar">
             <WalletRevenueView
               transactions={transactions}
               onProcessRefund={handleProcessRefund}

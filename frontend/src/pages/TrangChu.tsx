@@ -1,5 +1,6 @@
 import AdminDashboard from './AdminDashboard';
 import CustomerSchedule from '../components/CustomerSchedule';
+import PaymentCheckout from '../components/PaymentCheckout';
 import EmployeeDashboard from './employee/EmployeeDashboard';
 import VipCustomerDashboard from './VipCustomerDashboard';
 import { addBookingRequest } from '../types/bookingRequest';
@@ -61,9 +62,7 @@ export default function TrangChu() {
   const [sendZalo, setSendZalo] = useState<boolean>(true);
 
   // Order Submission State
-  const [isSubmitted, setIsSubmitted] = useState<boolean>(false);
   const [showPayment, setShowPayment] = useState<boolean>(false);
-  const [paymentPercent, setPaymentPercent] = useState<50 | 100>(100);
   const [showOTP, setShowOTP] = useState<boolean>(false);
   const [showLogin, setShowLogin] = useState<boolean>(false);
   const [showPassword, setShowPassword] = useState<boolean>(false);
@@ -78,7 +77,7 @@ export default function TrangChu() {
   const [otpAction, setOtpAction] = useState<'booking' | 'cancel'>('booking');
   const [popup, setPopup] = useState<any>(null);
   const showAlert = (title: string, message: string) => setPopup({ type: 'alert', title, message });
-    const [orderCode, setOrderCode] = useState<string>('CX-88291');
+  const [orderCode] = useState<string>('CX-88291');
 
   // Lookup Search State
   const [lookupQuery, setLookupQuery] = useState<string>('');
@@ -557,30 +556,28 @@ export default function TrangChu() {
       showAlert('Thiếu thông tin', 'Vui lòng nhập đầy đủ Họ tên và Số điện thoại!');
       return;
     }
-    setShowOTP(true);
+    setOtpAction('booking');
     setOtpInput('');
     setOtpError(false);
+    setShowOTP(true);
   };
 
   const handleVerifyOTP = () => {
     if (otpInput === '123456') {
       setShowOTP(false);
+      setOtpInput('');
+      setOtpError(false);
+
       if (otpAction === 'booking') {
         setShowPayment(true);
-      } else {
-        showAlert('Đã gửi yêu cầu hoàn tiền', 'Hệ thống đã tiếp nhận yêu cầu hủy vé.\n\nVui lòng đợi xử lý trong vòng 24h và kiểm tra trạng thái hoàn tiền tại mục Tra cứu thông tin đặt sân.');
-        setLookupResult((prev: any) => prev ? { ...prev, status: 'ĐÃ HỦY', paymentStatus: 'ĐANG XỬ LÝ HOÀN TIỀN' } : null);
+        return;
       }
+
+      showAlert('Đã gửi yêu cầu hoàn tiền', 'Hệ thống đã tiếp nhận yêu cầu hủy vé.\n\nVui lòng đợi xử lý trong vòng 24h và kiểm tra trạng thái hoàn tiền tại mục Tra cứu thông tin đặt sân.');
+      setLookupResult((prev: any) => prev ? { ...prev, status: 'ĐÃ HỦY', paymentStatus: 'ĐANG XỬ LÝ HOÀN TIỀN' } : null);
     } else {
       setOtpError(true);
     }
-  };
-
-  const simulatePaymentSuccess = () => {
-    const randomCode = 'CX-' + Math.floor(10000 + Math.random() * 90000);
-    setOrderCode(randomCode);
-    setShowPayment(false);
-    setIsSubmitted(true);
   };
 
   const handleLookupSearch = (e: React.FormEvent) => {
@@ -640,6 +637,19 @@ export default function TrangChu() {
 
   if (isVipLoggedIn) {
     return <VipCustomerDashboard onLogout={() => setIsVipLoggedIn(false)} />;
+  if (showPayment) {
+    return (
+      <PaymentCheckout
+        open={showPayment}
+        orderCode={orderCode}
+        customerName={customerName}
+        customerPhone={customerPhone}
+        totalAmount={1_200_000}
+        registrationMonths={6}
+        onClose={() => setShowPayment(false)}
+        onComplete={() => setShowPayment(false)}
+      />
+    );
   }
 
   return (
@@ -2294,6 +2304,48 @@ export default function TrangChu() {
         </div>
       )}
 
+      {/* ======================================================== */}
+      {/* 🟢 FIXED MOBILE BOTTOM NAVIGATION BAR (CONSTRAINED WRAPPER) */}
+      {/* ======================================================== */}
+      <footer className="fixed bottom-0 left-1/2 -translate-x-1/2 z-40 w-full max-w-md border-t border-slate-200 bg-white/95 px-3 py-2.5 backdrop-blur-md shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] pb-safe">
+          <div className="flex items-center justify-around text-center">
+            <button
+              type="button"
+              onClick={() => handleTabChange('booking')}
+              className={[
+                'flex flex-col items-center gap-1 transition active:scale-95',
+                activeTab === 'booking' ? 'text-emerald-600 font-extrabold' : 'text-slate-500 hover:text-slate-800',
+              ].join(' ')}
+            >
+              <CalendarIcon className="w-5 h-5 mb-0.5" />
+              <span className="text-[10px] uppercase tracking-wider">Đặt sân</span>
+            </button>
+  
+            <button
+              type="button"
+              onClick={() => handleTabChange('lookup')}
+              className={[
+                'flex flex-col items-center gap-1 transition active:scale-95',
+                activeTab === 'lookup' ? 'text-emerald-600 font-extrabold' : 'text-slate-500 hover:text-slate-800',
+              ].join(' ')}
+            >
+              <Search className="w-5 h-5 mb-0.5" />
+              <span className="text-[10px] uppercase tracking-wider">Tra cứu</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleTabChange('schedule')}
+              className={[
+                'flex flex-col items-center gap-1 transition active:scale-95',
+                activeTab === 'schedule' ? 'text-emerald-600 font-extrabold' : 'text-slate-500 hover:text-slate-800',
+              ].join(' ')}
+            >
+              <LayoutGrid className="w-5 h-5 mb-0.5" />
+              <span className="text-[10px] uppercase tracking-wider">Lịch sân</span>
+            </button>
+          </div>
+        </footer>
     </div>
   );
 }
