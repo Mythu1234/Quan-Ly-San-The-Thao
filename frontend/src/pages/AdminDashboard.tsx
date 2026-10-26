@@ -4,7 +4,6 @@ import {
   User as UserIcon,
   AlertTriangle,
   Calendar,
-  CalendarClock,
   ChevronLeft,
   ChevronRight,
   LogOut,
@@ -648,12 +647,6 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                 className={`flex items-center gap-3 px-3 py-3 rounded-xl font-bold text-sm cursor-pointer ${activeTab === 'nhan_vien' ? 'bg-emerald-700 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50'}`}
               >
                 <Users className="w-4 h-4" /> Nhân viên
-              </div>
-              <div
-                onClick={() => handleTabChange('ca_truc')}
-                className={`flex items-center gap-3 px-3 py-3 rounded-xl font-bold text-sm cursor-pointer ${activeTab === 'ca_truc' ? 'bg-emerald-700 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50'}`}
-              >
-                <CalendarClock className="w-4 h-4" /> Ca trực
               </div>
               <div
                 onClick={() => handleTabChange('vi_thu')}
