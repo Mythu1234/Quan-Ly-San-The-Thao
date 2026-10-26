@@ -15,10 +15,11 @@ import type {
   BookingRequest, 
   CustomerType 
 } from '../../types/bookingRequest';
-import { 
+import {
   getStoredBookingRequests, 
   saveBookingRequests 
 } from '../../types/bookingRequest';
+import PaymentCheckout, { type PaymentResult } from '../PaymentCheckout';
 
 export default function AdminBookingRequestsView() {
   const [requests, setRequests] = useState<BookingRequest[]>([]);
@@ -41,6 +42,7 @@ export default function AdminBookingRequestsView() {
   const [showContactModal, setShowContactModal] = useState<boolean>(false);
   const [showPaymentModal, setShowPaymentModal] = useState<boolean>(false);
   const [selectedReq, setSelectedReq] = useState<BookingRequest | null>(null);
+  const [checkoutReq, setCheckoutReq] = useState<BookingRequest | null>(null);
 
   // Detail Modal State (Mobile-first)
   const [detailReq, setDetailReq] = useState<BookingRequest | null>(null);
@@ -262,30 +264,39 @@ export default function AdminBookingRequestsView() {
     setShowPaymentModal(false);
   };
 
-  // Quick Confirm Handler
-  const handleQuickConfirm = (req: BookingRequest) => {
-    if (!window.confirm(`Xác nhận chốt đơn đặt sân cho "${req.customerName}"?`)) return;
+  const handleCompleteCheckout = (result: PaymentResult) => {
+    if (!checkoutReq) return;
 
-    const updated = requests.map(r => {
-      if (r.id === req.id) {
-        return {
-          ...r,
-          status: 'confirmed' as const,
-          statusLabel: 'Đã chốt đặt sân',
-          contactLogs: [
-            {
-              date: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' }),
-              staffName: 'Quản lý (Admin)',
-              note: 'Đã xác nhận chốt đặt sân thành công.'
-            },
-            ...(r.contactLogs || [])
-          ]
-        };
-      }
-      return r;
-    });
+    const totalPaid = Math.min(checkoutReq.finalPrice, checkoutReq.paidAmount + result.paidAmount);
+    const remainingDue = Math.max(0, checkoutReq.finalPrice - totalPaid);
+    const paymentMode = result.plan === 'full' ? 'full_100' : result.plan === 'half' ? 'deposit_50' : 'installments';
 
-    updateRequestsList(updated);
+    updateRequestsList(requests.map(request => {
+      if (request.id !== checkoutReq.id) return request;
+
+      return {
+        ...request,
+        paymentMode,
+        paymentModeLabel: result.planLabel,
+        installmentCount: result.installmentCount ?? undefined,
+        paidAmount: totalPaid,
+        remainingDue,
+        paymentMethod: result.method === 'qr' ? 'vietqr' : 'cash',
+        paymentStatus: remainingDue === 0 ? ('paid_in_full' as const) : ('partial' as const),
+        paymentStatusLabel: remainingDue === 0 ? 'Đã thanh toán đủ' : `Đã thanh toán ${totalPaid.toLocaleString('vi-VN')}đ`,
+        status: 'confirmed' as const,
+        statusLabel: 'Đã chốt đặt sân',
+        contactLogs: [
+          {
+            date: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' }),
+            staffName: 'Quản lý (Admin)',
+            note: `Đã chốt đặt sân và ghi nhận ${result.paidAmount.toLocaleString('vi-VN')}đ qua ${result.methodLabel}.`
+          },
+          ...(request.contactLogs || [])
+        ]
+      };
+    }));
+    setCheckoutReq(null);
   };
 
   // Submit New Request Created by Admin
@@ -579,7 +590,7 @@ export default function AdminBookingRequestsView() {
             </div>
 
             {/* QUICK ACTIONS BAR */}
-            <div className="grid grid-cols-3 gap-2">
+            <div className={`grid gap-2 ${currentDetailReq.status !== 'confirmed' ? 'grid-cols-3' : 'grid-cols-2'}`}>
               <a
                 href={`tel:${currentDetailReq.phone.replace(/[^0-9]/g, '')}`}
                 className="flex flex-col items-center justify-center p-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 transition font-bold"
@@ -589,7 +600,8 @@ export default function AdminBookingRequestsView() {
                 <span className="text-[9px] font-mono text-emerald-600 font-semibold">{currentDetailReq.phone}</span>
               </a>
 
-              <button
+              {currentDetailReq.status !== 'confirmed' && (
+                <button
                 type="button"
                 onClick={() => {
                   handleOpenPaymentModal(currentDetailReq);
@@ -602,6 +614,7 @@ export default function AdminBookingRequestsView() {
                   {currentDetailReq.remainingDue > 0 ? `Nợ ${currentDetailReq.remainingDue.toLocaleString('vi-VN')}đ` : 'Đã đủ 100%'}
                 </span>
               </button>
+              )}
 
               <button
                 type="button"
@@ -727,7 +740,7 @@ export default function AdminBookingRequestsView() {
               <button
                 type="button"
                 onClick={() => {
-                  handleQuickConfirm(currentDetailReq);
+                  setCheckoutReq(currentDetailReq);
                 }}
                 className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-sm transition active:scale-95 cursor-pointer"
               >
@@ -737,6 +750,19 @@ export default function AdminBookingRequestsView() {
             )}
           </div>
         </div>
+      )}
+
+      {checkoutReq && (
+        <PaymentCheckout
+          open
+          orderCode={checkoutReq.code}
+          customerName={checkoutReq.customerName}
+          customerPhone={checkoutReq.phone}
+          totalAmount={checkoutReq.finalPrice}
+          registrationMonths={checkoutReq.durationMonths}
+          onClose={() => setCheckoutReq(null)}
+          onComplete={handleCompleteCheckout}
+        />
       )}
 
       {/* ======================================================== */}

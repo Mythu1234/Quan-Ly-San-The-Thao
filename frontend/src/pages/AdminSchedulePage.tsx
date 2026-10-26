@@ -129,17 +129,6 @@ export default function AdminSchedulePage({ onCheckoutModeChange, onBookingCheck
     return getBookingStyle(startH, startM, endH, endM, placement.courtIndex, placement.rowSpan);
   };
 
-  const highlightBandStyle = (startH: number, startM: number, endH: number, endM: number) => {
-    const startMinutes = startH * 60 + startM;
-    const endMinutes = endH * 60 + endM;
-    const pixelsPerMinute = slotWidth / 30;
-
-    return {
-      left: leftCourtWidth + (startMinutes - timelineStartMinutes) * pixelsPerMinute,
-      width: (endMinutes - startMinutes) * pixelsPerMinute,
-    };
-  };
-
   const openBooking = (booking: BookingDetail) => {
     setSelectedBooking(booking);
   };
@@ -1426,18 +1415,15 @@ export default function AdminSchedulePage({ onCheckoutModeChange, onBookingCheck
               </div>
               <div className="flex h-full">
                 {timelineTimes.map((time) => {
-                  const isPriority = time >= '17:30' && time < '21:00';
                   const isNight = time >= '21:00';
 
                   return (
                     <div
                       key={time}
                       className={`w-[60px] shrink-0 border-r border-slate-200 flex items-center justify-center text-[10px] font-black ${
-                        isPriority
-                            ? 'text-slate-900 bg-blue-50/60'
-                            : isNight
-                              ? 'text-orange-700 bg-orange-50/60'
-                              : 'text-slate-700'
+                        isNight
+                          ? 'text-orange-700 bg-orange-50/60'
+                          : 'text-slate-700'
                       }`}
                     >
                       {time}
@@ -1448,18 +1434,6 @@ export default function AdminSchedulePage({ onCheckoutModeChange, onBookingCheck
             </div>
 
             <div className="relative" style={{ height: displayedCourts.length * rowHeight }}>
-              <div
-                className="absolute top-0 bottom-0 z-10 pointer-events-none"
-                style={{
-                  ...highlightBandStyle(17, 30, 21, 0),
-                  backgroundColor: '#f8fafc',
-                  backgroundImage: 'repeating-linear-gradient(135deg, rgba(148, 163, 184, 0.32) 0, rgba(148, 163, 184, 0.32) 1px, transparent 1px, transparent 6px)',
-                }}
-              >
-                <span className="absolute left-1 top-1 rounded bg-white/90 px-1.5 py-0.5 text-[8px] font-black uppercase text-blue-700 shadow-sm">
-                  Ưu tiên cầu lông 17:30 - 21:00
-                </span>
-              </div>
 
               {displayedCourts.map((court, rowIndex) => (
                 <div

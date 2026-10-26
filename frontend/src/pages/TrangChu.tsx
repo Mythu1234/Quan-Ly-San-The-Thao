@@ -1,11 +1,10 @@
 import AdminDashboard from './AdminDashboard';
 import CustomerSchedule from '../components/CustomerSchedule';
-import PaymentCheckout from '../components/PaymentCheckout';
 import EmployeeDashboard from './employee/EmployeeDashboard';
 import VipCustomerDashboard from './VipCustomerDashboard';
 import { addBookingRequest } from '../types/bookingRequest';
 import { useState, useRef, useEffect, useMemo } from 'react';
-import { Search, MapPin, Phone, Clock, Play, Home, Calendar as CalendarIcon, X, Zap , User, Lock, Eye, Bell, Key, ArrowLeft, Award, Trophy } from 'lucide-react';
+import { Search, MapPin, Phone, Clock, Play, Home, Calendar as CalendarIcon, X, Zap , User, Lock, Eye, Bell, Key, ArrowLeft, Award, Trophy, LayoutGrid } from 'lucide-react';
 
 // Custom SVG Icons matching Figma design
 const ShuttlecockIcon = () => (
@@ -63,6 +62,8 @@ export default function TrangChu() {
 
   // Order Submission State
   const [showPayment, setShowPayment] = useState<boolean>(false);
+  const [paymentPercent, setPaymentPercent] = useState<50 | 100>(100);
+  const [isSubmitted, setIsSubmitted] = useState<boolean>(false);
   const [showOTP, setShowOTP] = useState<boolean>(false);
   const [showLogin, setShowLogin] = useState<boolean>(false);
   const [showPassword, setShowPassword] = useState<boolean>(false);
@@ -580,6 +581,11 @@ export default function TrangChu() {
     }
   };
 
+  const simulatePaymentSuccess = () => {
+    setShowPayment(false);
+    setIsSubmitted(true);
+  };
+
   const handleLookupSearch = (e: React.FormEvent) => {
     e.preventDefault();
     setHasSearched(true);
@@ -637,19 +643,6 @@ export default function TrangChu() {
 
   if (isVipLoggedIn) {
     return <VipCustomerDashboard onLogout={() => setIsVipLoggedIn(false)} />;
-  if (showPayment) {
-    return (
-      <PaymentCheckout
-        open={showPayment}
-        orderCode={orderCode}
-        customerName={customerName}
-        customerPhone={customerPhone}
-        totalAmount={1_200_000}
-        registrationMonths={6}
-        onClose={() => setShowPayment(false)}
-        onComplete={() => setShowPayment(false)}
-      />
-    );
   }
 
   return (
