@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Menu,
   User as UserIcon,
@@ -19,6 +19,7 @@ import EmployeeProfileView from '../../components/employee/EmployeeProfileView';
 import FacilityManagementView from '../../components/admin/FacilityManagementView';
 import type { Employee, ShiftRegistration, FacilityEquipment, CourtStatusItem, FacilityIncident } from '../../types/admin';
 import { INITIAL_EMPLOYEES, INITIAL_SHIFTS, INITIAL_EQUIPMENT, INITIAL_COURT_STATUSES, INITIAL_INCIDENTS } from '../../types/admin';
+import { shiftApiService } from '../../services/shiftService';
 
 export type EmployeeTab = 'lich_san' | 'nhan_vien' | 'ca_truc' | 'co_so_vat_chat';
 
@@ -39,22 +40,51 @@ export default function EmployeeDashboard({ onLogout }: { onLogout: () => void }
   const [isCheckoutMode, setIsCheckoutMode] = useState(false);
   const [isSetupMode, setIsSetupMode] = useState(false);
 
-  // Shift handlers
-  const handleAddShift = (shift: Omit<ShiftRegistration, 'id'>) => {
-    const newShift: ShiftRegistration = {
-      ...shift,
-      id: `SH-${Math.floor(Math.random() * 1000)}`
+  // Load backend shifts on mount
+  useEffect(() => {
+    let isMounted = true;
+    shiftApiService.getShifts().then((res) => {
+      if (isMounted && res.isBackendOnline) {
+        setShifts(res.shifts);
+      }
+    }).catch(console.warn);
+    return () => {
+      isMounted = false;
     };
-    setShifts([...shifts, newShift]);
+  }, []);
+
+  // Shift handlers
+  const handleAddShift = async (shift: Omit<ShiftRegistration, 'id'>) => {
+    try {
+      const created = await shiftApiService.createShift(shift as any, 'Nhân viên ca trực');
+      setShifts((prev) => [...prev.filter((s) => s.id !== created.id), created]);
+    } catch (err) {
+      console.warn('Backend add shift error, saving locally:', err);
+      const newShift: ShiftRegistration = {
+        ...shift,
+        id: `SH-${Math.floor(Math.random() * 1000)}`
+      };
+      setShifts((prev) => [...prev, newShift]);
+    }
   };
 
-  const handleDeleteShift = (id: string, reason?: string, permanent?: boolean) => {
-    if (permanent) {
-      setShifts((prev) => prev.filter((s) => s.id !== id));
-    } else {
-      setShifts(
-        shifts.map((s) => (s.id === id ? { ...s, status: 'cancelled', cancelReason: reason || 'Nhân viên hủy' } : s))
+  const handleDeleteShift = async (id: string, reason?: string, permanent?: boolean) => {
+    try {
+      await shiftApiService.deleteShift(id, permanent, reason || 'Nhân viên xin hủy ca');
+      setShifts((prev) =>
+        permanent
+          ? prev.filter((s) => s.id !== id)
+          : prev.map((s) => (s.id === id ? { ...s, status: 'cancelled', cancelReason: reason || 'Nhân viên xin hủy ca' } : s))
       );
+    } catch (err) {
+      console.warn('Backend delete shift error, deleting locally:', err);
+      if (permanent) {
+        setShifts((prev) => prev.filter((s) => s.id !== id));
+      } else {
+        setShifts(
+          shifts.map((s) => (s.id === id ? { ...s, status: 'cancelled', cancelReason: reason || 'Nhân viên hủy' } : s))
+        );
+      }
     }
   };
 
@@ -157,6 +187,61 @@ export default function EmployeeDashboard({ onLogout }: { onLogout: () => void }
       }
       return eq;
     }));
+  };
+
+  const handleAddTimelineLog = (incidentId: string, title: string, description: string) => {
+    const nowTime = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+    const newLog = {
+      id: `TL-${Date.now()}`,
+      time: nowTime,
+      title,
+      description,
+      active: true,
+    };
+    setIncidents(prev =>
+      prev.map(i =>
+        i.id === incidentId
+          ? {
+              ...i,
+              timelineLogs: [newLog, ...(i.timelineLogs || []).map(l => ({ ...l, active: false }))],
+            }
+          : i
+      )
+    );
+  };
+
+  const handleCompleteEquipmentWarranty = (equipmentCode: string, equipmentName?: string) => {
+    const today = new Date().toLocaleDateString('vi-VN');
+    const formattedDate = `Hôm nay (${today})`;
+
+    // 1. Update equipment state
+    setEquipments(prev =>
+      prev.map(eq =>
+        eq.code === equipmentCode
+          ? {
+              ...eq,
+              status: 'san_sang',
+              statusLabel: 'Sẵn sàng',
+              healthRate: 'Tốt (Đã nghiệm thu bảo hành)',
+              lastMaintenance: formattedDate,
+            }
+          : eq
+      )
+    );
+
+    // 2. Find related incident and append timeline log
+    const relatedInc =
+      incidents.find(
+        i =>
+          i.equipmentCode === equipmentCode ||
+          i.damageItems?.some(d => d.equipmentCode === equipmentCode)
+      ) || incidents[0];
+
+    if (relatedInc) {
+      const logTitle = `Nghiệm thu hoàn tất bảo hành [${equipmentCode}]`;
+      const logDesc = `Đã nghiệm thu thiết bị ${equipmentName ? `${equipmentName} (${equipmentCode})` : equipmentCode} sau bảo hành/sửa chữa. Thiết bị chuyển sang trạng thái Sẵn sàng vận hành.`;
+      handleAddTimelineLog(relatedInc.id, logTitle, logDesc);
+    }
   };
 
   const handleTabChange = (tabId: EmployeeTab) => {
@@ -438,6 +523,8 @@ export default function EmployeeDashboard({ onLogout }: { onLogout: () => void }
               onUpdateIncidentStatus={handleUpdateIncidentStatus}
               onReturnToWarehouse={handleReturnToWarehouse}
               onAssignBookingToEquipment={handleAssignBookingToEquipment}
+              onCompleteEquipmentWarranty={handleCompleteEquipmentWarranty}
+              onAddTimelineLog={handleAddTimelineLog}
             />
           </div>
         )}

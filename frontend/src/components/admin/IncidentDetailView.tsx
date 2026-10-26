@@ -21,6 +21,7 @@ interface IncidentDetailViewProps {
   onBack: () => void;
   onUpdateStatus: (incidentId: string, newStatus: 'cho_xu_ly' | 'dang_sua_chua' | 'da_khac_phuc', unlockCourt?: boolean) => void;
   onAddTimelineLog?: (incidentId: string, title: string, description: string) => void;
+  onCompleteEquipmentWarranty?: (equipmentCode: string, equipmentName?: string) => void;
 }
 
 export default function IncidentDetailView({
@@ -28,6 +29,7 @@ export default function IncidentDetailView({
   onBack,
   onUpdateStatus,
   onAddTimelineLog,
+  onCompleteEquipmentWarranty,
 }: IncidentDetailViewProps) {
   const [currentStatus, setCurrentStatus] = useState(incident.status);
   const [timelineLogs, setTimelineLogs] = useState(incident.timelineLogs || []);
@@ -35,8 +37,40 @@ export default function IncidentDetailView({
   const [newLogDesc, setNewLogDesc] = useState('');
   const [showAddLog, setShowAddLog] = useState(false);
   const [showSuccessToast, setShowSuccessToast] = useState(false);
+  const [isEquipmentWarrantyDone, setIsEquipmentWarrantyDone] = useState(false);
+  const [warrantyToast, setWarrantyToast] = useState<string | null>(null);
+
+  const targetEquipmentCode = incident.equipmentCode || incident.damageItems?.[0]?.equipmentCode || 'MATB-02';
+  const targetEquipmentName = incident.equipmentName || incident.damageItems?.[0]?.title || 'Thảm sàn Vinyl BWF 4.5mm';
 
   const isResolved = currentStatus === 'da_khac_phuc';
+
+  const handleCompleteWarranty = () => {
+    const nowTime = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+    const logTitle = `Nghiệm thu hoàn tất bảo hành [${targetEquipmentCode}]`;
+    const logDesc = `Đã nghiệm thu thiết bị ${targetEquipmentName} sau khi hoàn tất bảo hành/sửa chữa kỹ thuật. Thiết bị đạt chuẩn kiểm định và chuyển về trạng thái 🟢 Sẵn sàng vận hành.`;
+
+    const warrantyLog = {
+      id: `TL-${Date.now()}`,
+      time: nowTime,
+      title: logTitle,
+      description: logDesc,
+      active: true,
+    };
+
+    setTimelineLogs((prev) => [warrantyLog, ...prev.map((l) => ({ ...l, active: false }))]);
+    setIsEquipmentWarrantyDone(true);
+
+    if (onAddTimelineLog) {
+      onAddTimelineLog(incident.id, logTitle, logDesc);
+    }
+    if (onCompleteEquipmentWarranty) {
+      onCompleteEquipmentWarranty(targetEquipmentCode, targetEquipmentName);
+    }
+
+    setWarrantyToast(`Đã nghiệm thu thiết bị [${targetEquipmentCode}]! Trạng thái chuyển về 🟢 Sẵn sàng và ghi nhận vào Nhật ký sự cố. Sân ${incident.courtName} vẫn giữ nguyên trạng thái khóa.`);
+    setTimeout(() => setWarrantyToast(null), 4500);
+  };
 
   const handleResolveAndUnlock = () => {
     setCurrentStatus('da_khac_phuc');
@@ -92,38 +126,43 @@ export default function IncidentDetailView({
 
   return (
     <div className="flex-1 space-y-4 p-4 pb-28 animate-in fade-in duration-200 w-full max-w-full min-w-0">
-      {/* 🟢 Top Navigation Bar */}
-      <div className="flex items-center justify-between rounded-2xl bg-white border border-slate-200 px-3.5 py-2.5 shadow-2xs">
+      {/* 🟢 Top Badge & Navigation */}
+      <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <button
             type="button"
             onClick={onBack}
-            className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-700 hover:bg-slate-200 transition active:scale-95 cursor-pointer"
+            className="flex h-8 w-8 items-center justify-center rounded-full bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 transition active:scale-95 cursor-pointer shadow-2xs"
+            title="Quay lại"
           >
             <ChevronLeft className="w-5 h-5 stroke-[2.5]" />
           </button>
-          <div>
-            <div className="flex items-center gap-1.5">
-              <span className="h-1.5 w-1.5 rounded-full bg-rose-600" />
-              <span className="text-[10px] font-black uppercase tracking-wider text-rose-800">
-                BIÊN BẢN KIỂM SOÁT SỰ CỐ
-              </span>
-            </div>
-            <h1 className="text-sm font-black text-slate-900 truncate">
-              Chi Tiết Sự Cố #{incident.id}
-            </h1>
+
+          <div className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-xs font-black text-emerald-800 border border-emerald-200 shadow-2xs">
+            <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+            BIÊN BẢN KIỂM SOÁT SỰ CỐ
           </div>
         </div>
 
-        <span className={`px-2.5 py-1 rounded-full text-[11px] font-black ${
+        <span className={`px-2.5 py-1 rounded-full text-[11px] font-black border shadow-2xs ${
           currentStatus === 'da_khac_phuc'
-            ? 'bg-emerald-100 text-emerald-800'
+            ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
             : currentStatus === 'dang_sua_chua'
-            ? 'bg-blue-100 text-blue-800'
-            : 'bg-amber-100 text-amber-800'
+            ? 'bg-blue-100 text-blue-800 border-blue-300'
+            : 'bg-amber-100 text-amber-800 border-amber-300'
         }`}>
           {currentStatus === 'da_khac_phuc' ? 'Đã khắc phục' : currentStatus === 'dang_sua_chua' ? 'Đang sửa chữa' : 'Chờ xử lý'}
         </span>
+      </div>
+
+      {/* 🟢 Main Title */}
+      <div>
+        <h1 className="text-2xl font-black tracking-tight text-slate-900 leading-tight">
+          CHI TIẾT SỰ CỐ <span className="text-emerald-600">#{incident.id}</span>
+        </h1>
+        <p className="mt-1 text-xs text-slate-500 leading-relaxed font-medium">
+          Hồ sơ kiểm soát kỹ thuật, nhật ký sửa chữa và nghiệm thu vận hành {incident.courtName}.
+        </p>
       </div>
 
       {/* Success Toast */}
@@ -133,6 +172,18 @@ export default function IncidentDetailView({
             <CheckCircle2 className="w-5 h-5 text-emerald-100" />
             <span className="text-xs font-black">
               Đã nghiệm thu thành công! Sân {incident.courtName} đã được mở lại.
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* Warranty Success Toast */}
+      {warrantyToast && (
+        <div className="rounded-2xl bg-emerald-700 text-white p-3.5 shadow-lg flex items-center justify-between animate-in slide-in-from-top duration-300">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="w-5 h-5 text-emerald-200 shrink-0" />
+            <span className="text-xs font-black">
+              {warrantyToast}
             </span>
           </div>
         </div>
@@ -304,8 +355,87 @@ export default function IncidentDetailView({
             <p className="text-xs text-slate-600 leading-relaxed">
               {incident.description}
             </p>
+
+            {incident.imageUrl && (
+              <div className="relative rounded-2xl overflow-hidden border border-slate-200 shadow-2xs aspect-video bg-slate-100">
+                <img
+                  src={incident.imageUrl}
+                  alt={incident.title}
+                  className="w-full h-full object-cover"
+                />
+                <div className="absolute bottom-2 left-2 flex items-center gap-1.5 rounded-lg bg-slate-900/80 backdrop-blur-sm px-2.5 py-1 text-[11px] font-bold text-white shadow">
+                  <Camera className="w-3.5 h-3.5" />
+                  <span>Ảnh chụp hiện trường sự cố</span>
+                </div>
+              </div>
+            )}
           </div>
         )}
+      </div>
+
+      {/* 3.5. Equipment Warranty & Acceptance Card ("BẢO HÀNH & NGHIỆM THU THIẾT BỊ") */}
+      <div className="rounded-3xl border border-emerald-200 bg-gradient-to-br from-emerald-50/70 via-white to-emerald-50/30 p-4 shadow-2xs space-y-3.5">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Wrench className="w-4 h-4 text-emerald-700" />
+            <h2 className="text-xs font-black uppercase tracking-wider text-slate-800">
+              Bảo hành & Nghiệm thu thiết bị
+            </h2>
+          </div>
+          <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black border ${
+            isEquipmentWarrantyDone
+              ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+              : 'bg-amber-100 text-amber-800 border-amber-300'
+          }`}>
+            {isEquipmentWarrantyDone ? '🟢 Đã nghiệm thu' : 'Chờ nghiệm thu'}
+          </span>
+        </div>
+
+        <div className="rounded-2xl bg-white border border-slate-200/80 p-3 space-y-2 text-xs">
+          <div className="flex items-center justify-between">
+            <span className="text-slate-500 font-medium">Thiết bị cần nghiệm thu:</span>
+            <span className="font-bold text-slate-800">{targetEquipmentName}</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-slate-500 font-medium">Mã dán thiết bị:</span>
+            <span className="font-mono font-black text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+              {targetEquipmentCode}
+            </span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-slate-500 font-medium">Trạng thái thiết bị:</span>
+            <span className={`font-bold ${isEquipmentWarrantyDone ? 'text-emerald-700 font-black' : 'text-amber-700'}`}>
+              {isEquipmentWarrantyDone ? '🟢 Sẵn sàng vận hành' : '🟡 Đang sửa chữa / Chờ bảo hành'}
+            </span>
+          </div>
+          <div className="flex items-center justify-between pt-1 border-t border-slate-100">
+            <span className="text-slate-500 font-medium">Hotline bảo hành hãng:</span>
+            <span className="font-bold text-emerald-700">1900 6868 (Yonex / Đại Việt)</span>
+          </div>
+        </div>
+
+        <p className="text-[11px] text-slate-500 leading-relaxed font-medium">
+          💡 Khi hãng hoặc thợ bảo trì đã sửa xong thiết bị, bấm nút nghiệm thu bên dưới để chuyển thiết bị về 🟢 <strong>Sẵn sàng</strong> và tự động ghi vào Nhật ký xử lý sự cố. <em>(Sân đấu vẫn giữ nguyên trạng thái khóa, người quản lý sẽ tự mở lại sân khi kiểm tra an toàn xong).</em>
+        </p>
+
+        {/* Nút Nghiệm thu thiết bị */}
+        <button
+          type="button"
+          disabled={isEquipmentWarrantyDone}
+          onClick={handleCompleteWarranty}
+          className={`w-full flex items-center justify-center gap-2 rounded-2xl py-3.5 text-xs font-black transition active:scale-95 cursor-pointer shadow-md ${
+            isEquipmentWarrantyDone
+              ? 'bg-emerald-100 text-emerald-800 border border-emerald-300 cursor-default'
+              : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/25'
+          }`}
+        >
+          <CheckCircle2 className="w-4 h-4 text-emerald-100" />
+          <span>
+            {isEquipmentWarrantyDone
+              ? `✓ Đã nghiệm thu [${targetEquipmentCode}] (🟢 Sẵn sàng)`
+              : 'Xác nhận đã bảo hành xong / Nghiệm thu'}
+          </span>
+        </button>
       </div>
 
       {/* 4. Reporter Card ("NGƯỜI LẬP BIÊN BẢN") */}
@@ -469,16 +599,34 @@ export default function IncidentDetailView({
         </div>
       </div>
 
-      {/* 7. Bottom Main CTA matching mockup ("Nghiệm thu & Mở lại sân") */}
-      <div className="pt-2">
+      {/* 7. Bottom Main CTA */}
+      <div className="pt-2 space-y-2.5">
+        <button
+          type="button"
+          disabled={isEquipmentWarrantyDone}
+          onClick={handleCompleteWarranty}
+          className={`w-full flex items-center justify-center gap-2 rounded-2xl py-3 text-xs font-black transition active:scale-95 cursor-pointer shadow-sm ${
+            isEquipmentWarrantyDone
+              ? 'bg-emerald-100 text-emerald-800 border border-emerald-300 cursor-default'
+              : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/20'
+          }`}
+        >
+          <CheckCircle2 className="w-4 h-4 text-emerald-100" />
+          <span>
+            {isEquipmentWarrantyDone
+              ? `✓ Đã nghiệm thu thiết bị [${targetEquipmentCode}] (🟢 Sẵn sàng)`
+              : 'Xác nhận đã bảo hành xong / Nghiệm thu'}
+          </span>
+        </button>
+
         {!isResolved ? (
           <button
             type="button"
             onClick={handleResolveAndUnlock}
-            className="w-full flex items-center justify-center gap-2 rounded-2xl bg-emerald-700 hover:bg-emerald-800 py-3.5 text-xs font-black text-white shadow-lg shadow-emerald-700/25 active:scale-95 transition cursor-pointer"
+            className="w-full flex items-center justify-center gap-2 rounded-2xl bg-slate-800 hover:bg-slate-900 py-3.5 text-xs font-black text-white shadow-lg transition active:scale-95 cursor-pointer"
           >
-            <Shield className="w-4 h-4 text-emerald-200" />
-            <span>Nghiệm thu & Mở lại sân</span>
+            <Shield className="w-4 h-4 text-emerald-300" />
+            <span>Nghiệm thu toàn bộ sự cố & Mở lại sân</span>
           </button>
         ) : (
           <div className="w-full flex items-center justify-center gap-2 rounded-2xl bg-emerald-100 border border-emerald-300 py-3 text-xs font-black text-emerald-800">

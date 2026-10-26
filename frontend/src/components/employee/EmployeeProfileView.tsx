@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import {
-  User,
   Phone,
   Mail,
   Calendar,
@@ -57,28 +56,26 @@ export default function EmployeeProfileView({
         </div>
       )}
 
-      {/* 🟢 Top Navigation Bar */}
-      <div className="flex items-center justify-between rounded-2xl bg-white border border-slate-200 px-3.5 py-2.5 shadow-2xs">
-        <div className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-100 text-emerald-800">
-            <User className="w-4 h-4" />
-          </div>
-          <div>
-            <div className="flex items-center gap-1.5">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-600" />
-              <span className="text-[10px] font-black uppercase tracking-wider text-emerald-800">
-                THÔNG TIN NHÂN SỰ
-              </span>
-            </div>
-            <h1 className="text-sm font-black text-slate-900 truncate">
-              Hồ Sơ Cá Nhân Của Tôi
-            </h1>
-          </div>
+      {/* 🟢 Top Badge */}
+      <div className="flex items-center justify-between">
+        <div className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-xs font-black text-emerald-800 border border-emerald-200 shadow-2xs">
+          <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+          THÔNG TIN NHÂN SỰ
         </div>
 
-        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 text-[11px] font-black border border-emerald-200">
+        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-white text-emerald-700 text-[11px] font-black border border-slate-200 shadow-2xs">
           Mã NV: {employee.id || 'NV-01'}
         </span>
+      </div>
+
+      {/* 🟢 Main Title */}
+      <div>
+        <h1 className="text-2xl font-black tracking-tight text-slate-900 leading-tight">
+          HỒ SƠ CÁ NHÂN <span className="text-emerald-600">CỦA TÔI</span>
+        </h1>
+        <p className="mt-1 text-xs text-slate-500 leading-relaxed font-medium">
+          Xem thông tin liên hệ cá nhân, phân quyền tài khoản và lịch trực phân công.
+        </p>
       </div>
 
       {/* 1. Main Profile Card */}
@@ -274,28 +271,33 @@ export default function EmployeeProfileView({
             employee.schedule5Days.map((sch, i) => (
               <div
                 key={i}
-                className="flex items-center justify-between p-2.5 rounded-xl border border-slate-100 bg-slate-50/70"
+                className="flex items-center justify-between p-2.5 rounded-2xl border border-slate-100 bg-slate-50/70 hover:bg-slate-50 transition gap-2.5"
               >
-                <div className="flex items-center gap-2.5">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white border border-slate-200 text-[11px] font-black text-slate-700">
-                    {sch.dayLabel}
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="min-w-[80px] px-2.5 py-1.5 rounded-xl bg-white border border-slate-200 text-center shrink-0 shadow-2xs">
+                    <span className="text-[11px] font-black text-slate-800 block leading-tight whitespace-nowrap">
+                      {sch.dayLabel.includes('(') ? sch.dayLabel.replace(/\s*\([^)]*\)/, '') : sch.dayLabel}
+                    </span>
+                    <span className="text-[10px] font-bold text-slate-400 block leading-tight mt-0.5 whitespace-nowrap">
+                      {sch.date || (sch.dayLabel.match(/\(([^)]+)\)/)?.[1] || '')}
+                    </span>
                   </div>
-                  <div>
-                    <div className="text-xs font-black text-slate-900">
-                      {sch.shiftName || 'Nghỉ'}
+                  <div className="min-w-0">
+                    <div className="text-xs font-black text-slate-900 truncate">
+                      {sch.shiftName || 'Nghỉ ca'}
                     </div>
-                    <div className="text-[10px] text-slate-500 font-medium">
+                    <div className="text-[10px] text-slate-500 font-medium truncate mt-0.5">
                       {sch.time || 'Không có ca trực'}
                     </div>
                   </div>
                 </div>
 
                 <span
-                  className={`px-2 py-0.5 rounded-md text-[10px] font-black ${
+                  className={`px-2.5 py-1 rounded-lg text-[10px] font-black shrink-0 ${
                     sch.status === 'working'
-                      ? 'bg-emerald-100 text-emerald-800'
+                      ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
                       : sch.status === 'scheduled'
-                      ? 'bg-blue-100 text-blue-800'
+                      ? 'bg-blue-100 text-blue-800 border border-blue-200'
                       : 'bg-slate-200 text-slate-600'
                   }`}
                 >

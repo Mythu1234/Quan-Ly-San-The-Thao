@@ -7,6 +7,8 @@ import {
   MapPin,
   Calendar,
   Check,
+  ShieldCheck,
+  Phone,
 } from 'lucide-react';
 import type { FacilityEquipment, EquipmentCategory } from '../../types/admin';
 
@@ -32,6 +34,9 @@ export default function AddEquipmentView({
   const [healthRate, setHealthRate] = useState('Mới 100%');
   const [purchaseDate, setPurchaseDate] = useState('16/10/2026');
   const [warrantyExpire, setWarrantyExpire] = useState('16/10/2028');
+  const [supplier, setSupplier] = useState('Công ty Thể Thao Đại Việt (Yonex VN)');
+  const [supplierPhone, setSupplierPhone] = useState('1900 6868');
+  const [serialNumber, setSerialNumber] = useState('');
   const [notes, setNotes] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -69,6 +74,9 @@ export default function AddEquipmentView({
       healthRate: healthRate.trim() || 'Tốt',
       purchaseDate,
       warrantyExpire,
+      supplier: supplier.trim() || undefined,
+      supplierPhone: supplierPhone.trim() || undefined,
+      serialNumber: serialNumber.trim() || undefined,
       notes: notes.trim() || undefined,
     };
 
@@ -77,32 +85,38 @@ export default function AddEquipmentView({
 
   return (
     <div className="flex-1 space-y-4 p-4 pb-28 animate-in fade-in duration-200 w-full max-w-full min-w-0">
-      {/* 🟢 Top Navigation Bar */}
-      <div className="flex items-center justify-between rounded-2xl bg-white border border-slate-200 px-3.5 py-2.5 shadow-2xs">
+      {/* 🟢 Top Badge & Navigation */}
+      <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <button
             type="button"
             onClick={onBack}
-            className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-700 hover:bg-slate-200 transition active:scale-95 cursor-pointer"
+            className="flex h-8 w-8 items-center justify-center rounded-full bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 transition active:scale-95 cursor-pointer shadow-2xs"
+            title="Quay lại"
           >
             <ChevronLeft className="w-5 h-5 stroke-[2.5]" />
           </button>
-          <div>
-            <div className="flex items-center gap-1.5">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-600" />
-              <span className="text-[10px] font-black uppercase tracking-wider text-emerald-800">
-                THÊM THIẾT BỊ LƯU ĐỘNG
-              </span>
-            </div>
-            <h1 className="text-sm font-black text-slate-900 truncate">
-              Nhập Thiết Bị & Đăng Ký Mã Dán
-            </h1>
+
+          <div className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-xs font-black text-emerald-800 border border-emerald-200 shadow-2xs">
+            <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+            QUẢN TRỊ CƠ SỞ VẬT CHẤT
           </div>
         </div>
 
-        <div className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 font-bold text-xs shadow-2xs">
-          <PlusCircle className="w-4 h-4" />
+        <div className="flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 text-[11px] font-black text-emerald-700 border border-emerald-200 shadow-2xs">
+          <PlusCircle className="w-3.5 h-3.5 text-emerald-600" />
+          <span>Mã: EQ-MỚI</span>
         </div>
+      </div>
+
+      {/* 🟢 Main Title */}
+      <div>
+        <h1 className="text-2xl font-black tracking-tight text-slate-900 leading-tight">
+          THÊM THIẾT BỊ <span className="text-emerald-600">& DỤNG CỤ MỚI</span>
+        </h1>
+        <p className="mt-1 text-xs text-slate-500 leading-relaxed font-medium">
+          Đăng ký mã thiết bị lưu động, thiết lập vị trí lưu trữ và thông tin bảo hành ban đầu.
+        </p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
@@ -246,16 +260,52 @@ export default function AddEquipmentView({
           </div>
         </div>
 
-        {/* 4. Ngày nhập & Bảo hành */}
+        {/* 4. Hồ sơ bảo hành & Nhà cung cấp */}
         <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-2xs space-y-3">
-          <div className="flex items-center gap-2">
-            <Calendar className="w-4 h-4 text-emerald-700" />
-            <h2 className="text-xs font-black uppercase tracking-wider text-slate-800">
-              Hạn bảo hành & Thông số
-            </h2>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="w-4 h-4 text-emerald-700" />
+              <h2 className="text-xs font-black uppercase tracking-wider text-slate-800">
+                Hồ sơ bảo hành & Nhà cung cấp
+              </h2>
+            </div>
+            <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200">
+              Chính hãng
+            </span>
           </div>
 
           <div className="grid grid-cols-2 gap-2.5">
+            <div>
+              <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                Hãng / Nhà cung cấp
+              </label>
+              <input
+                type="text"
+                value={supplier}
+                onChange={(e) => setSupplier(e.target.value)}
+                placeholder="Ví dụ: Yonex VN, Enlio Floor, Rạng Đông..."
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-xs font-bold text-slate-800 outline-none focus:border-emerald-500 focus:bg-white"
+              />
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                Hotline hỗ trợ bảo hành
+              </label>
+              <div className="relative">
+                <input
+                  type="text"
+                  value={supplierPhone}
+                  onChange={(e) => setSupplierPhone(e.target.value)}
+                  placeholder="1900 6868 hoặc SĐT thợ"
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 pr-8 text-xs font-bold text-slate-800 outline-none focus:border-emerald-500 focus:bg-white"
+                />
+                <Phone className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-3" />
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-2.5">
             <div>
               <label className="block text-[11px] font-bold text-slate-700 mb-1">
                 Ngày nhập
@@ -278,6 +328,27 @@ export default function AddEquipmentView({
                 className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-xs font-medium text-slate-800 outline-none focus:border-emerald-500 focus:bg-white"
               />
             </div>
+            <div>
+              <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                Số Seri / Model
+              </label>
+              <input
+                type="text"
+                value={serialNumber}
+                onChange={(e) => setSerialNumber(e.target.value)}
+                placeholder="SN-YN-8821"
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-xs font-medium text-slate-800 outline-none focus:border-emerald-500 focus:bg-white"
+              />
+            </div>
+          </div>
+
+          <div className="rounded-xl bg-emerald-50/70 border border-emerald-200 p-2.5 flex items-center justify-between text-xs">
+            <span className="font-bold text-emerald-800 text-[11px]">
+              Chế độ bảo hành:
+            </span>
+            <span className="font-black text-emerald-700 text-[11px]">
+              Hãng sửa chữa & đổi linh kiện miễn phí trong thời hạn
+            </span>
           </div>
 
           <div>

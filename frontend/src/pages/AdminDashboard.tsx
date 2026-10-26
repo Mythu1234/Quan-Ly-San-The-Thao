@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Menu, User as UserIcon, AlertTriangle, Calendar, CalendarClock, ChevronLeft, ChevronRight, LogOut, Settings, LayoutGrid, Users, Wallet, Dumbbell } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Menu, User as UserIcon, AlertTriangle, Calendar, CalendarClock, ChevronLeft, ChevronRight, LogOut, Settings, LayoutGrid, Users, Wallet, Dumbbell, Trash2, CheckCircle2 } from 'lucide-react';
 import AdminSchedulePage from './AdminSchedulePage';
 import AdminSetupReminderPage from './AdminSetupReminderPage';
 import ShiftScheduleView from '../components/admin/ShiftScheduleView';
@@ -11,6 +11,9 @@ import WalletRevenueView from '../components/admin/WalletRevenueView';
 import FacilityManagementView from '../components/admin/FacilityManagementView';
 import type { Employee, ShiftRegistration, Transaction, FacilityEquipment, CourtStatusItem, FacilityIncident } from '../types/admin';
 import { INITIAL_EMPLOYEES, INITIAL_SHIFTS, INITIAL_TRANSACTIONS, INITIAL_EQUIPMENT, INITIAL_COURT_STATUSES, INITIAL_INCIDENTS } from '../types/admin';
+import { employeeApiService } from '../services/employeeService';
+import { facilityApiService } from '../services/facilityService';
+import { shiftApiService } from '../services/shiftService';
 
 export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -65,7 +68,42 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
     if (tabId === 'nhan_vien') setStaffSubView('list');
   };
 
-  // Staff handlers
+  // State for backend connectivity status
+  const [isBackendOnline, setIsBackendOnline] = useState<boolean>(false);
+
+  // Load employees, facility data, and shifts from backend API on mount
+  useEffect(() => {
+    let isMounted = true;
+    const loadInitialData = async () => {
+      try {
+        const [empRes, facRes, shiftRes] = await Promise.all([
+          employeeApiService.getEmployees(),
+          facilityApiService.loadAllFacilityData(),
+          shiftApiService.getShifts(),
+        ]);
+        if (isMounted) {
+          setEmployees(empRes.employees);
+          setIsBackendOnline(empRes.isBackendOnline || facRes.isBackendOnline || shiftRes.isBackendOnline);
+          if (shiftRes.isBackendOnline) {
+            setShifts(shiftRes.shifts);
+          }
+          if (facRes.isBackendOnline) {
+            setEquipments(facRes.equipments);
+            setCourtStatuses(facRes.courts);
+            setIncidents(facRes.incidents);
+          }
+        }
+      } catch (err) {
+        console.warn('Could not load data from backend, using local state:', err);
+      }
+    };
+    loadInitialData();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // Staff handlers connected to backend
   const handleAddNewStaff = () => setStaffSubView('add');
   const handleSelectEmployee = (emp: Employee) => {
     setSelectedEmployee(emp);
@@ -75,130 +113,476 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
     setSelectedEmployee(emp);
     setStaffSubView('edit');
   };
-  const handleUpdateEmployee = (updatedEmp: Employee) => {
-    setEmployees(employees.map(e => (e.id === updatedEmp.id ? updatedEmp : e)));
-    setSelectedEmployee(updatedEmp);
-    setStaffSubView('detail');
-  };
-  const handleSaveEmployee = (emp: Omit<Employee, 'id'>) => {
-    const newEmp: Employee = { ...emp, id: `NV-0${Math.floor(Math.random() * 100) + 50}` };
-    setEmployees([...employees, newEmp]);
-    setStaffSubView('list');
-  };
-  const handleDeleteEmployee = (id: string, name: string) => {
-    if (window.confirm(`Xóa nhân viên ${name}?`)) {
-      setEmployees(employees.filter(e => e.id !== id));
-      if (staffSubView === 'detail' && selectedEmployee?.id === id) {
-        setStaffSubView('list');
-      }
+
+  const handleUpdateEmployee = async (updatedEmp: Employee, newPassword?: string) => {
+    try {
+      const saved = await employeeApiService.updateEmployee(updatedEmp.id, {
+        ...updatedEmp,
+        password: newPassword,
+      });
+      setEmployees((prev) => prev.map((e) => (e.id === saved.id ? saved : e)));
+      setSelectedEmployee(saved);
+      setStaffSubView('detail');
+      setPopup({
+        type: 'alert',
+        title: 'Cập nhật thành công',
+        message: `Đã lưu các thay đổi cho nhân viên "${saved.name}" (Mã: ${saved.id}) vào cơ sở dữ liệu!`,
+        confirmText: 'Đóng',
+      });
+    } catch (err: any) {
+      console.warn('Backend update failed, applying locally:', err);
+      setEmployees((prev) => prev.map((e) => (e.id === updatedEmp.id ? updatedEmp : e)));
+      setSelectedEmployee(updatedEmp);
+      setStaffSubView('detail');
     }
   };
-  const handleToggleStatus = (id: string) => {
-    setEmployees(employees.map(e => e.id === id ? { ...e, status: e.status === 'active' ? 'inactive' : 'active' } : e));
+
+  const handleSaveEmployee = async (emp: Employee, password?: string) => {
+    try {
+      const created = await employeeApiService.createEmployee({
+        name: emp.name,
+        phone: emp.phone,
+        email: emp.email,
+        role: emp.role,
+        status: emp.status,
+        avatarText: emp.avatarText,
+        avatarBg: emp.avatarBg,
+        avatarImage: emp.avatarImage,
+        password,
+      });
+      setEmployees((prev) => [created, ...prev]);
+      setStaffSubView('list');
+      setPopup({
+        type: 'alert',
+        title: 'Thêm nhân viên thành công',
+        message: `Đã thêm mới nhân viên "${created.name}" (Mã số: ${created.id}) vào hệ thống CourtX!`,
+        confirmText: 'Đóng',
+      });
+    } catch (err: any) {
+      console.warn('Backend create failed, saving locally:', err);
+      const newEmp: Employee = { ...emp, id: emp.id || `NV-0${Math.floor(Math.random() * 100) + 50}` };
+      setEmployees((prev) => [newEmp, ...prev]);
+      setStaffSubView('list');
+    }
+  };
+
+  // Custom common popup state
+  const [popup, setPopup] = useState<{
+    type: 'alert' | 'confirm' | 'danger';
+    title: string;
+    message: string;
+    confirmText?: string;
+    cancelText?: string;
+    onConfirm?: () => void;
+  } | null>(null);
+
+  const handleDeleteEmployee = (id: string, name: string, reason?: string) => {
+    setPopup({
+      type: 'danger',
+      title: 'Vô hiệu hóa nhân viên (UC-11)',
+      message: `Bạn có chắc chắn muốn vô hiệu hóa tài khoản của nhân viên "${name}" khỏi hệ thống không? (Hệ thống sẽ chuyển trạng thái sang Đã nghỉ việc, thu hồi ca trực tương lai và bảo lưu toàn bộ lịch sử theo quy tắc Soft Delete).`,
+      confirmText: 'Xác nhận vô hiệu hóa',
+      cancelText: 'Hủy bỏ',
+      onConfirm: async () => {
+        try {
+          const res = await employeeApiService.deleteEmployee(id, reason, false);
+          if (res.employee) {
+            setEmployees((prev) => prev.map((e) => (e.id === id ? res.employee! : e)));
+          } else {
+            setEmployees((prev) => prev.filter((e) => e.id !== id));
+          }
+          if (staffSubView === 'detail' && selectedEmployee?.id === id) {
+            setStaffSubView('list');
+          }
+          // UC-11: Revoke/cancel upcoming future shifts
+          setShifts((prev) =>
+            prev.map((s) =>
+              s.employeeId === id && s.status === 'scheduled'
+                ? { ...s, status: 'cancelled', cancelReason: reason || 'Nhân viên đã nghỉ việc (UC-11)' }
+                : s
+            )
+          );
+        } catch (err: any) {
+          console.warn('Backend delete failed, applying locally:', err);
+          setEmployees((prev) => prev.map((e) => (e.id === id ? { ...e, status: 'inactive' } : e)));
+          if (staffSubView === 'detail' && selectedEmployee?.id === id) {
+            setStaffSubView('list');
+          }
+        }
+      },
+    });
+  };
+
+  const handleToggleStatus = async (id: string) => {
+    try {
+      const updated = await employeeApiService.toggleStatus(id);
+      setEmployees((prev) => prev.map((e) => (e.id === id ? updated : e)));
+      if (selectedEmployee?.id === id) {
+        setSelectedEmployee(updated);
+      }
+    } catch (err: any) {
+      console.warn('Backend toggle failed, toggling locally:', err);
+      setEmployees((prev) =>
+        prev.map((e) => (e.id === id ? { ...e, status: e.status === 'active' ? 'inactive' : 'active' } : e))
+      );
+    }
   };
   const handleProcessRefund = (id: string) => {
     setTransactions(transactions.map(t => t.id === id ? { ...t, status: 'refunded', statusLabel: 'Đã hoàn tiền' } : t));
   };
 
-  // Facility handlers
-  const handleAddEquipment = (newEq: FacilityEquipment) => {
-    setEquipments([newEq, ...equipments]);
-  };
-
-  const handleUpdateEquipmentLocation = (equipmentCode: string, newLocation: string) => {
-    setEquipments(equipments.map(eq => eq.code === equipmentCode ? { ...eq, currentLocation: newLocation } : eq));
-  };
-
-  const handleToggleCourtLock = (courtId: string, isLocked: boolean, reason?: string) => {
-    setCourtStatuses(courtStatuses.map(c => c.id === courtId ? {
-      ...c,
-      isLocked,
-      lockReason: isLocked ? (reason || 'Bảo trì kỹ thuật') : undefined,
-      lockedAt: isLocked ? 'Vừa xong' : undefined,
-    } : c));
-  };
-
-  const handleSubmitIncident = (newIncident: FacilityIncident, lockCourt: boolean) => {
-    setIncidents([newIncident, ...incidents]);
-    if (lockCourt && newIncident.courtId) {
-      handleToggleCourtLock(newIncident.courtId, true, newIncident.title);
+  // Facility handlers connected to backend
+  const handleAddEquipment = async (newEq: FacilityEquipment) => {
+    try {
+      const created = await facilityApiService.createEquipment(newEq);
+      setEquipments((prev) => [created, ...prev]);
+    } catch (err) {
+      console.warn('Backend add equipment failed, adding locally:', err);
+      setEquipments([newEq, ...equipments]);
     }
   };
 
-  const handleUpdateIncidentStatus = (incidentId: string, newStatus: 'cho_xu_ly' | 'dang_sua_chua' | 'da_khac_phuc', unlockCourt?: boolean) => {
-    setIncidents(incidents.map(i => {
-      if (i.id === incidentId) {
-        return {
-          ...i,
-          status: newStatus,
-          statusLabel: newStatus === 'da_khac_phuc' ? 'Đã khắc phục' : newStatus === 'dang_sua_chua' ? 'Đang sửa chữa' : 'Chờ xử lý',
-          isCourtLocked: newStatus !== 'da_khac_phuc' ? i.isCourtLocked : false,
-        };
-      }
-      return i;
-    }));
+  const handleUpdateEquipmentLocation = async (equipmentCode: string, newLocation: string) => {
+    try {
+      const updated = await facilityApiService.relocateEquipment(equipmentCode, newLocation);
+      setEquipments((prev) => prev.map((eq) => (eq.code === equipmentCode ? updated : eq)));
+    } catch (err) {
+      console.warn('Backend relocate failed, applying locally:', err);
+      setEquipments((prev) =>
+        prev.map((eq) => (eq.code === equipmentCode ? { ...eq, currentLocation: newLocation } : eq))
+      );
+    }
+  };
 
-    if (unlockCourt) {
-      const targetInc = incidents.find(i => i.id === incidentId);
-      if (targetInc?.courtId) {
-        handleToggleCourtLock(targetInc.courtId, false);
+  const handleToggleCourtLock = async (courtId: string, isLocked: boolean, reason?: string) => {
+    try {
+      const updated = await facilityApiService.toggleCourtLock(courtId, isLocked, reason);
+      setCourtStatuses((prev) => prev.map((c) => (c.id === courtId ? updated : c)));
+    } catch (err) {
+      console.warn('Backend court lock failed, applying locally:', err);
+      setCourtStatuses((prev) =>
+        prev.map((c) =>
+          c.id === courtId
+            ? {
+                ...c,
+                isLocked,
+                lockReason: isLocked ? (reason || 'Bảo trì kỹ thuật') : undefined,
+                lockedAt: isLocked ? 'Vừa xong' : undefined,
+              }
+            : c
+        )
+      );
+    }
+  };
+
+  const handleSubmitIncident = async (newIncident: FacilityIncident, lockCourt: boolean) => {
+    try {
+      const res = await facilityApiService.createIncident({
+        ...newIncident,
+        lockCourt,
+      });
+      setIncidents((prev) => [res.incident, ...prev]);
+      if (res.courtLocked && newIncident.courtId) {
+        setCourtStatuses((prev) =>
+          prev.map((c) =>
+            c.id === newIncident.courtId
+              ? { ...c, isLocked: true, lockReason: `Sự cố: ${newIncident.title}` }
+              : c
+          )
+        );
+      }
+    } catch (err) {
+      console.warn('Backend incident report failed, applying locally:', err);
+      setIncidents([newIncident, ...incidents]);
+      if (lockCourt && newIncident.courtId) {
+        handleToggleCourtLock(newIncident.courtId, true, newIncident.title);
+      }
+    }
+  };
+
+  const handleUpdateIncidentStatus = async (
+    incidentId: string,
+    newStatus: 'cho_xu_ly' | 'dang_sua_chua' | 'da_khac_phuc',
+    unlockCourt?: boolean
+  ) => {
+    try {
+      const res = await facilityApiService.updateIncidentStatus(incidentId, newStatus, unlockCourt);
+      setIncidents((prev) => prev.map((i) => (i.id === incidentId ? res.incident : i)));
+      if (res.courtUnlocked) {
+        const targetInc = incidents.find((i) => i.id === incidentId);
+        if (targetInc?.courtId) {
+          setCourtStatuses((prev) =>
+            prev.map((c) => (c.id === targetInc.courtId ? { ...c, isLocked: false } : c))
+          );
+        }
+      }
+    } catch (err) {
+      console.warn('Backend incident update failed, applying locally:', err);
+      setIncidents(
+        incidents.map((i) => {
+          if (i.id === incidentId) {
+            return {
+              ...i,
+              status: newStatus,
+              statusLabel:
+                newStatus === 'da_khac_phuc'
+                  ? 'Đã khắc phục'
+                  : newStatus === 'dang_sua_chua'
+                  ? 'Đang sửa chữa'
+                  : 'Chờ xử lý',
+              isCourtLocked: newStatus !== 'da_khac_phuc' ? i.isCourtLocked : false,
+            };
+          }
+          return i;
+        })
+      );
+      if (unlockCourt) {
+        const targetInc = incidents.find((i) => i.id === incidentId);
+        if (targetInc?.courtId) {
+          handleToggleCourtLock(targetInc.courtId, false);
+        }
       }
     }
   };
 
   // Trả thiết bị về kho chung khi check-out hoặc điều phối
-  const handleReturnToWarehouse = (equipmentCode: string) => {
-    setEquipments(prev => prev.map(eq => eq.code === equipmentCode ? {
-      ...eq,
-      currentLocation: 'Kho chung',
-      status: 'san_sang',
-      statusLabel: 'Sẵn sàng',
-      healthRate: 'Sẵn sàng điều phối',
-      assignedBookingCode: undefined,
-      assignedTimeSlot: undefined,
-      assignedCustomer: undefined,
-      assignedCourt: undefined,
-    } : eq));
+  const handleReturnToWarehouse = async (equipmentCode: string) => {
+    try {
+      const updated = await facilityApiService.returnToWarehouse(equipmentCode);
+      setEquipments((prev) => prev.map((eq) => (eq.code === equipmentCode ? updated : eq)));
+    } catch (err) {
+      console.warn('Backend return to warehouse failed, applying locally:', err);
+      setEquipments((prev) =>
+        prev.map((eq) =>
+          eq.code === equipmentCode
+            ? {
+                ...eq,
+                currentLocation: 'Kho chung',
+                status: 'san_sang',
+                statusLabel: 'Sẵn sàng',
+                healthRate: 'Sẵn sàng điều phối',
+                assignedBookingCode: undefined,
+                assignedTimeSlot: undefined,
+                assignedCustomer: undefined,
+                assignedCourt: undefined,
+              }
+            : eq
+        )
+      );
+    }
   };
 
   // Ghi nhận ca đặt sân cho thiết bị
-  const handleAssignBookingToEquipment = (
+  const handleAssignBookingToEquipment = async (
     equipmentCode: string,
     courtName: string,
     timeSlot: string,
     bookingCode: string,
     customerName: string
   ) => {
-    setEquipments(prev => prev.map(eq => eq.code === equipmentCode ? {
-      ...eq,
-      currentLocation: courtName,
-      status: 'dang_su_dung',
-      statusLabel: 'Đang sử dụng',
-      assignedBookingCode: bookingCode || 'BK-8491',
-      assignedTimeSlot: timeSlot || '06:00 - 07:30',
-      assignedCustomer: customerName || 'Khách đặt sân',
-      assignedCourt: courtName,
-    } : eq));
+    try {
+      const updated = await facilityApiService.relocateEquipment(equipmentCode, courtName, {
+        bookingCode,
+        timeSlot,
+        customerName,
+      });
+      setEquipments((prev) => prev.map((eq) => (eq.code === equipmentCode ? updated : eq)));
+    } catch (err) {
+      console.warn('Backend assign booking failed, applying locally:', err);
+      setEquipments((prev) =>
+        prev.map((eq) =>
+          eq.code === equipmentCode
+            ? {
+                ...eq,
+                currentLocation: courtName,
+                status: 'dang_su_dung',
+                statusLabel: 'Đang sử dụng',
+                assignedBookingCode: bookingCode || 'BK-8491',
+                assignedTimeSlot: timeSlot || '06:00 - 07:30',
+                assignedCustomer: customerName || 'Khách đặt sân',
+                assignedCourt: courtName,
+              }
+            : eq
+        )
+      );
+    }
   };
 
   // Tự động thu hồi thiết bị của sân về Kho chung khi Check-out sân
-  const handleCheckoutCourtEquipment = (courtName: string, _timeSlot?: string) => {
-    setEquipments(prev => prev.map(eq => {
-      if (eq.currentLocation === courtName || eq.assignedCourt === courtName) {
-        return {
-          ...eq,
-          currentLocation: 'Kho chung',
-          status: 'san_sang',
-          statusLabel: 'Sẵn sàng',
-          healthRate: 'Sẵn sàng điều phối (Đã thu hồi về kho)',
-          assignedBookingCode: undefined,
-          assignedTimeSlot: undefined,
-          assignedCustomer: undefined,
-          assignedCourt: undefined,
-        };
-      }
-      return eq;
-    }));
+  const handleCheckoutCourtEquipment = async (courtName: string, _timeSlot?: string) => {
+    try {
+      const returnedList = await facilityApiService.checkoutCourtEquipments(courtName);
+      const returnedCodes = new Set(returnedList.map((e) => e.code));
+      setEquipments((prev) =>
+        prev.map((eq) => {
+          if (returnedCodes.has(eq.code)) {
+            const found = returnedList.find((r) => r.code === eq.code);
+            return found || eq;
+          }
+          return eq;
+        })
+      );
+    } catch (err) {
+      console.warn('Backend checkout court failed, applying locally:', err);
+      setEquipments((prev) =>
+        prev.map((eq) => {
+          if (eq.currentLocation === courtName || eq.assignedCourt === courtName) {
+            return {
+              ...eq,
+              currentLocation: 'Kho chung',
+              status: 'san_sang',
+              statusLabel: 'Sẵn sàng',
+              healthRate: 'Sẵn sàng điều phối (Đã thu hồi về kho)',
+              assignedBookingCode: undefined,
+              assignedTimeSlot: undefined,
+              assignedCustomer: undefined,
+              assignedCourt: undefined,
+            };
+          }
+          return eq;
+        })
+      );
+    }
+  };
+
+  const handleAddTimelineLog = async (incidentId: string, title: string, description: string) => {
+    const nowTime = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+    const newLog = {
+      id: `TL-${Date.now()}`,
+      time: nowTime,
+      title,
+      description,
+      active: true,
+    };
+    setIncidents((prev) =>
+      prev.map((i) =>
+        i.id === incidentId
+          ? {
+              ...i,
+              timelineLogs: [newLog, ...(i.timelineLogs || []).map((l) => ({ ...l, active: false }))],
+            }
+          : i
+      )
+    );
+    try {
+      await facilityApiService.addTimelineLog(incidentId, title, description);
+    } catch (err) {
+      console.warn('Backend timeline log error:', err);
+    }
+  };
+
+  const handleCompleteEquipmentWarranty = async (equipmentCode: string, equipmentName?: string) => {
+    const today = new Date().toLocaleDateString('vi-VN');
+    const formattedDate = `Hôm nay (${today})`;
+
+    // 1. Update equipment locally in AdminDashboard
+    setEquipments((prev) =>
+      prev.map((eq) =>
+        eq.code === equipmentCode
+          ? {
+              ...eq,
+              status: 'san_sang',
+              statusLabel: 'Sẵn sàng',
+              healthRate: 'Tốt (Đã nghiệm thu bảo hành)',
+              lastMaintenance: formattedDate,
+            }
+          : eq
+      )
+    );
+
+    // 2. Persist to backend
+    try {
+      await facilityApiService.updateEquipment(equipmentCode, {
+        status: 'san_sang',
+        statusLabel: 'Sẵn sàng',
+        healthRate: 'Tốt (Đã nghiệm thu bảo hành)',
+        lastMaintenance: formattedDate,
+      });
+    } catch (err) {
+      console.warn('Backend equipment update error:', err);
+    }
+
+    // 3. Find related incident and append timeline log
+    const relatedInc =
+      incidents.find(
+        (i) =>
+          i.equipmentCode === equipmentCode ||
+          i.damageItems?.some((d) => d.equipmentCode === equipmentCode)
+      ) || incidents[0];
+
+    if (relatedInc) {
+      const logTitle = `Nghiệm thu hoàn tất bảo hành [${equipmentCode}]`;
+      const logDesc = `Đã nghiệm thu thiết bị ${equipmentName ? `${equipmentName} (${equipmentCode})` : equipmentCode} sau bảo hành/sửa chữa. Thiết bị chuyển sang trạng thái Sẵn sàng vận hành.`;
+      await handleAddTimelineLog(relatedInc.id, logTitle, logDesc);
+    }
+  };
+
+  // Shift handlers connected to backend API
+  const handleAddShift = async (newShift: ShiftRegistration) => {
+    try {
+      const created = await shiftApiService.createShift(newShift);
+      setShifts((prev) => [...prev.filter((s) => s.id !== created.id), created]);
+    } catch (err) {
+      console.warn('Backend add shift failed, saving locally:', err);
+      setShifts((prev) => [...prev, newShift]);
+    }
+  };
+
+  const handleAddMultipleShifts = async (newShifts: ShiftRegistration[]) => {
+    try {
+      const res = await shiftApiService.createBatchShifts(newShifts);
+      const createdIds = new Set(res.createdShifts.map((s) => s.id));
+      setShifts((prev) => [...prev.filter((s) => !createdIds.has(s.id)), ...res.createdShifts]);
+    } catch (err) {
+      console.warn('Backend batch shifts failed, saving locally:', err);
+      setShifts((prev) => [...prev, ...newShifts]);
+    }
+  };
+
+  const handleUpdateShift = async (updatedShift: ShiftRegistration) => {
+    try {
+      const saved = await shiftApiService.updateShift(updatedShift.id, updatedShift);
+      setShifts((prev) => prev.map((s) => (s.id === saved.id ? saved : s)));
+    } catch (err) {
+      console.warn('Backend update shift failed, applying locally:', err);
+      setShifts((prev) => prev.map((s) => (s.id === updatedShift.id ? updatedShift : s)));
+    }
+  };
+
+  const handleDeleteShift = async (shiftId: string, reason: string, permanent?: boolean) => {
+    try {
+      await shiftApiService.deleteShift(shiftId, permanent, reason);
+      setShifts((prev) =>
+        permanent
+          ? prev.filter((s) => s.id !== shiftId)
+          : prev.map((s) => (s.id === shiftId ? { ...s, status: 'cancelled', cancelReason: reason } : s))
+      );
+    } catch (err) {
+      console.warn('Backend delete shift failed, applying locally:', err);
+      setShifts((prev) =>
+        permanent
+          ? prev.filter((s) => s.id !== shiftId)
+          : prev.map((s) => (s.id === shiftId ? { ...s, status: 'cancelled', cancelReason: reason } : s))
+      );
+    }
+  };
+
+  const handleDeleteMultipleShifts = async (shiftIds: string[], permanent?: boolean, reason?: string) => {
+    try {
+      await shiftApiService.deleteBatchShifts(shiftIds, permanent, reason);
+      setShifts((prev) =>
+        permanent
+          ? prev.filter((s) => !shiftIds.includes(s.id))
+          : prev.map((s) => (shiftIds.includes(s.id) ? { ...s, status: 'cancelled', cancelReason: reason } : s))
+      );
+    } catch (err) {
+      console.warn('Backend batch delete shifts failed, applying locally:', err);
+      setShifts((prev) =>
+        permanent
+          ? prev.filter((s) => !shiftIds.includes(s.id))
+          : prev.map((s) => (shiftIds.includes(s.id) ? { ...s, status: 'cancelled', cancelReason: reason } : s))
+      );
+    }
   };
 
   return (
@@ -365,6 +749,7 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                 onAddNew={handleAddNewStaff}
                 onDeleteEmployee={handleDeleteEmployee}
                 onToggleStatus={handleToggleStatus}
+                isBackendOnline={isBackendOnline}
               />
             )}
             {staffSubView === 'add' && (
@@ -376,6 +761,7 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
             {staffSubView === 'detail' && selectedEmployee && (
               <StaffDetailView
                 employee={selectedEmployee}
+                onBack={() => setStaffSubView('list')}
                 onViewSchedule={() => setActiveTab('ca_truc')}
                 onDeleteEmployee={handleDeleteEmployee}
                 onEditEmployee={handleEditEmployee}
@@ -396,25 +782,11 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
             <ShiftScheduleView
               employees={employees}
               shifts={shifts}
-              onAddShift={(newShift) => setShifts((prev) => [...prev, newShift])}
-              onAddMultipleShifts={(newShifts) => setShifts((prev) => [...prev, ...newShifts])}
-              onDeleteMultipleShifts={(shiftIds, permanent, reason) => {
-                setShifts((prev) =>
-                  permanent
-                    ? prev.filter((s) => !shiftIds.includes(s.id))
-                    : prev.map((s) => (shiftIds.includes(s.id) ? { ...s, status: 'cancelled', cancelReason: reason } : s))
-                );
-              }}
-              onUpdateShift={(updatedShift) => {
-                setShifts((prev) => prev.map((s) => (s.id === updatedShift.id ? updatedShift : s)));
-              }}
-              onDeleteShift={(shiftId, reason, permanent) => {
-                setShifts((prev) =>
-                  permanent
-                    ? prev.filter((s) => s.id !== shiftId)
-                    : prev.map((s) => (s.id === shiftId ? { ...s, status: 'cancelled', cancelReason: reason } : s))
-                );
-              }}
+              onAddShift={handleAddShift}
+              onAddMultipleShifts={handleAddMultipleShifts}
+              onDeleteMultipleShifts={handleDeleteMultipleShifts}
+              onUpdateShift={handleUpdateShift}
+              onDeleteShift={handleDeleteShift}
               isAdmin={true}
             />
           </div>
@@ -442,10 +814,66 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
               onUpdateIncidentStatus={handleUpdateIncidentStatus}
               onReturnToWarehouse={handleReturnToWarehouse}
               onAssignBookingToEquipment={handleAssignBookingToEquipment}
+              onCompleteEquipmentWarranty={handleCompleteEquipmentWarranty}
+              onAddTimelineLog={handleAddTimelineLog}
+              isBackendOnline={isBackendOnline}
             />
           </div>
         )}
       </div>
+
+      {/* 🟣 CUSTOM POPUP THEO THIẾT KẾ CHUNG */}
+      {popup && (
+        <div className="fixed inset-0 z-[300] flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="w-full max-w-sm rounded-3xl bg-white p-6 shadow-2xl animate-in zoom-in-95 duration-200 text-center border border-slate-100">
+            {popup.type === 'danger' ? (
+              <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 border border-rose-100 flex items-center justify-center mx-auto mb-3 shadow-2xs">
+                <Trash2 className="w-6 h-6 stroke-[2.2]" />
+              </div>
+            ) : popup.type === 'confirm' ? (
+              <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 border border-amber-100 flex items-center justify-center mx-auto mb-3 shadow-2xs">
+                <AlertTriangle className="w-6 h-6 stroke-[2.2]" />
+              </div>
+            ) : (
+              <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 border border-emerald-100 flex items-center justify-center mx-auto mb-3 shadow-2xs">
+                <CheckCircle2 className="w-6 h-6 stroke-[2.2]" />
+              </div>
+            )}
+
+            <h3 className="text-base sm:text-lg font-black text-slate-900">{popup.title}</h3>
+            <p className="mt-2 text-xs sm:text-sm text-slate-600 whitespace-pre-line leading-relaxed">{popup.message}</p>
+
+            <div className={`mt-5 grid gap-2.5 ${popup.type === 'alert' ? 'grid-cols-1' : 'grid-cols-2'}`}>
+              {popup.type !== 'alert' && (
+                <button
+                  type="button"
+                  onClick={() => setPopup(null)}
+                  className="rounded-xl border border-slate-200 py-3 text-xs font-bold text-slate-600 hover:bg-slate-50 active:scale-95 transition cursor-pointer"
+                >
+                  {popup.cancelText || 'Không, quay lại'}
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  const current = popup;
+                  setPopup(null);
+                  if (current.onConfirm) {
+                    setTimeout(() => current.onConfirm!(), 10);
+                  }
+                }}
+                className={`rounded-xl py-3 text-xs font-black text-white active:scale-95 transition shadow-sm cursor-pointer ${
+                  popup.type === 'danger'
+                    ? 'bg-rose-600 hover:bg-rose-700 shadow-rose-600/20'
+                    : 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-600/20'
+                }`}
+              >
+                {popup.confirmText || (popup.type === 'alert' ? 'Đóng' : 'Có, xác nhận')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import {
-  ArrowLeft,
   User,
   Phone,
   Mail,
@@ -14,13 +13,14 @@ import {
   Circle,
   Save,
   Briefcase,
+  ChevronLeft,
 } from 'lucide-react';
 import type { Employee } from '../../types/admin';
 
 interface EditStaffViewProps {
   employee: Employee;
   onBack: () => void;
-  onSaveEmployee: (updatedEmp: Employee) => void;
+  onSaveEmployee: (updatedEmp: Employee, newPassword?: string) => void;
 }
 
 export default function EditStaffView({
@@ -36,6 +36,7 @@ export default function EditStaffView({
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [avatarText, setAvatarText] = useState(employee.avatarText);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -65,9 +66,17 @@ export default function EditStaffView({
       return;
     }
 
-    if (newPassword) {
+    if (newPassword || confirmPassword) {
+      if (!newPassword) {
+        setErrorMessage('Vui lòng nhập mật khẩu mới!');
+        return;
+      }
       if (newPassword.length < 6) {
         setErrorMessage('Mật khẩu mới phải có ít nhất 6 ký tự!');
+        return;
+      }
+      if (!confirmPassword) {
+        setErrorMessage('Vui lòng nhập xác nhận lại mật khẩu mới!');
         return;
       }
       if (newPassword !== confirmPassword) {
@@ -101,38 +110,43 @@ export default function EditStaffView({
     setErrorMessage(null);
     setSuccessMessage('Cập nhật thông tin nhân viên thành công!');
     setTimeout(() => {
-      onSaveEmployee(updatedEmp);
+      onSaveEmployee(updatedEmp, newPassword || undefined);
     }, 400);
   };
 
   return (
     <div className="flex-1 space-y-4 p-4 pb-28 animate-in fade-in duration-200">
-      {/* 🟢 Top Navigation Bar */}
-      <div className="flex items-center justify-between rounded-2xl bg-white border border-slate-200 px-3.5 py-2.5 shadow-2xs">
+      {/* 🟢 Top Badge & Navigation */}
+      <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <button
             type="button"
             onClick={onBack}
-            className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-600 hover:bg-slate-200 active:scale-95 transition cursor-pointer"
+            className="flex h-8 w-8 items-center justify-center rounded-full bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 transition active:scale-95 cursor-pointer shadow-2xs"
+            title="Quay lại"
           >
-            <ArrowLeft className="w-4 h-4" />
+            <ChevronLeft className="w-5 h-5 stroke-[2.5]" />
           </button>
-          <div>
-            <div className="flex items-center gap-1.5">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-600" />
-              <span className="text-[10px] font-black uppercase tracking-wider text-emerald-800">
-                HỆ THỐNG COURTX
-              </span>
-            </div>
-            <p className="text-xs font-bold text-slate-800">Chỉnh Sửa Nhân Viên</p>
+
+          <div className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-xs font-black text-emerald-800 border border-emerald-200 shadow-2xs">
+            <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+            QUẢN TRỊ NHÂN VIÊN
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-black text-slate-600 border border-slate-200">
-            {employee.id}
-          </span>
-        </div>
+        <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-black text-slate-600 border border-slate-200 shadow-2xs">
+          Mã NV: {employee.id}
+        </span>
+      </div>
+
+      {/* 🟢 Main Title */}
+      <div>
+        <h1 className="text-2xl font-black tracking-tight text-slate-900 leading-tight">
+          CHỈNH SỬA THÔNG TIN <span className="text-emerald-600">NHÂN VIÊN</span>
+        </h1>
+        <p className="mt-1 text-xs text-slate-500 leading-relaxed font-medium">
+          Cập nhật hồ sơ, phân quyền và trạng thái hoạt động của nhân sự #{employee.id}.
+        </p>
       </div>
 
       {/* 🟢 Avatar Section */}
@@ -281,43 +295,68 @@ export default function EditStaffView({
 
           {/* Mật khẩu mới */}
           <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="text-xs font-bold text-slate-800">
+                Mật khẩu mới
+              </label>
+              <span className="text-[10px] text-slate-400 font-medium">Tối thiểu 6 ký tự</span>
+            </div>
             <div className="relative">
               <Key className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <input
                 type={showPassword ? 'text' : 'password'}
                 placeholder="Nhập mật khẩu mới (nếu muốn thay đổi)"
                 value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
+                onChange={(e) => {
+                  setNewPassword(e.target.value);
+                  setErrorMessage(null);
+                }}
                 className="w-full rounded-xl border border-slate-200 bg-slate-50/60 py-2.5 pl-10 pr-10 text-xs font-bold text-slate-800 placeholder-slate-400 outline-none transition focus:border-emerald-600 focus:bg-white"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
                 className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 cursor-pointer"
+                title={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
               >
                 {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
             </div>
           </div>
 
-          {/* Xác nhận mật khẩu mới */}
-          {newPassword && (
-            <div className="animate-in fade-in duration-150">
-              <label className="block text-xs font-bold text-slate-800 mb-1.5">
-                Xác nhận mật khẩu mới <span className="text-rose-500">*</span>
+          {/* Xác nhận mật khẩu mới (Luôn hiển thị) */}
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="text-xs font-bold text-slate-800">
+                Xác nhận mật khẩu mới
               </label>
-              <div className="relative">
-                <ShieldCheck className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                <input
-                  type="password"
-                  placeholder="Nhập lại mật khẩu mới"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50/60 py-2.5 pl-10 pr-3 text-xs font-bold text-slate-800 placeholder-slate-400 outline-none transition focus:border-emerald-600 focus:bg-white"
-                />
-              </div>
+              <span className="text-[10px] text-slate-400 font-medium">Nhập khớp mật khẩu trên</span>
             </div>
-          )}
+            <div className="relative">
+              <ShieldCheck className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <input
+                type={showConfirmPassword ? 'text' : 'password'}
+                placeholder="Xác nhận lại mật khẩu mới"
+                value={confirmPassword}
+                onChange={(e) => {
+                  setConfirmPassword(e.target.value);
+                  setErrorMessage(null);
+                }}
+                className="w-full rounded-xl border border-slate-200 bg-slate-50/60 py-2.5 pl-10 pr-10 text-xs font-bold text-slate-800 placeholder-slate-400 outline-none transition focus:border-emerald-600 focus:bg-white"
+              />
+              <button
+                type="button"
+                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 cursor-pointer"
+                title={showConfirmPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+              >
+                {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
+            <p className="mt-1.5 text-[10px] text-slate-400 font-medium">
+              Bỏ trống cả hai ô nếu không có nhu cầu đổi mật khẩu tài khoản nhân viên.
+            </p>
+          </div>
         </div>
 
         {/* SECTION 3: TRẠNG THÁI HOẠT ĐỘNG */}

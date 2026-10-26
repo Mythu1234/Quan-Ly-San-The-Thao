@@ -13,18 +13,21 @@ import {
   Trash2,
   AlertTriangle,
   Shield,
+  ChevronLeft,
 } from 'lucide-react';
 import type { Employee } from '../../types/admin';
 
 interface StaffDetailViewProps {
   employee: Employee;
+  onBack?: () => void;
   onViewSchedule: () => void;
-  onDeleteEmployee: (empId: string, empName: string) => void;
+  onDeleteEmployee: (empId: string, empName: string, reason?: string) => void;
   onEditEmployee: (emp: Employee) => void;
 }
 
 export default function StaffDetailView({
   employee,
+  onBack,
   onViewSchedule,
   onDeleteEmployee,
   onEditEmployee,
@@ -51,11 +54,46 @@ export default function StaffDetailView({
       return;
     }
     setShowDeleteConfirm(false);
-    onDeleteEmployee(employee.id, employee.name);
+    onDeleteEmployee(employee.id, employee.name, deleteReason);
   };
 
   return (
     <div className="flex-1 space-y-4 p-4 pb-28 animate-in fade-in duration-200">
+      {/* 🟢 Top Badge & Navigation */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          {onBack && (
+            <button
+              type="button"
+              onClick={onBack}
+              className="flex h-8 w-8 items-center justify-center rounded-full bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 transition active:scale-95 cursor-pointer shadow-2xs"
+              title="Quay lại"
+            >
+              <ChevronLeft className="w-5 h-5 stroke-[2.5]" />
+            </button>
+          )}
+
+          <div className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-xs font-black text-emerald-800 border border-emerald-200 shadow-2xs">
+            <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+            HỒ SƠ NHÂN SỰ
+          </div>
+        </div>
+
+        <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-black text-slate-600 border border-slate-200 shadow-2xs">
+          Mã NV: {employee.id}
+        </span>
+      </div>
+
+      {/* 🟢 Main Title */}
+      <div>
+        <h1 className="text-2xl font-black tracking-tight text-slate-900 leading-tight">
+          CHI TIẾT NHÂN VIÊN <span className="text-emerald-600">& CA LÀM</span>
+        </h1>
+        <p className="mt-1 text-xs text-slate-500 leading-relaxed font-medium">
+          Xem thông tin liên hệ cá nhân, trạng thái công việc và lịch trực 5 ngày gần nhất.
+        </p>
+      </div>
+
       {/* 🟢 Profile Card */}
       <div className="flex flex-col items-center rounded-3xl border border-slate-200 bg-white p-6 text-center shadow-2xs">
         {/* Avatar with status indicator */}

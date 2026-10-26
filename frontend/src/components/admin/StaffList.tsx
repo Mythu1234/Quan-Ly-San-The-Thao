@@ -1,7 +1,5 @@
 import { useState } from 'react';
 import {
-  Users,
-  UserCheck,
   Clock,
   Search,
   X,
@@ -13,17 +11,20 @@ import {
   Trash2,
   Eye,
   CalendarPlus,
-  Ban
+  Ban,
+  Bell,
 } from 'lucide-react';
 import type { Employee } from '../../types/admin';
+import NotificationModal from './NotificationModal';
 
 interface StaffListProps {
   employees: Employee[];
   onSelectEmployee: (emp: Employee) => void;
   onAddNew: () => void;
-  onDeleteEmployee: (empId: string, empName: string) => void;
+  onDeleteEmployee: (empId: string, empName: string, reason?: string) => void;
   onToggleStatus: (empId: string) => void;
   readOnly?: boolean;
+  isBackendOnline?: boolean;
 }
 
 export default function StaffList({
@@ -33,10 +34,12 @@ export default function StaffList({
   onDeleteEmployee,
   onToggleStatus,
   readOnly = false,
+  isBackendOnline: _isBackendOnline = false,
 }: StaffListProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterMode, setFilterMode] = useState<'all' | 'active' | 'inactive'>('all');
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
+  const [showNotificationModal, setShowNotificationModal] = useState(false);
 
   // Filtered employees
   const filteredEmployees = employees.filter((emp) => {
@@ -52,17 +55,35 @@ export default function StaffList({
     );
   });
 
-  // Calculate statistics
-  const totalEmployees = employees.length;
-  const readyEmployees = employees.filter((e) => e.status === 'active').length;
-  const workingEmployees = employees.filter((e) => e.currentShift?.status === 'working').length;
+  // Render Notification Screen if active
+  if (showNotificationModal) {
+    return (
+      <NotificationModal
+        onBack={() => setShowNotificationModal(false)}
+      />
+    );
+  }
 
   return (
     <div className="flex-1 space-y-4 p-4 pb-28 animate-in fade-in duration-200">
       {/* 🟢 Top Badge */}
-      <div className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-xs font-black text-emerald-800 border border-emerald-200 shadow-2xs">
-        <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-        QUẢN TRỊ NHÂN VIÊN
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <div className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-xs font-black text-emerald-800 border border-emerald-200 shadow-2xs">
+            <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+            QUẢN TRỊ NHÂN VIÊN
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => setShowNotificationModal(true)}
+          className="relative flex h-8 w-8 items-center justify-center rounded-full bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 transition cursor-pointer shadow-2xs"
+          title="Thông báo hệ thống"
+        >
+          <Bell className="w-4 h-4" />
+          <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-rose-600 ring-2 ring-white" />
+        </button>
       </div>
 
       {/* 🟢 Main Title */}
@@ -73,42 +94,6 @@ export default function StaffList({
         <p className="mt-1 text-xs text-slate-500 leading-relaxed font-medium">
           Quản lý thông tin và điều phối lịch trực vận hành sân thể thao đa năng.
         </p>
-      </div>
-
-      {/* 🟢 3 KPI Cards */}
-      <div className="grid grid-cols-3 gap-2.5">
-        {/* Card 1: Tổng NV */}
-        <div className="flex flex-col items-center justify-center rounded-2xl border border-slate-200 bg-white p-3 shadow-2xs">
-          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 text-slate-700 mb-1.5">
-            <Users className="w-4 h-4 stroke-[2.2]" />
-          </div>
-          <span className="text-xl font-black text-slate-900 leading-none">
-            {totalEmployees < 10 ? `0${totalEmployees}` : totalEmployees}
-          </span>
-          <span className="text-[11px] font-semibold text-slate-500 mt-1">Tổng NV</span>
-        </div>
-
-        {/* Card 2: Sẵn sàng */}
-        <div className="flex flex-col items-center justify-center rounded-2xl border border-slate-200 bg-white p-3 shadow-2xs">
-          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-50 text-emerald-700 mb-1.5">
-            <UserCheck className="w-4 h-4 stroke-[2.2]" />
-          </div>
-          <span className="text-xl font-black text-slate-900 leading-none">
-            {readyEmployees < 10 ? `0${readyEmployees}` : readyEmployees}
-          </span>
-          <span className="text-[11px] font-semibold text-slate-500 mt-1">Sẵn sàng</span>
-        </div>
-
-        {/* Card 3: Trong ca */}
-        <div className="flex flex-col items-center justify-center rounded-2xl border border-slate-200 bg-white p-3 shadow-2xs">
-          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-purple-50 text-purple-700 mb-1.5">
-            <Clock className="w-4 h-4 stroke-[2.2]" />
-          </div>
-          <span className="text-xl font-black text-slate-900 leading-none">
-            {workingEmployees < 10 ? `0${workingEmployees}` : workingEmployees}
-          </span>
-          <span className="text-[11px] font-semibold text-slate-500 mt-1">Trong ca</span>
-        </div>
       </div>
 
       {/* 🟢 Search bar & Action */}

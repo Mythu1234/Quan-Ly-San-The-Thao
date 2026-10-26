@@ -80,26 +80,6 @@ export default function AdminShiftManager({ shifts }: AdminShiftManagerProps) {
         </div>
       </div>
 
-      {/* 🟢 Summary Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-sm flex flex-col justify-center gap-0.5 overflow-hidden">
-          <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wide truncate">Tổng ca tuần</div>
-          <div className="text-lg sm:text-xl font-black text-slate-800 truncate">21<span className="text-[10px] font-bold text-slate-400 ml-1">ca</span></div>
-        </div>
-        <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-3 shadow-sm flex flex-col justify-center gap-0.5 overflow-hidden">
-          <div className="text-[10px] font-bold text-emerald-700 uppercase tracking-wide truncate">Đã phân công</div>
-          <div className="text-lg sm:text-xl font-black text-emerald-700 truncate">16<span className="text-[10px] font-bold text-emerald-600/70 ml-1">ca</span></div>
-        </div>
-        <div className="bg-rose-50 border border-rose-100 rounded-xl p-3 shadow-sm flex flex-col justify-center gap-0.5 overflow-hidden">
-          <div className="text-[10px] font-bold text-rose-700 uppercase tracking-wide truncate">Còn trống</div>
-          <div className="text-lg sm:text-xl font-black text-rose-700 truncate">5<span className="text-[10px] font-bold text-rose-600/70 ml-1">ca</span></div>
-        </div>
-        <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 shadow-sm flex flex-col justify-center gap-0.5 overflow-hidden">
-          <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wide truncate">Chi phí dự kiến</div>
-          <div className="text-lg sm:text-xl font-black text-slate-800 truncate">3.2M<span className="text-[10px] font-bold text-slate-400 ml-1">VNĐ</span></div>
-        </div>
-      </div>
-
       {/* 🟢 Filters */}
       <div className="flex flex-wrap justify-between bg-slate-50 border border-slate-200 p-3 rounded-2xl gap-4 items-center">
         <div className="flex flex-wrap gap-3 w-full xl:w-auto items-center">
@@ -133,11 +113,11 @@ export default function AdminShiftManager({ shifts }: AdminShiftManagerProps) {
 
       {/* 🟢 Calendar Matrix */}
       <div className="border border-slate-200 rounded-2xl overflow-hidden bg-white shadow-sm overflow-x-auto relative">
-        <table className="w-full min-w-[900px] text-left border-collapse">
+        <table className="w-full min-w-[700px] text-left border-collapse">
           <thead>
             <tr>
-              <th className="sticky left-0 z-10 w-24 md:w-32 p-3 border-b border-r border-slate-200 bg-slate-50 text-[10px] font-black text-slate-500 uppercase tracking-wider shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] align-middle">
-                KHUNG CA LÀM
+              <th className="sticky left-0 z-10 w-[84px] sm:w-[92px] p-2 border-b border-r border-slate-200 bg-slate-50 text-[9.5px] font-black text-slate-500 uppercase tracking-wider shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] align-middle text-center">
+                KHUNG CA
               </th>
               {weekDays.map(day => (
                 <th 
@@ -157,12 +137,12 @@ export default function AdminShiftManager({ shifts }: AdminShiftManagerProps) {
           <tbody>
             {shiftsConfig.map(shiftRow => (
               <tr key={shiftRow.id}>
-                <td className="sticky left-0 z-10 p-3 border-b border-r border-slate-200 align-top bg-white shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">
+                <td className="sticky left-0 z-10 w-[84px] sm:w-[92px] p-2 border-b border-r border-slate-200 align-top bg-white shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] text-center">
                   <div className={['text-xs font-black leading-tight', shiftRow.color].join(' ')}>{shiftRow.name.split('(')[0].trim()}</div>
                   {shiftRow.name.includes('(') && (
                     <div className={['text-[9px] font-bold mt-0.5 opacity-80', shiftRow.color].join(' ')}>({shiftRow.name.split('(')[1]}</div>
                   )}
-                  <div className="text-[10px] text-slate-500 font-medium mt-1 leading-tight">{shiftRow.time.split(' ')[0]} - {shiftRow.time.split(' ')[2]}</div>
+                  <div className="text-[9px] text-slate-500 font-medium mt-1 leading-tight">{shiftRow.time.split(' ')[0]} - {shiftRow.time.split(' ')[2]}</div>
                 </td>
                 
                 {weekDays.map(day => {

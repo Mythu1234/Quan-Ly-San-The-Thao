@@ -10,11 +10,8 @@ import {
   Sunset,
   Clock,
   AlertTriangle,
-  Share2,
-  MoreVertical,
   User,
   Users,
-  RefreshCw,
   ChevronLeft,
   ChevronRight,
   Sparkles,
@@ -23,18 +20,23 @@ import {
   UserMinus,
   Calendar,
   CalendarCheck,
-  Search,
   CheckSquare,
-  Square,
-  MapPin,
   ClipboardList,
-  Flame,
   Info,
-  Zap,
   Sliders,
+  RotateCcw,
+  Bell,
+  UserCheck,
+  Table,
+  Filter,
+  MapPin,
+  Phone,
+  Mail,
 } from 'lucide-react';
 import type { Employee, ShiftRegistration } from '../../types/admin';
 import { INITIAL_SHIFTS } from '../../types/admin';
+import NotificationModal from './NotificationModal';
+import AssignStaffShiftView from './AssignStaffShiftView';
 
 export interface StandardShiftConfig {
   type: string;
@@ -74,12 +76,16 @@ export default function ShiftScheduleView({
 }: ShiftScheduleViewProps) {
   // Modal states
   const [showExportModal, setShowExportModal] = useState(false);
+  const [showNotificationModal, setShowNotificationModal] = useState(false);
   const [selectedShiftForDelete, setSelectedShiftForDelete] = useState<ShiftRegistration | null>(null);
   const [deleteActionContext, setDeleteActionContext] = useState<'unassign_employee' | 'delete_shift' | 'cancel_shift'>('unassign_employee');
   const [isPermanentDelete, setIsPermanentDelete] = useState(true);
   const [cancelReason, setCancelReason] = useState('');
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [successToast, setSuccessToast] = useState<string | null>(null);
+
+  // Shift Detail Modal state (Xem chi tiết khi bấm vào cục ca trực)
+  const [selectedShiftDetail, setSelectedShiftDetail] = useState<ShiftRegistration | null>(null);
 
   // Admin Add Task Modal state (Giao việc cho ca trực)
   const [taskModalData, setTaskModalData] = useState<{
@@ -95,14 +101,24 @@ export default function ShiftScheduleView({
   const [taskError, setTaskError] = useState<string | null>(null);
   const [localAssignedTasks, setLocalAssignedTasks] = useState<Record<string, string[]>>({});
 
-  // Admin Create Shift Modal state (Thêm ca trực vào lịch)
-  const [showCreateShiftModal, setShowCreateShiftModal] = useState(false);
-  const [createShiftDate, setCreateShiftDate] = useState('2026-10-16');
-  const [createShiftType, setCreateShiftType] = useState<string>('Ca 1');
-  const [createShiftEmployeeId, setCreateShiftEmployeeId] = useState('');
-  const [createShiftArea, setCreateShiftArea] = useState('Toàn bộ 8 sân');
-  const [createShiftNotes, setCreateShiftNotes] = useState('');
-  const [createShiftError, setCreateShiftError] = useState<string | null>(null);
+  // Admin Assign Staff Shift Screen state (Phân công nhân viên cho ca trực - Không modal)
+  const [assigningShiftData, setAssigningShiftData] = useState<{
+    shiftType: string;
+    date: string;
+    targetShift?: ShiftRegistration | null;
+  } | null>(null);
+
+  const handleOpenAssignShift = (
+    shiftType?: string,
+    date?: string,
+    targetShift?: ShiftRegistration | null
+  ) => {
+    setAssigningShiftData({
+      shiftType: shiftType || 'Ca 1',
+      date: date || '2026-10-16',
+      targetShift: targetShift || null,
+    });
+  };
 
   // Track slots where shifts were deleted in this session
   const [deletedSlotsHistory, setDeletedSlotsHistory] = useState<
@@ -110,23 +126,8 @@ export default function ShiftScheduleView({
   >({});
 
   // View & Filter states
-  const [viewFilter, setViewFilter] = useState<'all' | 'my'>('all');
   const [shiftTypeFilter, setShiftTypeFilter] = useState<string>('ALL');
-  const [adminViewMode, setAdminViewMode] = useState<'matrix' | 'list'>('matrix');
-  const [listSearchQuery, setListSearchQuery] = useState('');
-  const [calendarSelectedDate, setCalendarSelectedDate] = useState<string>('ALL');
 
-  // Checklist state for today's tasks (Employee view)
-  const [taskChecklist, setTaskChecklist] = useState<Record<string, boolean>>({
-    't1': true,
-    't2': false,
-    't3': false,
-    't4': false,
-  });
-
-  const toggleTask = (taskId: string) => {
-    setTaskChecklist((prev) => ({ ...prev, [taskId]: !prev[taskId] }));
-  };
 
   const quickCancelReasons = [
     'Chủ sân xóa ca khỏi lịch',
@@ -139,35 +140,20 @@ export default function ShiftScheduleView({
     'Xin đổi sang ca trực khác',
   ];
 
-  // Export Excel states (UC-10)
-  const [exportMonth] = useState('10');
-  const [exportYear] = useState('2026');
+  // Export Excel states (UC-10: Xuất Excel bảng phân ca & chấm công)
+  const [exportMonth, setExportMonth] = useState('10');
+  const [exportYear, setExportYear] = useState('2026');
+  const [exportScope, setExportScope] = useState<'week_current' | 'all_month' | 'week_1' | 'week_2' | 'week_3' | 'week_4' | 'week_5'>('week_current');
+  const [exportEmployeeId, setExportEmployeeId] = useState<string>('ALL');
+  const [exportShiftType, setExportShiftType] = useState<string>('ALL');
+  const [exportIncludeNightBonus, setExportIncludeNightBonus] = useState<boolean>(true);
+  const [exportOnlyCompleted, setExportOnlyCompleted] = useState<boolean>(false);
+  const [exportIncludeTasks, setExportIncludeTasks] = useState<boolean>(true);
 
   // Week selection state - Defaults to active week 15/10 - 21/10
   const [currentWeekStart, setCurrentWeekStart] = useState<Date>(new Date('2026-10-15'));
-  const [viewDaysSpan, setViewDaysSpan] = useState<7 | 14>(7);
-
   // Calculate days in the current week (7 days for Matrix view)
   const weekDays = Array.from({ length: 7 }).map((_, i) => {
-    const d = new Date(currentWeekStart);
-    d.setDate(d.getDate() + i);
-    const dayNames = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
-    const yyyy = d.getFullYear();
-    const mm = String(d.getMonth() + 1).padStart(2, '0');
-    const dd = String(d.getDate()).padStart(2, '0');
-    return {
-      date: `${yyyy}-${mm}-${dd}`,
-      day: dayNames[d.getDay()],
-      label: `${dd}/${mm}`,
-      dayNum: dd,
-      monthNum: mm,
-      year: yyyy,
-      isToday: `${yyyy}-${mm}-${dd}` === '2026-10-16',
-    };
-  });
-
-  // Calculate days for List/Calendar view (7 or 14 days)
-  const displayDays = Array.from({ length: viewDaysSpan }).map((_, i) => {
     const d = new Date(currentWeekStart);
     d.setDate(d.getDate() + i);
     const dayNames = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
@@ -459,13 +445,44 @@ export default function ShiftScheduleView({
   const [bulkTab, setBulkTab] = useState<'structure' | 'delete'>('structure');
   const [editingShifts, setEditingShifts] = useState<StandardShiftConfig[]>(DEFAULT_SHIFTS_CONFIG);
 
-  // Scope states for Shift Structure (1. Khoảng ngày, 2. Thứ trong tuần, 3. Khung ca, 6. Nhiệm vụ mẫu)
+  // Common popup system (thay thế cho alert / confirm mặc định của trình duyệt)
+  const [commonPopup, setCommonPopup] = useState<{
+    type: 'alert' | 'confirm' | 'danger';
+    title: string;
+    message: string;
+    confirmText?: string;
+    cancelText?: string;
+    onConfirm?: () => void;
+  } | null>(null);
+
+  const showCommonAlert = (title: string, message: string) => {
+    setCommonPopup({ type: 'alert', title, message });
+  };
+
+  const showCommonConfirm = (
+    title: string,
+    message: string,
+    onConfirm: () => void,
+    isDanger = false,
+    confirmText = 'Có, xác nhận',
+    cancelText = 'Không, quay lại'
+  ) => {
+    setCommonPopup({
+      type: isDanger ? 'danger' : 'confirm',
+      title,
+      message,
+      onConfirm,
+      confirmText,
+      cancelText,
+    });
+  };
+
+  // Scope states for Shift Structure (1. Khoảng ngày, 2. Thứ trong tuần, 3. Nhiệm vụ mẫu)
   const [structureStartDate, setStructureStartDate] = useState('2026-10-15');
   const [structureEndDate, setStructureEndDate] = useState('2026-10-21');
   const [structureDaysOfWeek, setStructureDaysOfWeek] = useState<string[]>([
     'T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN',
   ]);
-  const [structureShiftTypes, setStructureShiftTypes] = useState<string[]>(['Ca 1', 'Ca 2', 'Ca 3']);
   const [structureTasks, setStructureTasks] = useState<string[]>([
     'Mở/đóng cửa và kiểm tra hệ thống điện chiếu sáng',
     'Đón tiếp khách, soát mã đặt sân và thu phí',
@@ -517,12 +534,9 @@ export default function ShiftScheduleView({
       const dayCode = dayCodes[dayOfWeekIdx];
 
       if (structureDaysOfWeek.includes(dayCode)) {
-        structureShiftTypes.forEach((shType) => {
-          const config = newStructure.find((s) => s.type === shType);
-          if (!config) return;
-
+        newStructure.forEach((config) => {
           const existingShift = effectiveShifts.find(
-            (s) => s.date === curDateStr && s.shiftType === shType && s.status !== 'cancelled'
+            (s) => s.date === curDateStr && s.shiftType === config.type && s.status !== 'cancelled'
           );
 
           if (existingShift) {
@@ -584,7 +598,10 @@ export default function ShiftScheduleView({
     });
 
     if (matchingShifts.length === 0) {
-      alert('Không tìm thấy ca trực nào trong khoảng ngày và khung ca đã chọn!');
+      showCommonAlert(
+        'Không tìm thấy ca trực',
+        'Không tìm thấy ca trực nào phù hợp trong khoảng ngày và khung ca đã chọn để thực hiện xóa!'
+      );
       return;
     }
 
@@ -628,6 +645,9 @@ export default function ShiftScheduleView({
     return acc + (shiftMeta?.hours || 8);
   }, 0);
 
+  // Số ngày có ca làm việc của nhân viên trong tuần
+  const myWorkingDaysInWeek = new Set(myShiftsInWeek.map((s) => s.date)).size;
+
   // Active shifts in week for Admin
   const activeWeekShifts = effectiveShifts.filter(
     (s) => currentWeekDates.includes(s.date) && s.status !== 'cancelled'
@@ -636,71 +656,7 @@ export default function ShiftScheduleView({
   // Unique employees working in this week
   const activeStaffIds = new Set(activeWeekShifts.map((s) => s.employeeId));
 
-  // Admin UC-08: Open Create Shift Modal (Thêm ca trực vào lịch)
-  const handleOpenCreateShiftModal = (
-    shiftType?: string,
-    date?: string
-  ) => {
-    if (shiftType) setCreateShiftType(shiftType);
-    if (date) setCreateShiftDate(date);
-    else setCreateShiftDate('2026-10-16');
-    setCreateShiftEmployeeId('');
-    setCreateShiftArea('Toàn bộ 8 sân');
-    setCreateShiftNotes('');
-    setCreateShiftError(null);
-    setShowCreateShiftModal(true);
-  };
 
-  // Admin UC-08: Confirm Create Shift (Tạo ca trực mới trên lịch)
-  const handleConfirmCreateShift = () => {
-    if (!createShiftDate) {
-      setCreateShiftError('Vui lòng chọn ngày trực!');
-      return;
-    }
-
-    // Kiểm tra xem ca này trong ngày đã có chưa
-    const existing = effectiveShifts.find(
-      (s) => s.date === createShiftDate && s.shiftType === createShiftType && s.status !== 'cancelled'
-    );
-    if (existing) {
-      setCreateShiftError(
-        `Khung ${createShiftType} ngày ${createShiftDate.split('-').reverse().join('/')} đã có ca trực (mã: ${existing.id})! Vui lòng xóa ca cũ hoặc chọn khung ca/ngày khác.`
-      );
-      return;
-    }
-
-    const shiftMeta = standardShifts.find((s) => s.type === createShiftType);
-    const selectedEmp = employees.find((e) => e.id === createShiftEmployeeId);
-    const shiftDateObj = new Date(createShiftDate);
-    const dayNames = ['Chủ Nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
-    const dayOfWeek = dayNames[shiftDateObj.getDay()] || 'Ngày trực';
-
-    const newShift: ShiftRegistration = {
-      id: `SH-${Date.now().toString().slice(-4)}`,
-      employeeId: selectedEmp ? selectedEmp.id : 'PENDING',
-      employeeName: selectedEmp ? selectedEmp.name : 'Chờ NV nhận ca',
-      date: createShiftDate,
-      dayOfWeek,
-      shiftType: createShiftType,
-      shiftName: shiftMeta?.name || createShiftType,
-      timeRange: shiftMeta?.time || '05:00 - 11:00',
-      status: 'scheduled',
-      courtArea: createShiftArea,
-      taskDescription: createShiftNotes.trim() || 'Ca trực được tạo bởi Chủ sân',
-      tasks: createShiftNotes.trim() ? [createShiftNotes.trim()] : [],
-    };
-
-    onAddShift?.(newShift);
-    const createdCellKey = `${createShiftType}-${createShiftDate}`;
-    setDeletedSlotsHistory((prev) => {
-      const next = { ...prev };
-      delete next[createdCellKey];
-      return next;
-    });
-    setShowCreateShiftModal(false);
-    setSuccessToast(`Đã thêm ${newShift.shiftName} ngày ${createShiftDate.split('-').reverse().join('/')} vào lịch ca trực!`);
-    setTimeout(() => setSuccessToast(null), 3500);
-  };
 
   // Submit UC-09: Delete / Cancel Shift or Unassign Employee
   const handleConfirmDeleteShift = () => {
@@ -831,29 +787,183 @@ export default function ShiftScheduleView({
     setTaskError(null);
   };
 
-  // Submit UC-10: Export Excel file
-  const handleDownloadExcel = () => {
-    const headers = ['Mã Ca', 'Nhân Viên', 'Ngày Trực', 'Ca Trực', 'Khung Giờ', 'Trạng Thái'];
-    const rows = effectiveShifts.map((s) => [
-      s.id,
-      s.employeeName,
-      s.date,
-      s.shiftType,
-      s.timeRange,
-      s.status === 'cancelled' ? 'Đã hủy' : 'Đã xác nhận',
-    ]);
+  // Helper: Lấy giờ công tiêu chuẩn của ca trực
+  const getShiftStandardHours = (shiftType: string) => {
+    const meta = standardShifts.find((c) => c.type === shiftType);
+    return meta?.hours || 6;
+  };
+
+  // Helper: Lấy giờ công quy đổi (Hệ số ca đêm x1.3 cho Ca 3 theo BR2)
+  const getShiftWeightedHours = (shiftType: string) => {
+    const std = getShiftStandardHours(shiftType);
+    if (exportIncludeNightBonus && (shiftType === 'Ca 3' || shiftType.toLowerCase().includes('tối'))) {
+      return Math.round(std * 1.3 * 10) / 10;
+    }
+    return std;
+  };
+
+  // UC-10: Tính toán danh sách ca trực theo bộ lọc cấu hình xuất báo cáo
+  const getFilteredExportShifts = () => {
+    return effectiveShifts
+      .filter((s) => {
+        if (s.status === 'cancelled') return false;
+
+        // 1. Lọc theo tháng và năm
+        const parts = s.date.split('-');
+        if (parts.length >= 3) {
+          const sYear = parts[0];
+          const sMonth = parts[1];
+          const dayInt = parseInt(parts[2], 10);
+
+          if (exportScope === 'week_current') {
+            if (!currentWeekDates.includes(s.date)) return false;
+          } else {
+            if (sYear !== exportYear || sMonth !== exportMonth.padStart(2, '0')) {
+              return false;
+            }
+            if (exportScope === 'week_1' && (dayInt < 1 || dayInt > 7)) return false;
+            if (exportScope === 'week_2' && (dayInt < 8 || dayInt > 14)) return false;
+            if (exportScope === 'week_3' && (dayInt < 15 || dayInt > 21)) return false;
+            if (exportScope === 'week_4' && (dayInt < 22 || dayInt > 28)) return false;
+            if (exportScope === 'week_5' && (dayInt < 29 || dayInt > 31)) return false;
+          }
+        }
+
+        // 2. Lọc theo nhân sự
+        if (exportEmployeeId !== 'ALL') {
+          if (exportEmployeeId === 'PENDING') {
+            if (s.employeeId !== 'PENDING') return false;
+          } else {
+            if (s.employeeId !== exportEmployeeId) return false;
+          }
+        }
+
+        // 3. Lọc theo khung ca
+        if (exportShiftType !== 'ALL') {
+          if (s.shiftType !== exportShiftType) return false;
+        }
+
+        // 4. Lọc chỉ ca hoàn thành / đang trực
+        if (exportOnlyCompleted) {
+          if (s.status !== 'completed' && s.status !== 'in_progress') return false;
+        }
+
+        return true;
+      })
+      .sort((a, b) => a.date.localeCompare(b.date) || a.shiftType.localeCompare(b.shiftType));
+  };
+
+  // Helper tạo tên file xuất chuẩn nghiệp vụ UC-10
+  const getExportFileName = (extension: 'xlsx' | 'csv' = 'xlsx') => {
+    let scopeSlug = `Thang_${exportMonth}_${exportYear}`;
+    if (exportScope === 'week_current') {
+      scopeSlug = `Tuan_${weekDays[0].dayNum}_${weekDays[6].dayNum}_Thang_${exportMonth}_${exportYear}`;
+    } else if (exportScope === 'week_1') {
+      scopeSlug = `Tuan_1_Thang_${exportMonth}_${exportYear}`;
+    } else if (exportScope === 'week_2') {
+      scopeSlug = `Tuan_2_Thang_${exportMonth}_${exportYear}`;
+    } else if (exportScope === 'week_3') {
+      scopeSlug = `Tuan_3_Thang_${exportMonth}_${exportYear}`;
+    } else if (exportScope === 'week_4') {
+      scopeSlug = `Tuan_4_Thang_${exportMonth}_${exportYear}`;
+    } else if (exportScope === 'week_5') {
+      scopeSlug = `Tuan_5_Thang_${exportMonth}_${exportYear}`;
+    }
+
+    let staffSlug = '';
+    if (exportEmployeeId !== 'ALL') {
+      const emp = employees.find((e) => e.id === exportEmployeeId);
+      const cleanName = emp ? emp.name.replace(/\s+/g, '_') : exportEmployeeId;
+      staffSlug = `_${cleanName}`;
+    }
+
+    return `Bang_Phan_Ca_${scopeSlug}${staffSlug}_CourtX.${extension}`;
+  };
+
+  // Submit UC-10: Export Excel / CSV file
+  const handleDownloadExcel = (format: 'xlsx' | 'csv' = 'xlsx') => {
+    const exportList = getFilteredExportShifts();
+    if (exportList.length === 0) {
+      showCommonAlert(
+        'Không có dữ liệu ca trực',
+        'Không tìm thấy ca trực nào phù hợp với bộ lọc hiện tại để xuất file Excel. Vui lòng chọn lại kỳ hoặc phạm vi khác!'
+      );
+      return;
+    }
+
+    const headers = [
+      'STT',
+      'Mã Ca',
+      'Ngày Trực',
+      'Thứ',
+      'Khung Ca',
+      'Thời Gian',
+      'Giờ Chuẩn (h)',
+      'Giờ Quy Đổi (x1.3 Đêm)',
+      'Mã NV',
+      'Nhân Viên Phụ Trách',
+      'Khu Vực Sân',
+      'Trạng Thái',
+      'Nhiệm Vụ Ca Trực',
+    ];
+
+    let totalStd = 0;
+    let totalWeight = 0;
+
+    const rows = exportList.map((s, idx) => {
+      const stdH = getShiftStandardHours(s.shiftType);
+      const weightH = getShiftWeightedHours(s.shiftType);
+      totalStd += stdH;
+      totalWeight += weightH;
+
+      return [
+        idx + 1,
+        s.id,
+        s.date,
+        s.dayOfWeek || '',
+        s.shiftType,
+        s.timeRange,
+        stdH,
+        weightH,
+        s.employeeId,
+        `"${s.employeeName}"`,
+        `"${s.courtArea || 'Toàn bộ 8 sân'}"`,
+        s.status === 'in_progress' ? 'Đang trực' : s.status === 'completed' ? 'Đã xong' : 'Đã xác nhận',
+        `"${(exportIncludeTasks ? (s.tasks && s.tasks.length > 0 ? s.tasks.join('; ') : s.taskDescription || '') : '').replace(/"/g, '""')}"`,
+      ];
+    });
+
+    const summaryRow = [
+      'TỔNG CỘNG',
+      `"${exportList.length} ca trực"`,
+      '',
+      '',
+      '',
+      '',
+      totalStd,
+      Math.round(totalWeight * 10) / 10,
+      '',
+      `"${new Set(exportList.map((s) => s.employeeId).filter((id) => id !== 'PENDING')).size} nhân sự"`,
+      '',
+      '',
+      '',
+    ];
+
     const csvContent =
       'data:text/csv;charset=utf-8,\uFEFF' +
-      [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
+      [headers.join(','), ...rows.map((e) => e.join(',')), summaryRow.join(',')].join('\n');
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `Bang_Phan_Ca_Thang_${exportMonth}_${exportYear}_CourtX.csv`);
+    const fileName = getExportFileName(format);
+    link.setAttribute('download', fileName);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
 
     setShowExportModal(false);
+    setSuccessToast(`Đã tải xuống tệp ${fileName} thành công (${exportList.length} ca trực, ${totalStd}h công)!`);
+    setTimeout(() => setSuccessToast(null), 3500);
   };
 
   const [assignedCells, setAssignedCells] = useState<Record<string, boolean>>({});
@@ -899,100 +1009,1684 @@ export default function ShiftScheduleView({
     setTimeout(() => setSuccessToast(null), 3500);
   };
 
-
-
   if (showExportModal) {
+    const exportShifts = getFilteredExportShifts();
+    const fileName = getExportFileName('xlsx');
+
+    const totalStdHours = exportShifts.reduce((acc, s) => acc + getShiftStandardHours(s.shiftType), 0);
+    const totalWeightedHours = Math.round(
+      exportShifts.reduce((acc, s) => acc + getShiftWeightedHours(s.shiftType), 0) * 10
+    ) / 10;
+    const uniqueEmployees = Array.from(
+      new Set(exportShifts.map((s) => s.employeeId).filter((id) => id !== 'PENDING'))
+    );
+    const assignedCount = exportShifts.filter((s) => s.employeeId !== 'PENDING').length;
+    const matchPercentage = exportShifts.length > 0
+      ? Math.round((assignedCount / exportShifts.length) * 100)
+      : 100;
+
+    const getScopeDisplayLabel = () => {
+      if (exportScope === 'all_month') return `Toàn Bộ Tháng ${exportMonth}/${exportYear}`;
+      if (exportScope === 'week_current') return `Tuần Hiện Tại (${weekDays[0].label} – ${weekDays[6].label}/${exportYear})`;
+      if (exportScope === 'week_1') return `Tuần 1 (01 – 07/${exportMonth}/${exportYear})`;
+      if (exportScope === 'week_2') return `Tuần 2 (08 – 14/${exportMonth}/${exportYear})`;
+      if (exportScope === 'week_3') return `Tuần 3 (15 – 21/${exportMonth}/${exportYear})`;
+      if (exportScope === 'week_4') return `Tuần 4 (22 – 28/${exportMonth}/${exportYear})`;
+      if (exportScope === 'week_5') return `Tuần 5 (29 – 31/${exportMonth}/${exportYear})`;
+      return `Tháng ${exportMonth}/${exportYear}`;
+    };
+
+    const selectedEmployeeObj = employees.find((e) => e.id === exportEmployeeId);
+
+    const handleResetExportFilters = () => {
+      setExportMonth('10');
+      setExportYear('2026');
+      setExportScope('week_current');
+      setExportEmployeeId('ALL');
+      setExportShiftType('ALL');
+      setExportIncludeNightBonus(true);
+      setExportOnlyCompleted(false);
+      setExportIncludeTasks(true);
+    };
+
     return (
       <div className="flex-1 space-y-4 p-4 pb-28 animate-in fade-in duration-200 w-full max-w-full min-w-0">
-        {/* Top Navigation Bar */}
-        <div className="flex items-center justify-between rounded-2xl bg-white border border-slate-200 px-3.5 py-2.5 shadow-2xs">
+        {/* 🟢 Top Badge & Navigation Bar */}
+        <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={() => setShowExportModal(false)}
-              className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-700 hover:bg-slate-200 transition active:scale-95 cursor-pointer"
+              className="flex h-8 w-8 items-center justify-center rounded-full bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 transition active:scale-95 cursor-pointer shadow-2xs"
+              title="Quay lại lịch trực"
             >
               <ChevronLeft className="w-5 h-5 stroke-[2.5]" />
             </button>
-            <div>
-              <div className="flex items-center gap-1.5">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-600" />
-                <span className="text-[10px] font-black uppercase tracking-wider text-emerald-800">
-                  HỆ THỐNG COURTX
-                </span>
-              </div>
-              <h1 className="text-sm font-black text-slate-900 truncate">
-                Xuất Excel Bảng Phân Ca
-              </h1>
+
+            <div className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-xs font-black text-emerald-800 border border-emerald-200 shadow-2xs">
+              <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+              XUẤT BÁO CÁO PHÂN CA & BẢNG CÔNG
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 text-[11px] font-black text-slate-700 border border-slate-200 shadow-2xs">
+            <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+            <span>Excel (.xlsx) / CSV</span>
+          </div>
+        </div>
+
+        {/* 🟢 Main Title */}
+        <div>
+          <h1 className="text-2xl font-black tracking-tight text-slate-900 leading-tight">
+            CẤU HÌNH & XUẤT BÁO CÁO <span className="text-emerald-600">LỊCH TRỰC</span>
+          </h1>
+          <p className="mt-1 text-xs text-slate-500 leading-relaxed font-medium">
+            Chọn kỳ làm việc, nhân viên, khung ca và các tùy chọn đối soát để trích xuất file Excel / CSV tính lương.
+          </p>
+        </div>
+
+        {/* 🟢 CARD 1: BỘ LỌC & CẤU HÌNH TRÍCH XUẤT (UC-10 STEP 2) */}
+        <div className="rounded-3xl border border-slate-200 bg-white p-4 sm:p-5 shadow-2xs space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center justify-center shrink-0">
+                <Filter className="w-4 h-4" />
+              </div>
+              <div>
+                <h3 className="text-xs font-black uppercase text-slate-900 tracking-wider">
+                  Bộ Lọc & Cấu Hình Trích Xuất (UC-10)
+                </h3>
+                <p className="text-[10px] text-slate-400 font-medium">
+                  Thiết lập kỳ làm việc, nhân sự và các tiêu chí tính công
+                </p>
+              </div>
+            </div>
+
             <button
               type="button"
-              onClick={() => {
-                if (navigator.share) {
-                  navigator.share({ title: 'Bảng Phân Ca', text: 'Bảng Phân Ca Trực CourtX' }).catch(() => {});
-                }
-              }}
-              className="p-1.5 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg cursor-pointer transition"
-              title="Chia sẻ"
+              onClick={handleResetExportFilters}
+              className="inline-flex items-center gap-1 text-[11px] font-bold text-slate-500 hover:text-slate-800 bg-slate-100 hover:bg-slate-200 px-2.5 py-1 rounded-xl transition cursor-pointer active:scale-95"
+              title="Khôi phục thiết lập mặc định"
             >
-              <Share2 className="w-4 h-4" />
+              <RotateCcw className="w-3 h-3" />
+              <span>Đặt lại</span>
             </button>
-            <button
-              type="button"
-              className="p-1.5 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg cursor-pointer transition"
-            >
-              <MoreVertical className="w-4 h-4" />
-            </button>
-            <div className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-600 text-white font-bold text-xs shadow-2xs">
-              <User className="w-4 h-4" />
+          </div>
+
+          {/* 1. Chọn Kỳ Phân Ca (Tháng & Năm) + Phạm Vi */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between text-xs font-black text-slate-800">
+              <span className="flex items-center gap-1.5 text-slate-900">
+                <Calendar className="w-3.5 h-3.5 text-emerald-600" />
+                1. KỲ PHÂN CA & PHẠM VI THỜI GIAN:
+              </span>
+              <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-200">
+                Tháng {exportMonth}/{exportYear}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              <div>
+                <label className="text-[10px] font-bold text-slate-500 block mb-1">CHỌN THÁNG:</label>
+                <select
+                  value={exportMonth}
+                  onChange={(e) => setExportMonth(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 hover:bg-white text-xs font-black text-slate-800 outline-none focus:border-emerald-500 transition cursor-pointer"
+                >
+                  {Array.from({ length: 12 }, (_, i) => String(i + 1)).map((m) => (
+                    <option key={m} value={m}>
+                      Tháng {m.padStart(2, '0')}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold text-slate-500 block mb-1">CHỌN NĂM:</label>
+                <select
+                  value={exportYear}
+                  onChange={(e) => setExportYear(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 hover:bg-white text-xs font-black text-slate-800 outline-none focus:border-emerald-500 transition cursor-pointer"
+                >
+                  <option value="2025">Năm 2025</option>
+                  <option value="2026">Năm 2026</option>
+                  <option value="2027">Năm 2027</option>
+                </select>
+              </div>
+
+              <div className="col-span-2">
+                <label className="text-[10px] font-bold text-slate-500 block mb-1">PHẠM VI TRÍCH XUẤT:</label>
+                <select
+                  value={exportScope}
+                  onChange={(e) => setExportScope(e.target.value as any)}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 hover:bg-white text-xs font-black text-slate-800 outline-none focus:border-emerald-500 transition cursor-pointer"
+                >
+                  <option value="week_current">Tuần hiện tại ({weekDays[0].label} – {weekDays[6].label})</option>
+                  <option value="all_month">📅 Toàn bộ Tháng {exportMonth}/{exportYear}</option>
+                  <option value="week_1">Tuần 1 (01/10 – 07/10)</option>
+                  <option value="week_2">Tuần 2 (08/10 – 14/10)</option>
+                  <option value="week_3">Tuần 3 (15/10 – 21/10)</option>
+                  <option value="week_4">Tuần 4 (22/10 – 28/10)</option>
+                  <option value="week_5">Tuần 5 (29/10 – 31/10)</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Quick scope pills */}
+            <div className="flex flex-wrap items-center gap-1.5 pt-1">
+              {[
+                { id: 'all_month', label: `Cả tháng ${exportMonth}` },
+                { id: 'week_current', label: 'Tuần này (15-21)' },
+                { id: 'week_1', label: 'Tuần 1 (01-07)' },
+                { id: 'week_2', label: 'Tuần 2 (08-14)' },
+                { id: 'week_3', label: 'Tuần 3 (15-21)' },
+                { id: 'week_4', label: 'Tuần 4 (22-28)' },
+                { id: 'week_5', label: 'Tuần 5 (29-31)' },
+              ].map((sc) => (
+                <button
+                  key={sc.id}
+                  type="button"
+                  onClick={() => setExportScope(sc.id as any)}
+                  className={`text-[10.5px] px-2.5 py-1 rounded-xl font-bold transition active:scale-95 cursor-pointer ${
+                    exportScope === sc.id
+                      ? 'bg-emerald-600 text-white shadow-2xs'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200 border border-slate-200/60'
+                  }`}
+                >
+                  {sc.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* 2. Chọn Nhân Viên Phụ Trách (Bộ Lọc Nhân Sự) */}
+          <div className="space-y-2 pt-2 border-t border-slate-100">
+            <div className="flex items-center justify-between text-xs font-black text-slate-800">
+              <span className="flex items-center gap-1.5 text-slate-900">
+                <Users className="w-3.5 h-3.5 text-emerald-600" />
+                2. NHÂN VIÊN TRỰC CA (BỘ LỌC NHÂN SỰ):
+              </span>
+              <span className="text-[11px] font-bold text-slate-500">
+                {exportEmployeeId === 'ALL'
+                  ? 'Tất cả nhân sự'
+                  : exportEmployeeId === 'PENDING'
+                  ? 'Chờ nhận ca'
+                  : selectedEmployeeObj?.name || exportEmployeeId}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <div className="sm:col-span-3">
+                <select
+                  value={exportEmployeeId}
+                  onChange={(e) => setExportEmployeeId(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 hover:bg-white text-xs font-black text-slate-800 outline-none focus:border-emerald-500 transition cursor-pointer"
+                >
+                  <option value="ALL">👥 Tất cả nhân sự ({employees.length} nhân viên)</option>
+                  {employees.map((emp) => (
+                    <option key={emp.id} value={emp.id}>
+                      👤 {emp.id} - {emp.name} ({emp.role})
+                    </option>
+                  ))}
+                  <option value="PENDING">⚠️ Chờ NV nhận ca (Ca chưa phân công)</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Quick Staff avatar pills */}
+            <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+              <button
+                type="button"
+                onClick={() => setExportEmployeeId('ALL')}
+                className={`text-[10.5px] px-2.5 py-1 rounded-xl font-bold transition active:scale-95 cursor-pointer flex items-center gap-1.5 ${
+                  exportEmployeeId === 'ALL'
+                    ? 'bg-slate-900 text-white shadow-2xs'
+                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                }`}
+              >
+                <span>Tất cả</span>
+                <span className="text-[9.5px] opacity-75">({employees.length})</span>
+              </button>
+
+              {employees.map((emp) => (
+                <button
+                  key={emp.id}
+                  type="button"
+                  onClick={() => setExportEmployeeId(emp.id)}
+                  className={`text-[10.5px] px-2.5 py-1 rounded-xl font-bold transition active:scale-95 cursor-pointer flex items-center gap-1.5 ${
+                    exportEmployeeId === emp.id
+                      ? 'bg-emerald-600 text-white shadow-2xs'
+                      : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'
+                  }`}
+                >
+                  <span
+                    className={`w-4 h-4 rounded-full flex items-center justify-center text-[8.5px] font-black ${
+                      exportEmployeeId === emp.id
+                        ? 'bg-white/20 text-white'
+                        : 'bg-emerald-100 text-emerald-800'
+                    }`}
+                  >
+                    {emp.avatarText || emp.name.charAt(0)}
+                  </span>
+                  <span>{emp.name.split(' ').slice(-2).join(' ')}</span>
+                  <span className="text-[9px] opacity-70">({emp.id})</span>
+                </button>
+              ))}
+
+              <button
+                type="button"
+                onClick={() => setExportEmployeeId('PENDING')}
+                className={`text-[10.5px] px-2.5 py-1 rounded-xl font-bold transition active:scale-95 cursor-pointer flex items-center gap-1 ${
+                  exportEmployeeId === 'PENDING'
+                    ? 'bg-amber-600 text-white shadow-2xs'
+                    : 'bg-amber-50 border border-amber-200 text-amber-800 hover:bg-amber-100'
+                }`}
+              >
+                <span>⚠️ Ca trống</span>
+              </button>
+            </div>
+          </div>
+
+          {/* 3. Chọn Khung Ca Trực */}
+          <div className="space-y-2 pt-2 border-t border-slate-100">
+            <div className="flex items-center justify-between text-xs font-black text-slate-800">
+              <span className="flex items-center gap-1.5 text-slate-900">
+                <Clock className="w-3.5 h-3.5 text-emerald-600" />
+                3. KHUNG CA TRỰC:
+              </span>
+              <span className="text-[11px] font-bold text-slate-500">
+                {exportShiftType === 'ALL' ? 'Tất cả các ca' : exportShiftType}
+              </span>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-1.5">
+              {[
+                { id: 'ALL', label: 'Tất cả ca' },
+                { id: 'Ca 1', label: '☀️ Ca 1 (05:00 - 11:00)' },
+                { id: 'Ca 2', label: '🌤️ Ca 2 (11:00 - 17:00)' },
+                { id: 'Ca 3', label: '🌙 Ca 3 (17:00 - 23:00)' },
+              ].map((st) => (
+                <button
+                  key={st.id}
+                  type="button"
+                  onClick={() => setExportShiftType(st.id)}
+                  className={`text-[10.5px] px-3 py-1.5 rounded-xl font-bold transition active:scale-95 cursor-pointer ${
+                    exportShiftType === st.id
+                      ? 'bg-slate-900 text-white shadow-2xs'
+                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                  }`}
+                >
+                  {st.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* 4. Tùy Chọn Nghiệp Vụ & Tính Công (BR2, Task, Status) */}
+          <div className="space-y-2 pt-2 border-t border-slate-100">
+            <span className="flex items-center gap-1.5 text-xs font-black text-slate-900">
+              <CheckSquare className="w-3.5 h-3.5 text-emerald-600" />
+              4. TÙY CHỌN TÍNH CÔNG & NỘI DUNG XUẤT (BUSINESS RULES):
+            </span>
+
+            <div className="space-y-2 bg-slate-50/80 p-3 rounded-2xl border border-slate-200/80">
+              <label className="flex items-start gap-2.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={exportIncludeNightBonus}
+                  onChange={(e) => setExportIncludeNightBonus(e.target.checked)}
+                  className="mt-0.5 rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer h-4 w-4"
+                />
+                <div>
+                  <span className="text-xs font-black text-slate-800 block">
+                    Áp dụng hệ số ca đêm x1.3 cho Ca 3 (Theo BR2 quy chế CourtX)
+                  </span>
+                  <span className="text-[10.5px] text-slate-500 font-medium leading-relaxed block">
+                    Tự động tính thêm cột & hàng tổng cộng Giờ quy đổi = 6 giờ × 1.3 = 7.8 giờ công phục vụ chấm lương.
+                  </span>
+                </div>
+              </label>
+
+              <label className="flex items-start gap-2.5 cursor-pointer pt-1 border-t border-slate-200/50">
+                <input
+                  type="checkbox"
+                  checked={exportIncludeTasks}
+                  onChange={(e) => setExportIncludeTasks(e.target.checked)}
+                  className="mt-0.5 rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer h-4 w-4"
+                />
+                <div>
+                  <span className="text-xs font-black text-slate-800 block">
+                    Kèm phân bổ cụm sân & chi tiết nhiệm vụ giao ca
+                  </span>
+                  <span className="text-[10.5px] text-slate-500 font-medium leading-relaxed block">
+                    Xuất đầy đủ khu vực sân phụ trách (Cụm 01-04, 05-08) và danh sách việc cần làm của từng ca.
+                  </span>
+                </div>
+              </label>
+
+              <label className="flex items-start gap-2.5 cursor-pointer pt-1 border-t border-slate-200/50">
+                <input
+                  type="checkbox"
+                  checked={exportOnlyCompleted}
+                  onChange={(e) => setExportOnlyCompleted(e.target.checked)}
+                  className="mt-0.5 rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer h-4 w-4"
+                />
+                <div>
+                  <span className="text-xs font-black text-slate-800 block">
+                    Chỉ xuất ca đã hoàn thành / đang trực (Bỏ qua ca dự kiến)
+                  </span>
+                  <span className="text-[10.5px] text-slate-500 font-medium leading-relaxed block">
+                    Phù hợp khi kế toán cần chốt bảng công thực tế cuối tuần hoặc cuối tháng.
+                  </span>
+                </div>
+              </label>
             </div>
           </div>
         </div>
 
-        {/* XLSX Banner Card */}
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-2xs space-y-3">
+        {/* 🟢 CARD 2: THẺ TÓM TẮT TRÍCH XUẤT (UC-10 STEP 4) */}
+        <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-2xs space-y-3">
           <div className="flex items-start gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-200 shrink-0 shadow-2xs">
-              <FileSpreadsheet className="w-7 h-7" />
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600 border border-emerald-200 shrink-0 shadow-2xs">
+              <FileSpreadsheet className="w-6 h-6 stroke-[2.2]" />
             </div>
             <div className="min-w-0 flex-1">
-              <span className="text-[10px] font-black uppercase tracking-wider text-emerald-600 block">
-                XLSX BANG_PHAN_CA_THANG_10_2026.XLSX
+              <span className="text-[10px] font-black uppercase tracking-wider text-emerald-700 block truncate" title={fileName}>
+                Tệp xuất: {fileName}
               </span>
               <h2 className="text-base font-black tracking-tight text-slate-900 mt-0.5 truncate">
-                Lịch Trực Tuần (15/10 – 21/10/2026)
+                {getScopeDisplayLabel()} {selectedEmployeeObj ? `· NV: ${selectedEmployeeObj.name}` : ''}
               </h2>
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2 pt-1">
+          <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-slate-100">
             <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-bold text-emerald-700 border border-emerald-200">
               <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-              100% Khớp ca
+              {matchPercentage}% Khớp ca
             </span>
             <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-bold text-slate-700 border border-slate-200">
-              <Users className="w-3.5 h-3.5 text-slate-500" />
-              {activeWeekShifts.length} ca đã gán quân số
+              <Table className="w-3.5 h-3.5 text-slate-500" />
+              {exportShifts.length} ca trực
             </span>
+            <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-bold text-blue-700 border border-blue-200">
+              <Clock className="w-3.5 h-3.5 text-blue-600" />
+              {totalStdHours}h công chuẩn
+            </span>
+            {exportIncludeNightBonus && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-purple-50 px-2.5 py-1 text-[11px] font-bold text-purple-700 border border-purple-200">
+                <Sparkles className="w-3.5 h-3.5 text-purple-600" />
+                {totalWeightedHours}h quy đổi (x1.3)
+              </span>
+            )}
             <span className="inline-flex items-center gap-1 rounded-full bg-teal-50 px-2.5 py-1 text-[11px] font-bold text-teal-700 border border-teal-200">
-              <RefreshCw className="w-3 h-3 text-teal-600" />
-              Khung giờ mở cửa: 05:00 - 23:00
+              <Users className="w-3.5 h-3.5 text-teal-600" />
+              {uniqueEmployees.length} nhân sự tham gia
             </span>
           </div>
         </div>
 
-        <button
-          type="button"
-          onClick={handleDownloadExcel}
-          className="w-full flex items-center justify-center gap-2 rounded-2xl bg-[#0f5132] hover:bg-[#0c3e27] py-3.5 text-sm font-black text-white shadow-md active:scale-95 transition cursor-pointer"
-        >
-          <Download className="w-4 h-4 stroke-[2.5]" />
-          <span>Xác nhận & Tải tệp Excel về máy</span>
-        </button>
+        {/* 🟢 CARD 3: BẢNG DỮ LIỆU SẼ XUẤT RA EXCEL (Preview Data Table) */}
+        <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-2xs space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 flex items-center justify-center shrink-0">
+                <Table className="w-4 h-4" />
+              </div>
+              <div>
+                <h3 className="text-xs font-black uppercase text-slate-900 tracking-wider">
+                  Bảng dữ liệu sẽ xuất ra Excel ({exportShifts.length} ca trực)
+                </h3>
+                <p className="text-[10px] text-slate-400 font-medium">
+                  {getScopeDisplayLabel()} {selectedEmployeeObj ? `· Lọc theo ${selectedEmployeeObj.name}` : '· Tất cả nhân sự'}
+                </p>
+              </div>
+            </div>
+            <span className="text-[10px] font-black text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-xl whitespace-nowrap">
+              {exportShifts.length} bản ghi
+            </span>
+          </div>
+
+          {/* Table Container */}
+          <div className="border border-slate-200 rounded-2xl overflow-hidden overflow-x-auto shadow-2xs">
+            <table className="w-full text-left text-xs border-collapse min-w-[700px]">
+              <thead>
+                <tr className="bg-slate-50 border-b border-slate-200 text-[10px] font-black uppercase text-slate-500 tracking-wider">
+                  <th className="py-2.5 px-3 w-10 text-center">STT</th>
+                  <th className="py-2.5 px-3">Ngày trực</th>
+                  <th className="py-2.5 px-3">Khung ca</th>
+                  <th className="py-2.5 px-3 text-center">Giờ công</th>
+                  <th className="py-2.5 px-3">Nhân sự trực ca</th>
+                  <th className="py-2.5 px-3">Khu vực & Nhiệm vụ</th>
+                  <th className="py-2.5 px-3 text-center">Trạng thái</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {exportShifts.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="text-center py-10 px-4 text-slate-400 font-medium">
+                      <div className="w-12 h-12 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto mb-2 text-slate-400">
+                        <AlertTriangle className="w-6 h-6" />
+                      </div>
+                      <p className="text-xs font-bold text-slate-700">Không tìm thấy ca trực nào phù hợp với bộ lọc đã chọn</p>
+                      <p className="text-[11px] text-slate-400 mt-1">
+                        Vui lòng thử chọn tháng khác, đổi phạm vi hoặc nhấn nút đặt lại bộ lọc.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={handleResetExportFilters}
+                        className="mt-3 text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-xl hover:bg-emerald-100 transition cursor-pointer"
+                      >
+                        Khôi phục bộ lọc mặc định
+                      </button>
+                    </td>
+                  </tr>
+                ) : (
+                  exportShifts.map((s, idx) => {
+                    const isPending = s.employeeId === 'PENDING';
+                    const shiftDateObj = new Date(s.date);
+                    const dayNames = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
+                    const dayLabel = dayNames[shiftDateObj.getDay()] || '';
+                    const dateFormatted = s.date.split('-').reverse().slice(0, 2).join('/');
+                    const stdH = getShiftStandardHours(s.shiftType);
+                    const weightH = getShiftWeightedHours(s.shiftType);
+
+                    return (
+                      <tr key={s.id} className="hover:bg-slate-50/70 transition">
+                        <td className="py-2.5 px-3 text-center font-bold text-slate-400">
+                          {idx + 1}
+                        </td>
+                        <td className="py-2.5 px-3">
+                          <div className="font-black text-slate-900 leading-tight">
+                            {dayLabel}, {dateFormatted}
+                          </div>
+                          <div className="text-[9.5px] text-slate-400 font-medium">
+                            {s.date}
+                          </div>
+                        </td>
+                        <td className="py-2.5 px-3">
+                          <div className="font-black text-slate-800 leading-tight">
+                            {s.shiftType}
+                          </div>
+                          <div className="text-[10px] text-slate-500 font-bold">
+                            {s.timeRange}
+                          </div>
+                        </td>
+                        <td className="py-2.5 px-3 text-center">
+                          <div className="font-black text-slate-900 text-xs">
+                            {stdH}h
+                          </div>
+                          {exportIncludeNightBonus && weightH > stdH && (
+                            <span className="inline-block text-[9.5px] font-black text-purple-700 bg-purple-50 px-1.5 py-0.2 rounded border border-purple-200">
+                              x1.3 = {weightH}h
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-2.5 px-3">
+                          {isPending ? (
+                            <span className="inline-flex items-center gap-1 text-[10.5px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-lg border border-amber-200">
+                              Chờ NV nhận ca
+                            </span>
+                          ) : (
+                            <div className="flex items-center gap-2">
+                              <div className="w-6 h-6 rounded-lg bg-emerald-100 text-emerald-800 flex items-center justify-center font-black text-[10px] shrink-0">
+                                {s.employeeName.charAt(0)}
+                              </div>
+                              <div>
+                                <span className="font-black text-slate-900 text-xs block leading-tight">
+                                  {s.employeeName}
+                                </span>
+                                <span className="text-[9.5px] text-slate-400 font-medium">
+                                  {s.employeeId}
+                                </span>
+                              </div>
+                            </div>
+                          )}
+                        </td>
+                        <td className="py-2.5 px-3 text-slate-600 font-medium text-[11px] max-w-[200px]">
+                          <div className="font-bold text-slate-800 truncate">
+                            {s.courtArea || 'Toàn bộ 8 sân'}
+                          </div>
+                          {exportIncludeTasks && (s.tasks?.length || s.taskDescription) && (
+                            <div className="text-[10px] text-slate-400 truncate mt-0.5">
+                              {s.tasks && s.tasks.length > 0 ? s.tasks.join('; ') : s.taskDescription}
+                            </div>
+                          )}
+                        </td>
+                        <td className="py-2.5 px-3 text-center">
+                          <span
+                            className={`inline-block px-2 py-0.5 rounded-md text-[10px] font-black ${
+                              s.status === 'in_progress'
+                                ? 'bg-emerald-100 text-emerald-800'
+                                : s.status === 'completed'
+                                ? 'bg-blue-100 text-blue-800'
+                                : 'bg-slate-100 text-slate-700'
+                            }`}
+                          >
+                            {s.status === 'in_progress'
+                              ? 'Đang trực'
+                              : s.status === 'completed'
+                              ? 'Đã xong'
+                              : 'Đã xác nhận'}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+
+              {/* Table Footer with Summary Row */}
+              {exportShifts.length > 0 && (
+                <tfoot>
+                  <tr className="bg-slate-50/90 border-t-2 border-slate-200 text-xs font-black text-slate-900">
+                    <td className="py-3 px-3 text-center font-black text-emerald-700">∑</td>
+                    <td className="py-3 px-3 text-emerald-800 font-black">
+                      TỔNG CỘNG
+                    </td>
+                    <td className="py-3 px-3 text-slate-700 font-black">
+                      {exportShifts.length} ca
+                    </td>
+                    <td className="py-3 px-3 text-center text-emerald-700 font-black">
+                      <div>{totalStdHours} giờ</div>
+                      {exportIncludeNightBonus && totalWeightedHours > totalStdHours && (
+                        <div className="text-[10px] text-purple-700 font-bold">
+                          Quy đổi: {totalWeightedHours}h
+                        </div>
+                      )}
+                    </td>
+                    <td className="py-3 px-3 text-slate-700 font-black">
+                      {uniqueEmployees.length} nhân sự
+                    </td>
+                    <td colSpan={2} className="py-3 px-3 text-right text-[11px] font-bold text-slate-500">
+                      Xuất định dạng Excel 2010+ chuẩn
+                    </td>
+                  </tr>
+                </tfoot>
+              )}
+            </table>
+          </div>
+        </div>
+
+        {/* 🟢 Footer Buttons */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+          <button
+            type="button"
+            onClick={() => setShowExportModal(false)}
+            className="rounded-2xl border border-slate-200 bg-white py-3.5 text-xs font-bold text-slate-700 hover:bg-slate-50 active:scale-95 transition cursor-pointer shadow-2xs text-center"
+          >
+            Hủy bỏ & Quay lại
+          </button>
+
+          <button
+            type="button"
+            onClick={() => handleDownloadExcel('csv')}
+            disabled={exportShifts.length === 0}
+            className="rounded-2xl border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 py-3.5 text-xs font-bold text-emerald-800 active:scale-95 transition cursor-pointer shadow-2xs flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <FileSpreadsheet className="w-4 h-4 text-emerald-700" />
+            <span>Tải file CSV (.csv)</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => handleDownloadExcel('xlsx')}
+            disabled={exportShifts.length === 0}
+            className="rounded-2xl bg-emerald-600 hover:bg-emerald-700 py-3.5 text-xs font-black text-white shadow-md shadow-emerald-600/25 active:scale-95 transition cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Download className="w-4 h-4 stroke-[2.5]" />
+            <span>Xác nhận & Tải Excel (.xlsx)</span>
+          </button>
+        </div>
       </div>
+    );
+  }
+
+  // 🟣 Helper render popup xác nhận theo thiết kế chung chuẩn hệ thống
+  const renderCommonPopupModal = () => {
+    if (!commonPopup) return null;
+    return (
+      <div className="fixed inset-0 z-[300] flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm animate-in fade-in duration-200">
+        <div className="w-full max-w-sm rounded-3xl bg-white p-6 shadow-2xl animate-in zoom-in-95 duration-200 text-center border border-slate-100">
+          {/* Top Icon */}
+          {commonPopup.type === 'danger' ? (
+            <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 border border-rose-100 flex items-center justify-center mx-auto mb-3 shadow-2xs">
+              <Trash2 className="w-6 h-6 stroke-[2.2]" />
+            </div>
+          ) : commonPopup.type === 'confirm' ? (
+            <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 border border-amber-100 flex items-center justify-center mx-auto mb-3 shadow-2xs">
+              <AlertTriangle className="w-6 h-6 stroke-[2.2]" />
+            </div>
+          ) : (
+            <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 border border-emerald-100 flex items-center justify-center mx-auto mb-3 shadow-2xs">
+              <CheckCircle2 className="w-6 h-6 stroke-[2.2]" />
+            </div>
+          )}
+
+          <h3 className="text-base sm:text-lg font-black text-slate-900">{commonPopup.title}</h3>
+          <p className="mt-2 text-xs sm:text-sm text-slate-600 whitespace-pre-line leading-relaxed">{commonPopup.message}</p>
+
+          <div className={`mt-5 grid gap-2.5 ${commonPopup.type === 'alert' ? 'grid-cols-1' : 'grid-cols-2'}`}>
+            {commonPopup.type !== 'alert' && (
+              <button
+                type="button"
+                onClick={() => setCommonPopup(null)}
+                className="rounded-xl border border-slate-200 py-3 text-xs font-bold text-slate-600 hover:bg-slate-50 active:scale-95 transition cursor-pointer"
+              >
+                {commonPopup.cancelText || 'Không, quay lại'}
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => {
+                const current = commonPopup;
+                setCommonPopup(null);
+                if (current.onConfirm) {
+                  setTimeout(() => current.onConfirm!(), 10);
+                }
+              }}
+              className={`rounded-xl py-3 text-xs font-black text-white active:scale-95 transition shadow-sm cursor-pointer ${
+                commonPopup.type === 'danger'
+                  ? 'bg-rose-600 hover:bg-rose-700 shadow-rose-600/20'
+                  : 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-600/20'
+              }`}
+            >
+              {commonPopup.confirmText || (commonPopup.type === 'alert' ? 'Đóng' : 'Có, xác nhận')}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderSuccessToast = () => {
+    if (!successToast) return null;
+    return (
+      <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-[350] flex items-center gap-2.5 rounded-2xl bg-emerald-600 text-white px-4 py-3 text-xs font-bold shadow-2xl shadow-emerald-900/30 border border-emerald-500 backdrop-blur-sm animate-in fade-in slide-in-from-bottom-2 duration-200 w-[90%] max-w-[360px] justify-center text-center">
+        <CheckCircle2 className="w-4 h-4 text-white shrink-0" />
+        <span className="leading-snug break-words whitespace-normal text-left">{successToast}</span>
+      </div>
+    );
+  };
+
+  // 🟢 MODAL CHI TIẾT CA TRỰC KHI CLICK VÀO CỤC CA TRỰC
+  const renderShiftDetailModal = () => {
+    if (!selectedShiftDetail) return null;
+
+    const matchedEmployee = employees.find(
+      (e) => e.id === selectedShiftDetail.employeeId || e.name === selectedShiftDetail.employeeName
+    );
+    const matchedConfig = standardShifts.find((cfg) => cfg.type === selectedShiftDetail.shiftType);
+    const ShiftIcon = matchedConfig?.icon || Clock;
+    const isPending = selectedShiftDetail.employeeId === 'PENDING';
+    const isToday = selectedShiftDetail.date === '2026-10-16';
+
+    const allTasks = Array.from(
+      new Set([
+        ...(localAssignedTasks[selectedShiftDetail.id] || []),
+        ...(selectedShiftDetail.tasks || []),
+        ...(selectedShiftDetail.taskDescription ? [selectedShiftDetail.taskDescription] : []),
+      ].filter(Boolean) as string[])
+    );
+
+    const getStatusBadge = () => {
+      switch (selectedShiftDetail.status) {
+        case 'completed':
+          return { label: 'Đã hoàn thành', bg: 'bg-emerald-100 text-emerald-800 border-emerald-200' };
+        case 'in_progress':
+          return { label: 'Đang trực', bg: 'bg-blue-100 text-blue-800 border-blue-200' };
+        case 'cancelled':
+          return { label: 'Đã hủy', bg: 'bg-rose-100 text-rose-800 border-rose-200' };
+        default:
+          return { label: 'Đã phân công', bg: 'bg-amber-100 text-amber-800 border-amber-200' };
+      }
+    };
+
+    const statusBadge = getStatusBadge();
+
+    const dateFormatted = selectedShiftDetail.date
+      ? selectedShiftDetail.date.split('-').reverse().join('/')
+      : '';
+
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-3 sm:p-4 backdrop-blur-sm animate-in fade-in duration-200 overflow-y-auto">
+        <div className="w-full max-w-lg rounded-3xl bg-white shadow-2xl border border-slate-100 overflow-hidden animate-in zoom-in-95 duration-150 my-auto">
+          {/* Header */}
+          <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4 bg-gradient-to-r from-slate-50 via-emerald-50/20 to-slate-50">
+            <div className="flex items-center gap-3">
+              <div
+                className={`w-11 h-11 rounded-2xl flex items-center justify-center shadow-xs shrink-0 ${
+                  matchedConfig?.color || 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                }`}
+              >
+                <ShiftIcon className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-base font-black text-slate-900">
+                    Chi tiết ca trực
+                  </h3>
+                  <span className={`text-[10px] font-black px-2 py-0.5 rounded-full border ${statusBadge.bg}`}>
+                    {statusBadge.label}
+                  </span>
+                </div>
+                <p className="text-xs text-slate-500 font-semibold mt-0.5 flex items-center gap-1.5">
+                  <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                  <span>{selectedShiftDetail.dayOfWeek || 'Ngày trực'} • {dateFormatted}</span>
+                  {isToday && (
+                    <span className="text-[9.5px] font-extrabold text-emerald-700 bg-emerald-100 px-1.5 py-0.2 rounded-md">
+                      Hôm nay
+                    </span>
+                  )}
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setSelectedShiftDetail(null)}
+              className="text-slate-400 hover:text-slate-700 cursor-pointer p-1.5 rounded-xl hover:bg-slate-100 transition"
+              title="Đóng"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          {/* Modal Content */}
+          <div className="p-5 space-y-3.5 max-h-[72vh] overflow-y-auto">
+            {/* Box 1: Khung ca & Thời gian */}
+            <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 flex items-center justify-between">
+              <div>
+                <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider">
+                  Khung ca làm việc
+                </span>
+                <div className="text-sm font-black text-slate-800 mt-0.5">
+                  {selectedShiftDetail.shiftName || matchedConfig?.name || selectedShiftDetail.shiftType}
+                </div>
+              </div>
+              <div className="text-right">
+                <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider">
+                  Thời gian trực
+                </span>
+                <div className="text-sm font-black text-emerald-700 flex items-center gap-1 justify-end mt-0.5">
+                  <Clock className="w-4 h-4 text-emerald-600" />
+                  <span>{selectedShiftDetail.timeRange || matchedConfig?.time}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Box 2: Thông tin nhân viên phụ trách */}
+            <div className="p-4 rounded-2xl border border-slate-200 bg-white shadow-2xs space-y-2.5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-black uppercase tracking-wider text-slate-700">
+                  Nhân viên trực ca
+                </span>
+                {!isPending && (
+                  <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md">
+                    Mã NV: {selectedShiftDetail.employeeId}
+                  </span>
+                )}
+              </div>
+
+              {isPending ? (
+                <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                    <span className="font-bold">Chưa phân công nhân viên (Ca mở)</span>
+                  </div>
+                  {isAdmin && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const s = selectedShiftDetail;
+                        setSelectedShiftDetail(null);
+                        handleOpenAssignShift(s.shiftType, s.date, s);
+                      }}
+                      className="px-2.5 py-1 text-[11px] font-black text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-2xs cursor-pointer active:scale-95 transition"
+                    >
+                      Phân công ngay
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <div className="flex items-start gap-3 pt-0.5">
+                  <div className="w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center justify-center text-base font-black shrink-0 shadow-2xs">
+                    {matchedEmployee?.avatarText || selectedShiftDetail.employeeName.charAt(0)}
+                  </div>
+                  <div className="min-w-0 flex-1 space-y-0.5">
+                    <div className="text-sm font-black text-slate-900 leading-snug">
+                      {selectedShiftDetail.employeeName}
+                    </div>
+                    <div className="text-xs font-semibold text-slate-600">
+                      {matchedEmployee?.role || 'Nhân viên vận hành nhà thi đấu CourtX'}
+                    </div>
+                    {(matchedEmployee?.phone || matchedEmployee?.email) && (
+                      <div className="flex flex-wrap items-center gap-3 pt-1 text-[11px] text-slate-500 font-medium">
+                        {matchedEmployee?.phone && (
+                          <span className="flex items-center gap-1">
+                            <Phone className="w-3 h-3 text-slate-400" />
+                            {matchedEmployee.phone}
+                          </span>
+                        )}
+                        {matchedEmployee?.email && (
+                          <span className="flex items-center gap-1">
+                            <Mail className="w-3 h-3 text-slate-400" />
+                            {matchedEmployee.email}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Box 3: Khu vực phân công */}
+            <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-600 shadow-2xs shrink-0">
+                  <MapPin className="w-4 h-4 text-emerald-600" />
+                </div>
+                <div>
+                  <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider">
+                    Khu vực sân phân công
+                  </span>
+                  <div className="text-xs font-bold text-slate-800">
+                    {selectedShiftDetail.courtArea || 'Toàn bộ 8 sân thi đấu'}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Box 4: Nhiệm vụ trong ca */}
+            <div className="p-4 rounded-2xl border border-slate-200 bg-white shadow-2xs space-y-2.5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-black uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                  <CheckSquare className="w-3.5 h-3.5 text-emerald-600" />
+                  Nhiệm vụ trong ca ({allTasks.length})
+                </span>
+                {isAdmin && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const s = selectedShiftDetail;
+                      setSelectedShiftDetail(null);
+                      handleOpenAddTaskModal(s.shiftType, s.date, s);
+                    }}
+                    className="text-[11px] font-black text-emerald-700 hover:text-emerald-800 flex items-center gap-1 hover:underline cursor-pointer"
+                  >
+                    <Plus className="w-3 h-3 stroke-[2.5]" />
+                    <span>Thêm việc</span>
+                  </button>
+                )}
+              </div>
+
+              {allTasks.length > 0 ? (
+                <div className="space-y-1.5 pt-0.5">
+                  {allTasks.map((taskText, idx) => (
+                    <div
+                      key={idx}
+                      className="p-2.5 rounded-xl bg-emerald-50/70 border border-emerald-200/80 text-xs font-medium text-slate-800 flex items-start gap-2 leading-relaxed"
+                    >
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                      <span className="flex-1">{taskText}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="p-3 text-center rounded-xl bg-slate-50 border border-dashed border-slate-200 text-xs text-slate-400 font-medium">
+                  Chưa có nhiệm vụ cụ thể được giao cho ca này. Ca trực diễn ra theo quy trình chuẩn.
+                </div>
+              )}
+            </div>
+
+            {/* Box 5: Ghi chú ca (nếu có) */}
+            {selectedShiftDetail.notes && (
+              <div className="p-3 rounded-2xl bg-amber-50/80 border border-amber-200 text-xs text-amber-900 space-y-1">
+                <div className="font-black flex items-center gap-1 text-[11px] uppercase tracking-wider">
+                  <Info className="w-3.5 h-3.5" /> Ghi chú ca trực
+                </div>
+                <div className="font-medium">{selectedShiftDetail.notes}</div>
+              </div>
+            )}
+          </div>
+
+          {/* Footer Actions */}
+          <div className="border-t border-slate-100 p-4 bg-slate-50 flex items-center justify-between gap-2.5">
+            <div>
+              {isAdmin && !isPending && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const s = selectedShiftDetail;
+                    setSelectedShiftDetail(null);
+                    setSelectedShiftForDelete(s);
+                    setDeleteActionContext('unassign_employee');
+                    setIsPermanentDelete(true);
+                    setCancelReason('');
+                    setDeleteError(null);
+                  }}
+                  className="px-3 py-2 rounded-xl border border-rose-200 text-rose-700 bg-rose-50 hover:bg-rose-100 text-xs font-black transition cursor-pointer flex items-center gap-1.5 active:scale-95"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Gỡ nhân viên khỏi ca</span>
+                </button>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2">
+              {isAdmin && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const s = selectedShiftDetail;
+                    setSelectedShiftDetail(null);
+                    handleOpenAddTaskModal(s.shiftType, s.date, s);
+                  }}
+                  className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black transition cursor-pointer flex items-center gap-1.5 shadow-sm active:scale-95"
+                >
+                  <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+                  <span>Thêm việc</span>
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => setSelectedShiftDetail(null)}
+                className="px-4 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-100 text-xs font-black transition cursor-pointer active:scale-95 shadow-2xs"
+              >
+                Đóng
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // 🟢 MÀN HÌNH QUẢN TRỊ CƠ CẤU CA & THAO TÁC CA HÀNG LOẠT (SUB-VIEW TOÀN MÀN HÌNH THEO THIẾT KẾ APP)
+  if (showBulkModal) {
+    return (
+      <div className="flex-1 space-y-4 p-4 pb-28 animate-in fade-in duration-200 w-full max-w-full min-w-0">
+        {/* 🟢 Top Badge & Navigation (Đồng bộ chuẩn với các màn hình quản lý) */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setShowBulkModal(false)}
+              className="flex h-8 w-8 items-center justify-center rounded-full bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 transition active:scale-95 cursor-pointer shadow-2xs"
+              title="Quay lại lịch trực"
+            >
+              <ChevronLeft className="w-5 h-5 stroke-[2.5]" />
+            </button>
+
+            <div className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-xs font-black text-emerald-800 border border-emerald-200 shadow-2xs">
+              <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+              {bulkTab === 'structure' ? 'CẤU HÌNH CƠ CẤU CA' : 'XÓA CA HÀNG LOẠT'}
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => {
+              if (bulkTab === 'structure') {
+                setEditingShifts(standardShifts);
+              } else {
+                setBulkDeleteStartDate(weekDays[0]?.date || '2026-10-15');
+                setBulkDeleteEndDate(weekDays[6]?.date || '2026-10-21');
+                setBulkDeleteShiftTypes(['Ca 1', 'Ca 2', 'Ca 3']);
+              }
+            }}
+            className="flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-bold text-slate-700 hover:bg-slate-50 active:scale-95 transition cursor-pointer shadow-2xs"
+            title="Khôi phục mặc định"
+          >
+            <RotateCcw className="w-3.5 h-3.5 text-slate-500" />
+            <span>Đặt lại</span>
+          </button>
+        </div>
+
+        {/* 🟢 Main Title */}
+        <div>
+          <h1 className="text-2xl font-black tracking-tight text-slate-900 leading-tight">
+            {bulkTab === 'structure' ? (
+              <>
+                CẤU HÌNH CƠ CẤU <span className="text-emerald-600">CA TRỰC</span>
+              </>
+            ) : (
+              <>
+                QUẢN LÝ XÓA CA <span className="text-rose-600">HÀNG LOẠT</span>
+              </>
+            )}
+          </h1>
+          <p className="mt-1 text-xs text-slate-500 leading-relaxed font-medium">
+            {bulkTab === 'structure'
+              ? 'Thiết lập khung giờ và cơ cấu các ca trực áp dụng cho toàn bộ hệ thống sân CourtX.'
+              : 'Xóa bỏ nhanh các ca trực không còn phù hợp trong khoảng thời gian đã chọn.'}
+          </p>
+        </div>
+
+        {/* 2 Tabs Navigation: Đổi cơ cấu ca | Xóa ca hàng loạt */}
+        <div className="flex items-center rounded-2xl bg-slate-100 p-1 border border-slate-200 text-xs font-bold">
+          <button
+            type="button"
+            onClick={() => {
+              setEditingShifts(standardShifts);
+              setBulkTab('structure');
+            }}
+            className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl transition cursor-pointer font-black ${
+              bulkTab === 'structure'
+                ? 'bg-white text-slate-900 shadow-sm'
+                : 'text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            <Sliders className="w-3.5 h-3.5 text-amber-500" />
+            <span>Đổi cơ cấu ca</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setBulkTab('delete')}
+            className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl transition cursor-pointer font-black ${
+              bulkTab === 'delete'
+                ? 'bg-rose-500 text-white shadow-sm'
+                : 'text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            <span>Xóa ca hàng loạt</span>
+          </button>
+        </div>
+
+        {/* Nội dung chi tiết */}
+        {bulkTab === 'structure' ? (
+          <div className="space-y-4">
+            {/* Box 1: Mẫu quy chuẩn (Chọn nhanh) */}
+            <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-2xs space-y-2.5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                  <span>Mẫu cơ cấu chuẩn (chọn nhanh):</span>
+                </span>
+                <span className="text-[10px] text-slate-400 font-bold">Vuốt ngang ❯</span>
+              </div>
+
+              <div className="flex gap-2 overflow-x-auto pb-1.5 pt-0.5 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] snap-x">
+                {SHIFT_STRUCTURE_PRESETS.map((preset) => (
+                  <button
+                    key={preset.id}
+                    type="button"
+                    onClick={() => {
+                      setEditingShifts(preset.shifts);
+                    }}
+                    className="w-[220px] shrink-0 snap-start p-3 rounded-2xl border text-left transition cursor-pointer bg-slate-50 hover:bg-emerald-50/60 hover:border-emerald-300 border-slate-200 flex flex-col justify-between"
+                  >
+                    <div>
+                      <div className="flex items-center justify-between gap-1">
+                        <span className="text-xs font-black text-slate-900 truncate">
+                          {preset.title.split('(')[0].trim()}
+                        </span>
+                        <span className="text-[9px] font-extrabold px-1.5 py-0.2 rounded-full bg-slate-200 text-slate-700 shrink-0">
+                          {preset.badge}
+                        </span>
+                      </div>
+                      <p className="text-[10.5px] text-slate-500 mt-1 line-clamp-1 leading-tight">
+                        {preset.desc}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-1 mt-2 flex-wrap">
+                      {preset.shifts.map((s) => (
+                        <span
+                          key={s.type}
+                          className="text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-white border border-slate-200 text-slate-700"
+                        >
+                          {s.type} ({s.time.split(' - ')[0]})
+                        </span>
+                      ))}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Box 2: Chi tiết khung ca áp dụng */}
+            <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-2xs space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-black uppercase tracking-wider text-slate-800">
+                  Chi tiết khung ca áp dụng ({editingShifts.length} ca):
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const nextIdx = editingShifts.length + 1;
+                    const newShiftType = `Ca ${nextIdx}`;
+                    setEditingShifts([
+                      ...editingShifts,
+                      {
+                        type: newShiftType,
+                        name: `${newShiftType}: Ca tăng cường`,
+                        time: '18:00 - 22:00',
+                        hours: 4,
+                        icon: Sunset,
+                        color: 'border-indigo-200 bg-indigo-50/80 text-indigo-900',
+                        accentColor: 'text-indigo-700',
+                        badgeColor: 'bg-indigo-100 text-indigo-800',
+                        description: 'Ca tăng cường theo nhu cầu vận hành',
+                        subNote: 'Ca bổ sung',
+                        wageMultiplier: 1.0,
+                        isActive: true,
+                      },
+                    ]);
+                  }}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-bold border border-emerald-200 transition cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Thêm khung ca</span>
+                </button>
+              </div>
+
+              <div className="space-y-2.5">
+                {editingShifts.map((sh, idx) => (
+                  <div
+                    key={idx}
+                    className="p-3 rounded-2xl border border-slate-200 bg-slate-50/70 shadow-2xs space-y-2"
+                  >
+                    {/* Hàng 1: Số thứ tự + Tên ca + Thùng rác */}
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 flex-1 min-w-0">
+                        <span className="w-6 h-6 rounded-lg bg-slate-900 text-white text-[11px] font-black flex items-center justify-center shrink-0">
+                          {idx + 1}
+                        </span>
+                        <input
+                          type="text"
+                          value={sh.name}
+                          onChange={(e) => {
+                            const updated = [...editingShifts];
+                            updated[idx] = { ...sh, name: e.target.value };
+                            setEditingShifts(updated);
+                          }}
+                          className="text-xs font-bold text-slate-900 border-b border-dashed border-slate-300 focus:border-emerald-500 outline-none pb-0.5 bg-transparent flex-1 min-w-0"
+                          placeholder="Tên khung ca..."
+                        />
+                      </div>
+
+                      {editingShifts.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            showCommonConfirm(
+                              'Xác nhận xóa khung ca',
+                              `Bạn có chắc chắn muốn xóa "${sh.name}" (${sh.time}) khỏi cơ cấu ca của sân không?\n\n💡 Dữ liệu các ca trực cũ đã phân công trên lịch vẫn được lưu giữ an toàn trong hệ thống, chỉ tạm thời không hiển thị trên ma trận tuần mới.`,
+                              () => {
+                                setEditingShifts(editingShifts.filter((_, i) => i !== idx));
+                              },
+                              true,
+                              'Xác nhận xóa',
+                              'Không, quay lại'
+                            );
+                          }}
+                          className="h-7 w-7 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 flex items-center justify-center transition cursor-pointer shrink-0"
+                          title="Xóa khung ca này khỏi cơ cấu"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Hàng 2: Khung giờ + Giờ công + Hệ số nằm trên CÙNG 1 HÀNG GỌN GÀNG */}
+                    <div className="flex items-center gap-2 pt-0.5 text-xs">
+                      <div className="flex-1 min-w-0">
+                        <span className="text-[9.5px] font-bold text-slate-400 block mb-0.5">KHUNG GIỜ:</span>
+                        <input
+                          type="text"
+                          value={sh.time}
+                          onChange={(e) => {
+                            const updated = [...editingShifts];
+                            updated[idx] = { ...sh, time: e.target.value };
+                            setEditingShifts(updated);
+                          }}
+                          className="w-full px-2.5 py-1.5 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-800 outline-none focus:border-emerald-500"
+                          placeholder="06:00 - 14:00"
+                        />
+                      </div>
+
+                      <div className="w-18 shrink-0">
+                        <span className="text-[9.5px] font-bold text-slate-400 block mb-0.5 text-center">GIỜ CÔNG:</span>
+                        <input
+                          type="number"
+                          step="0.5"
+                          value={sh.hours}
+                          onChange={(e) => {
+                            const updated = [...editingShifts];
+                            updated[idx] = { ...sh, hours: parseFloat(e.target.value) || 0 };
+                            setEditingShifts(updated);
+                          }}
+                          className="w-full px-2 py-1.5 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-800 outline-none focus:border-emerald-500 text-center"
+                        />
+                      </div>
+
+                      <div className="w-18 shrink-0">
+                        <span className="text-[9.5px] font-bold text-slate-400 block mb-0.5 text-center">HỆ SỐ:</span>
+                        <input
+                          type="number"
+                          step="0.1"
+                          value={sh.wageMultiplier || 1.0}
+                          onChange={(e) => {
+                            const updated = [...editingShifts];
+                            updated[idx] = { ...sh, wageMultiplier: parseFloat(e.target.value) || 1.0 };
+                            setEditingShifts(updated);
+                          }}
+                          className="w-full px-2 py-1.5 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-800 outline-none focus:border-emerald-500 text-center"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Box 3: Phạm vi áp dụng & Nhiệm vụ bàn giao */}
+            <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-2xs space-y-3.5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-black uppercase tracking-wider text-slate-800">
+                  Thiết lập phạm vi áp dụng
+                </span>
+                <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">
+                  Linh hoạt theo ngày & thứ
+                </span>
+              </div>
+
+              {/* 1. Khoảng ngày áp dụng */}
+              <div>
+                <label className="text-[10.5px] font-black uppercase text-slate-700 tracking-wider">
+                  1. Khoảng ngày áp dụng:
+                </label>
+                <div className="grid grid-cols-2 gap-2 mt-1">
+                  <div>
+                    <span className="text-[9.5px] font-bold text-slate-400">Từ ngày:</span>
+                    <input
+                      type="date"
+                      value={structureStartDate}
+                      onChange={(e) => setStructureStartDate(e.target.value)}
+                      className="w-full mt-0.5 px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-800 bg-slate-50 outline-none focus:border-amber-500 focus:bg-white"
+                    />
+                  </div>
+                  <div>
+                    <span className="text-[9.5px] font-bold text-slate-400">Đến ngày:</span>
+                    <input
+                      type="date"
+                      value={structureEndDate}
+                      onChange={(e) => setStructureEndDate(e.target.value)}
+                      className="w-full mt-0.5 px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-800 bg-slate-50 outline-none focus:border-amber-500 focus:bg-white"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* 2. Áp dụng theo thứ trong tuần */}
+              <div>
+                <div className="flex items-center justify-between">
+                  <label className="text-[10.5px] font-black uppercase text-slate-700 tracking-wider">
+                    2. Áp dụng theo thứ trong tuần:
+                  </label>
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-700">
+                    <button
+                      type="button"
+                      onClick={() => setStructureDaysOfWeek(['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'])}
+                      className="hover:underline cursor-pointer"
+                    >
+                      Tất cả
+                    </button>
+                    <span>•</span>
+                    <button
+                      type="button"
+                      onClick={() => setStructureDaysOfWeek(['T2', 'T3', 'T4', 'T5', 'T6'])}
+                      className="hover:underline cursor-pointer"
+                    >
+                      T2-T6
+                    </button>
+                    <span>•</span>
+                    <button
+                      type="button"
+                      onClick={() => setStructureDaysOfWeek(['T7', 'CN'])}
+                      className="hover:underline cursor-pointer"
+                    >
+                      T7,CN
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-7 gap-1.5 mt-1.5">
+                  {['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'].map((d) => {
+                    const isSelected = structureDaysOfWeek.includes(d);
+                    return (
+                      <button
+                        key={d}
+                        type="button"
+                        onClick={() => {
+                          if (isSelected) {
+                            if (structureDaysOfWeek.length > 1) {
+                              setStructureDaysOfWeek(structureDaysOfWeek.filter((item) => item !== d));
+                            }
+                          } else {
+                            setStructureDaysOfWeek([...structureDaysOfWeek, d]);
+                          }
+                        }}
+                        className={`py-2 rounded-xl text-xs font-black transition cursor-pointer text-center ${
+                          isSelected
+                            ? 'bg-amber-500 text-white shadow-2xs'
+                            : 'bg-slate-50 border border-slate-200 text-slate-700 hover:bg-slate-100'
+                        }`}
+                      >
+                        {d}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* 3. Nhiệm vụ mẫu bàn giao cho ca */}
+              <div>
+                <label className="text-[10.5px] font-black uppercase text-slate-700 tracking-wider">
+                  3. Nhiệm vụ mẫu bàn giao cho ca:
+                </label>
+                <div className="space-y-1.5 mt-1.5">
+                  {structureTasks.map((t, idx) => {
+                    const isChecked = selectedStructureTasks.includes(t);
+                    return (
+                      <label
+                        key={idx}
+                        className={`flex items-center gap-2.5 p-2.5 rounded-xl border transition cursor-pointer ${
+                          isChecked
+                            ? 'bg-amber-50/50 border-amber-300 text-slate-900'
+                            : 'bg-slate-50 border-slate-200 text-slate-500'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => {
+                            if (isChecked) {
+                              setSelectedStructureTasks(selectedStructureTasks.filter((item) => item !== t));
+                            } else {
+                              setSelectedStructureTasks([...selectedStructureTasks, t]);
+                            }
+                          }}
+                          className="w-4 h-4 rounded accent-amber-600 cursor-pointer shrink-0"
+                        />
+                        <span className="flex-1 text-xs font-semibold leading-tight">{t}</span>
+                        {structureTasks.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              setStructureTasks(structureTasks.filter((_, i) => i !== idx));
+                              setSelectedStructureTasks(selectedStructureTasks.filter((item) => item !== t));
+                            }}
+                            className="text-slate-400 hover:text-rose-500 p-0.5 transition cursor-pointer shrink-0"
+                            title="Xóa nhiệm vụ này khỏi mẫu"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </label>
+                    );
+                  })}
+                </div>
+
+                <div className="flex gap-2 mt-2">
+                  <input
+                    type="text"
+                    placeholder="Thêm việc tùy biến..."
+                    value={structureCustomTaskInput}
+                    onChange={(e) => setStructureCustomTaskInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleAddStructureTask();
+                      }
+                    }}
+                    className="flex-1 px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-xs font-medium text-slate-800 outline-none focus:border-amber-500 focus:bg-white"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAddStructureTask}
+                    className="px-3.5 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-black transition active:scale-95 cursor-pointer whitespace-nowrap shadow-xs shadow-amber-600/20"
+                  >
+                    Thêm việc
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {/* Tab Xóa ca hàng loạt */}
+            <div className="rounded-2xl bg-rose-50 border border-rose-200 p-3.5 flex items-start gap-2.5">
+              <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+              <p className="text-xs text-rose-900 leading-snug font-medium">
+                <strong>Lưu ý:</strong> Chức năng này cho phép dọn sạch hoặc hủy hàng loạt các ca trực trên lịch theo khoảng ngày.
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-2xs space-y-2">
+              <label className="text-xs font-black uppercase text-slate-700 tracking-wider">
+                1. Khoảng ngày cần xóa:
+              </label>
+              <div className="grid grid-cols-2 gap-2 mt-1">
+                <div>
+                  <span className="text-[10px] font-bold text-slate-400">Từ ngày:</span>
+                  <input
+                    type="date"
+                    value={bulkDeleteStartDate}
+                    onChange={(e) => setBulkDeleteStartDate(e.target.value)}
+                    className="w-full mt-0.5 px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-800 bg-slate-50 outline-none focus:border-rose-500 focus:bg-white"
+                  />
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold text-slate-400">Đến ngày:</span>
+                  <input
+                    type="date"
+                    value={bulkDeleteEndDate}
+                    onChange={(e) => setBulkDeleteEndDate(e.target.value)}
+                    className="w-full mt-0.5 px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-800 bg-slate-50 outline-none focus:border-rose-500 focus:bg-white"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-2xs space-y-2">
+              <label className="text-xs font-black uppercase text-slate-700 tracking-wider">
+                2. Chọn các khung ca cần xóa:
+              </label>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-1">
+                {standardShifts.map((st) => {
+                  const checked = bulkDeleteShiftTypes.includes(st.type);
+                  return (
+                    <button
+                      key={st.type}
+                      type="button"
+                      onClick={() => {
+                        if (checked) {
+                          setBulkDeleteShiftTypes(bulkDeleteShiftTypes.filter((t) => t !== st.type));
+                        } else {
+                          setBulkDeleteShiftTypes([...bulkDeleteShiftTypes, st.type]);
+                        }
+                      }}
+                      className={`p-2.5 rounded-xl border text-left transition cursor-pointer flex items-center justify-between ${
+                        checked
+                          ? 'bg-rose-50 border-rose-300 text-rose-900 shadow-2xs'
+                          : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+                      }`}
+                    >
+                      <div className="min-w-0 pr-1">
+                        <div className="text-xs font-black truncate">{st.name.split(':')[0]}</div>
+                        <div className="text-[10px] text-slate-500 font-bold truncate">{st.time}</div>
+                      </div>
+                      {checked ? (
+                        <CheckCircle2 className="w-4 h-4 text-rose-600 shrink-0" />
+                      ) : (
+                        <div className="w-4 h-4 rounded-full border border-slate-300 shrink-0" />
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-2xs space-y-2">
+              <label className="text-xs font-black uppercase text-slate-700 tracking-wider">
+                3. Hình thức xóa:
+              </label>
+              <div className="grid grid-cols-2 gap-2 mt-1">
+                <label
+                  className={`p-3 rounded-xl border cursor-pointer transition flex flex-col justify-between ${
+                    bulkDeleteMode === 'full_delete'
+                      ? 'bg-rose-50 border-rose-300 text-rose-900'
+                      : 'bg-slate-50 border-slate-200 text-slate-700'
+                  }`}
+                >
+                  <div className="flex items-center gap-1.5">
+                    <input
+                      type="radio"
+                      name="bulkDeleteMode"
+                      checked={bulkDeleteMode === 'full_delete'}
+                      onChange={() => setBulkDeleteMode('full_delete')}
+                      className="accent-rose-600"
+                    />
+                    <span className="text-xs font-black">Xóa hoàn toàn</span>
+                  </div>
+                  <span className="text-[10px] text-slate-500 mt-1">Đóng ca, đưa về ô trống</span>
+                </label>
+
+                <label
+                  className={`p-3 rounded-xl border cursor-pointer transition flex flex-col justify-between ${
+                    bulkDeleteMode === 'unassign_only'
+                      ? 'bg-amber-50 border-amber-300 text-amber-900'
+                      : 'bg-slate-50 border-slate-200 text-slate-700'
+                  }`}
+                >
+                  <div className="flex items-center gap-1.5">
+                    <input
+                      type="radio"
+                      name="bulkDeleteMode"
+                      checked={bulkDeleteMode === 'unassign_only'}
+                      onChange={() => setBulkDeleteMode('unassign_only')}
+                      className="accent-amber-600"
+                    />
+                    <span className="text-xs font-black">Chỉ gỡ NV</span>
+                  </div>
+                  <span className="text-[10px] text-slate-500 mt-1">Giữ lại ô ca để đăng ký</span>
+                </label>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-2xs space-y-2">
+              <label className="text-xs font-black uppercase text-slate-700 tracking-wider">
+                4. Lý do điều chỉnh:
+              </label>
+              <input
+                type="text"
+                value={bulkDeleteReason}
+                onChange={(e) => setBulkDeleteReason(e.target.value)}
+                className="w-full mt-1 px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-xs font-bold text-slate-800 outline-none focus:border-rose-500 focus:bg-white"
+                placeholder="Nhập lý do xóa..."
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Action Buttons ở chân màn hình */}
+        <div className="pt-2 flex items-center justify-between gap-2.5">
+          <button
+            type="button"
+            onClick={() => setShowBulkModal(false)}
+            className="flex-1 py-3 rounded-2xl border border-slate-200 bg-white text-xs font-bold text-slate-700 hover:bg-slate-100 transition cursor-pointer text-center"
+          >
+            Hủy bỏ
+          </button>
+
+          {bulkTab === 'structure' ? (
+            <button
+              type="button"
+              onClick={() => handleSaveShiftStructure(editingShifts)}
+              className="flex-2 py-3 rounded-2xl bg-slate-900 hover:bg-black text-white text-xs font-black shadow-md transition active:scale-95 cursor-pointer flex items-center justify-center gap-2"
+            >
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+              <span>Lưu & Áp dụng cơ cấu ca</span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={handleExecuteBulkDelete}
+              className="flex-2 py-3 rounded-2xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-black shadow-md shadow-rose-600/25 active:scale-95 transition cursor-pointer flex items-center justify-center gap-2"
+            >
+              <Trash2 className="w-4 h-4" />
+              <span>Xác nhận xóa hàng loạt</span>
+            </button>
+          )}
+        </div>
+
+        {/* Render Common Confirm Popup nếu có */}
+        {renderCommonPopupModal()}
+        {renderSuccessToast()}
+      </div>
+    );
+  }
+
+  // Render Notification Screen if active
+  if (showNotificationModal) {
+    return (
+      <NotificationModal
+        onBack={() => setShowNotificationModal(false)}
+      />
+    );
+  }
+
+  // Render Assign Staff Shift Screen if active (Màn hình phân công nhân viên - không modal)
+  if (assigningShiftData) {
+    return (
+      <AssignStaffShiftView
+        initialShiftType={assigningShiftData.shiftType}
+        initialDate={assigningShiftData.date}
+        standardShifts={standardShifts}
+        employees={employees}
+        existingShifts={effectiveShifts}
+        weekDays={weekDays}
+        targetShift={assigningShiftData.targetShift}
+        onBack={() => setAssigningShiftData(null)}
+        onConfirmAssign={(assignedShift) => {
+          if (assigningShiftData.targetShift) {
+            onUpdateShift?.(assignedShift);
+          } else {
+            const existing = effectiveShifts.find(
+              (s) =>
+                s.date === assignedShift.date &&
+                s.shiftType === assignedShift.shiftType &&
+                s.status !== 'cancelled'
+            );
+            if (existing) {
+              onUpdateShift?.({ ...assignedShift, id: existing.id });
+            } else {
+              onAddShift?.(assignedShift);
+            }
+          }
+
+          const cellKey = `${assignedShift.shiftType}-${assignedShift.date}`;
+          setDeletedSlotsHistory((prev) => {
+            const next = { ...prev };
+            delete next[cellKey];
+            return next;
+          });
+
+          setAssigningShiftData(null);
+          const empName =
+            assignedShift.employeeId === 'PENDING'
+              ? 'mở ca trống'
+              : `nhân viên ${assignedShift.employeeName}`;
+          setSuccessToast(
+            `Đã phân công ${empName} cho ${assignedShift.shiftName} ngày ${assignedShift.date.split('-').reverse().join('/')} thành công!`
+          );
+          setTimeout(() => setSuccessToast(null), 3500);
+        }}
+      />
     );
   }
 
@@ -1002,11 +2696,23 @@ export default function ShiftScheduleView({
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-xs font-black text-emerald-800 border border-emerald-200 shadow-2xs">
           <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-          {isAdmin ? 'BAN QUẢN LÝ: THEO DÕI & ĐIỀU PHỐI LỊCH TRỰC' : 'NHÂN VIÊN: CA TRỰC CỦA TÔI'}
+          {isAdmin ? 'QUẢN TRỊ LỊCH TRỰC' : 'LỊCH TRỰC NHÂN VIÊN'}
         </div>
-        <div className="flex items-center gap-2 text-[11px] font-bold text-slate-500 bg-white px-2.5 py-1 rounded-full border border-slate-200">
-          <Clock className="w-3.5 h-3.5 text-emerald-600" />
-          <span>Hôm nay: T6, 16/10/2026</span>
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 text-[11px] font-bold text-slate-500 bg-white px-2.5 py-1 rounded-full border border-slate-200">
+            <Clock className="w-3.5 h-3.5 text-emerald-600" />
+            <span>Hôm nay: T6, 16/10/2026</span>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setShowNotificationModal(true)}
+            className="relative flex h-8 w-8 items-center justify-center rounded-full bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 transition cursor-pointer shadow-2xs"
+            title="Thông báo hệ thống"
+          >
+            <Bell className="w-4 h-4" />
+            <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-rose-600 ring-2 ring-white" />
+          </button>
         </div>
       </div>
 
@@ -1014,230 +2720,23 @@ export default function ShiftScheduleView({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-black tracking-tight text-slate-900 leading-tight">
-            LỊCH TRỰC TUẦN{' '}
             {isAdmin ? (
-              <span className="text-emerald-600">NHÂN VIÊN</span>
+              <>
+                LỊCH TRỰC TUẦN <span className="text-emerald-600">& PHÂN CÔNG CA</span>
+              </>
             ) : (
-              <span className="text-emerald-600">& ĐĂNG KÝ CA</span>
+              <>
+                LỊCH TRỰC TUẦN <span className="text-emerald-600">& ĐĂNG KÝ CA</span>
+              </>
             )}
           </h1>
-          <p className="mt-1 text-xs text-slate-500 font-medium">
+          <p className="mt-1 text-xs text-slate-500 leading-relaxed font-medium">
             {isAdmin
               ? 'Theo dõi lịch trực nhân sự và giao nhiệm vụ công việc cho từng ca trực nhà thi đấu CourtX.'
               : 'Xem lịch trực cá nhân, kiểm tra nhiệm vụ ca và đăng ký các ca làm việc còn trống.'}
           </p>
         </div>
-
-        {/* Action Buttons */}
-        <div className="flex items-center gap-2 flex-wrap">
-          {isAdmin && (
-            <>
-              {/* Nút Thêm ca trực / Thêm công việc ca trực cho Admin */}
-              <button
-                type="button"
-                onClick={() => {
-                  if (adminViewMode === 'list') {
-                    handleOpenCreateShiftModal(undefined, '2026-10-16');
-                  } else {
-                    handleOpenAddTaskModal('Ca 1', '2026-10-16');
-                  }
-                }}
-                className="flex items-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 px-3.5 py-2 text-xs font-black text-white shadow-md shadow-emerald-600/20 active:scale-95 transition cursor-pointer"
-              >
-                <Plus className="w-4 h-4 stroke-[2.5]" />
-                <span>{adminViewMode === 'list' ? 'Thêm ca trực' : 'Thêm công việc ca'}</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setShowExportModal(true)}
-                className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-2xs hover:bg-slate-50 cursor-pointer"
-              >
-                <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
-                <span>Xuất Excel</span>
-              </button>
-            </>
-          )}
-
-          {!isAdmin && (
-            <div className="flex items-center rounded-xl bg-slate-100 p-1 border border-slate-200 text-xs font-bold">
-              <button
-                type="button"
-                onClick={() => setViewFilter('all')}
-                className={`px-3 py-1.5 rounded-lg transition cursor-pointer ${
-                  viewFilter === 'all'
-                    ? 'bg-white text-emerald-700 shadow-2xs font-black'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                Tất cả ca trực
-              </button>
-              <button
-                type="button"
-                onClick={() => setViewFilter('my')}
-                className={`px-3 py-1.5 rounded-lg transition cursor-pointer ${
-                  viewFilter === 'my'
-                    ? 'bg-emerald-600 text-white shadow-2xs font-black'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                Ca của tôi ({myShiftsInWeek.length})
-              </button>
-            </div>
-          )}
-        </div>
       </div>
-
-      {/* 🟢 STATS CARDS (Hiển thị rõ ràng, không bị cắt xén chữ hay tràn viền) */}
-      {isAdmin ? (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3.5 w-full">
-          {/* Card 1: Tổng ca tuần */}
-          <div className="bg-white border border-slate-200 rounded-2xl p-3 sm:p-4 shadow-2xs flex flex-col justify-between">
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-xs sm:text-[13px] font-bold text-slate-600 leading-tight">
-                Tổng ca tuần
-              </span>
-              <div className="w-7 h-7 rounded-xl bg-slate-100 flex items-center justify-center shrink-0 text-slate-500">
-                <Calendar className="w-3.5 h-3.5" />
-              </div>
-            </div>
-            <div className="mt-2 flex items-baseline gap-1">
-              <span className="text-2xl sm:text-3xl font-black text-slate-900 leading-none">21</span>
-              <span className="text-xs font-bold text-slate-400">ca</span>
-            </div>
-            <div className="text-[11px] text-slate-500 font-medium mt-1 leading-tight">
-              3 ca/ngày × 7 ngày
-            </div>
-          </div>
-
-          {/* Card 2: Đã phân công */}
-          <div className="bg-emerald-50/70 border border-emerald-200 rounded-2xl p-3 sm:p-4 shadow-2xs flex flex-col justify-between">
-            <div className="flex items-center justify-between gap-2 text-emerald-800">
-              <span className="text-xs sm:text-[13px] font-bold leading-tight">
-                Đã phân công
-              </span>
-              <div className="w-7 h-7 rounded-xl bg-emerald-100 flex items-center justify-center shrink-0 text-emerald-700">
-                <CheckCircle2 className="w-3.5 h-3.5" />
-              </div>
-            </div>
-            <div className="mt-2 flex items-baseline gap-1">
-              <span className="text-2xl sm:text-3xl font-black text-emerald-800 leading-none">
-                {activeWeekShifts.length}
-              </span>
-              <span className="text-xs font-bold text-emerald-600/80">ca</span>
-            </div>
-            <div className="text-[11px] text-emerald-700 font-bold mt-1 leading-tight">
-              Đạt {Math.round((activeWeekShifts.length / 21) * 100)}% lịch tuần
-            </div>
-          </div>
-
-          {/* Card 3: Ca còn trống */}
-          <div className="bg-rose-50/70 border border-rose-200 rounded-2xl p-3 sm:p-4 shadow-2xs flex flex-col justify-between">
-            <div className="flex items-center justify-between gap-2 text-rose-800">
-              <span className="text-xs sm:text-[13px] font-bold leading-tight">
-                Ca còn trống
-              </span>
-              <div className="w-7 h-7 rounded-xl bg-rose-100 flex items-center justify-center shrink-0 text-rose-600">
-                <AlertTriangle className="w-3.5 h-3.5" />
-              </div>
-            </div>
-            <div className="mt-2 flex items-baseline gap-1">
-              <span className="text-2xl sm:text-3xl font-black text-rose-700 leading-none">
-                {Math.max(0, 21 - activeWeekShifts.length)}
-              </span>
-              <span className="text-xs font-bold text-rose-600/80">ca</span>
-            </div>
-            <div className="text-[11px] text-rose-600 font-medium mt-1 leading-tight">
-              Chờ xếp lịch trực
-            </div>
-          </div>
-
-          {/* Card 4: Nhân sự trực */}
-          <div className="bg-blue-50/70 border border-blue-200 rounded-2xl p-3 sm:p-4 shadow-2xs flex flex-col justify-between">
-            <div className="flex items-center justify-between gap-2 text-blue-800">
-              <span className="text-xs sm:text-[13px] font-bold leading-tight">
-                Nhân sự trực
-              </span>
-              <div className="w-7 h-7 rounded-xl bg-blue-100 flex items-center justify-center shrink-0 text-blue-700">
-                <Users className="w-3.5 h-3.5" />
-              </div>
-            </div>
-            <div className="mt-2 flex items-baseline gap-1">
-              <span className="text-2xl sm:text-3xl font-black text-blue-800 leading-none">
-                {activeStaffIds.size}
-              </span>
-              <span className="text-xs font-bold text-blue-600/80">người</span>
-            </div>
-            <div className="text-[11px] text-blue-600 font-medium mt-1 leading-tight">
-              {employees.length} tổng nhân sự
-            </div>
-          </div>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3.5 w-full">
-          {/* Card 1: Ca đã đăng ký */}
-          <div className="bg-emerald-50/80 border border-emerald-200/90 rounded-2xl p-3 sm:p-4 shadow-2xs flex flex-col justify-between">
-            <div className="flex items-center justify-between gap-2 text-emerald-800">
-              <span className="text-xs sm:text-[13px] font-bold leading-tight">
-                Ca đăng ký
-              </span>
-              <div className="w-7 h-7 rounded-xl bg-emerald-100 flex items-center justify-center shrink-0 text-emerald-700">
-                <CalendarCheck className="w-3.5 h-3.5" />
-              </div>
-            </div>
-            <div className="mt-2 flex items-baseline gap-1">
-              <span className="text-2xl sm:text-3xl font-black text-emerald-800 leading-none">
-                {myShiftsInWeek.length}
-              </span>
-              <span className="text-xs font-bold text-emerald-600/80">ca</span>
-            </div>
-            <div className="text-[11px] text-emerald-700 font-medium mt-1 leading-tight">
-              Đã xác nhận vào lịch
-            </div>
-          </div>
-
-          {/* Card 2: Tổng giờ làm */}
-          <div className="bg-blue-50/80 border border-blue-200/90 rounded-2xl p-3 sm:p-4 shadow-2xs flex flex-col justify-between">
-            <div className="flex items-center justify-between gap-2 text-blue-800">
-              <span className="text-xs sm:text-[13px] font-bold leading-tight">
-                Tổng giờ làm
-              </span>
-              <div className="w-7 h-7 rounded-xl bg-blue-100 flex items-center justify-center shrink-0 text-blue-700">
-                <Clock className="w-3.5 h-3.5" />
-              </div>
-            </div>
-            <div className="mt-2 flex items-baseline gap-1">
-              <span className="text-2xl sm:text-3xl font-black text-blue-800 leading-none">
-                {totalMyHoursInWeek}
-              </span>
-              <span className="text-xs font-bold text-blue-600/80">giờ</span>
-            </div>
-            <div className="text-[11px] text-blue-700 font-medium mt-1 leading-tight">
-              Tuần 15 – 21/10
-            </div>
-          </div>
-
-          {/* Card 3: Chuyên cần */}
-          <div className="bg-purple-50/80 border border-purple-200/90 rounded-2xl p-3 sm:p-4 shadow-2xs flex flex-col justify-between">
-            <div className="flex items-center justify-between gap-2 text-purple-800">
-              <span className="text-xs sm:text-[13px] font-bold leading-tight">
-                Chuyên cần
-              </span>
-              <div className="w-7 h-7 rounded-xl bg-purple-100 flex items-center justify-center shrink-0 text-purple-700">
-                <Award className="w-3.5 h-3.5" />
-              </div>
-            </div>
-            <div className="mt-2 flex items-baseline gap-1">
-              <span className="text-2xl sm:text-3xl font-black text-purple-800 leading-none">
-                100%
-              </span>
-            </div>
-            <div className="text-[11px] text-purple-700 font-medium mt-1 leading-tight">
-              Đúng giờ
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* 🟢 Navigation Bar (Week Selector + Mode Tabs) */}
       <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-2xs flex items-center justify-between flex-wrap gap-2">
@@ -1276,38 +2775,19 @@ export default function ShiftScheduleView({
           </button>
         </div>
 
-        {/* Admin Matrix vs List mode toggle */}
-        {isAdmin && (
-          <div className="flex items-center rounded-xl bg-slate-100 p-1 border border-slate-200 text-xs font-bold">
-            <button
-              type="button"
-              onClick={() => setAdminViewMode('matrix')}
-              className={`px-3 py-1 rounded-lg transition cursor-pointer ${
-                adminViewMode === 'matrix'
-                  ? 'bg-white text-emerald-700 shadow-2xs font-black'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              Ma trận tuần
-            </button>
-            <button
-              type="button"
-              onClick={() => setAdminViewMode('list')}
-              className={`px-3 py-1 rounded-lg transition cursor-pointer flex items-center gap-1.5 ${
-                adminViewMode === 'list'
-                  ? 'bg-white text-emerald-700 shadow-2xs font-black'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <Calendar className="w-3.5 h-3.5 text-emerald-600" />
-              <span>Lịch ca trực ({activeWeekShifts.length})</span>
-            </button>
-          </div>
-        )}
-
         {/* Action buttons for admin */}
         {isAdmin && (
           <div className="flex items-center gap-1.5 flex-wrap sm:ml-auto">
+            <button
+              type="button"
+              onClick={() => setShowExportModal(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold shadow-2xs active:scale-95 transition cursor-pointer"
+              title="Xuất Excel bảng phân ca"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Xuất Excel</span>
+            </button>
+
             <button
               type="button"
               onClick={() => {
@@ -1315,7 +2795,6 @@ export default function ShiftScheduleView({
                 setStructureStartDate(weekDays[0]?.date || '2026-10-15');
                 setStructureEndDate(weekDays[6]?.date || '2026-10-21');
                 setStructureDaysOfWeek(['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN']);
-                setStructureShiftTypes(standardShifts.map((s) => s.type));
                 setBulkTab('structure');
                 setShowBulkModal(true);
               }}
@@ -1324,21 +2803,6 @@ export default function ShiftScheduleView({
             >
               <Sliders className="w-3.5 h-3.5 text-amber-400" />
               <span>Đổi cơ cấu ca</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => {
-                setBulkTab('delete');
-                setBulkDeleteStartDate(weekDays[0].date);
-                setBulkDeleteEndDate(weekDays[6].date);
-                setShowBulkModal(true);
-              }}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-black border border-rose-200 shadow-2xs active:scale-95 transition cursor-pointer"
-              title="Xóa ca hàng loạt theo khoảng ngày"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-              <span>Xóa ca hàng loạt</span>
             </button>
           </div>
         )}
@@ -1362,19 +2826,18 @@ export default function ShiftScheduleView({
         </div>
       </div>
 
-      {/* 🟢 VIEW 1: BẢNG MA TRẬN PHÂN CA TUẦN */}
-      {(!isAdmin || adminViewMode === 'matrix') && (
+      {/* 🟢 BẢNG MA TRẬN PHÂN CA TUẦN */}
         <div className="border border-slate-200 rounded-3xl overflow-hidden bg-white shadow-sm overflow-x-auto relative">
-          <table className="w-full table-fixed min-w-[880px] text-left border-collapse">
+          <table className="w-full table-fixed min-w-[700px] text-left border-collapse">
             <colgroup>
-              <col className="w-32 md:w-36" />
+              <col className="w-[84px] sm:w-[92px]" />
               {weekDays.map((d) => (
                 <col key={d.date} />
               ))}
             </colgroup>
             <thead>
               <tr>
-                <th className="sticky left-0 z-20 w-32 md:w-36 p-1.5 border-b border-r border-slate-200 bg-slate-50 text-[10px] font-black text-slate-500 uppercase tracking-wider shadow-[2px_0_5px_-2px_rgba(0,0,0,0.08)] align-middle text-center">
+                <th className="sticky left-0 z-20 w-[84px] sm:w-[92px] p-1 border-b border-r border-slate-200 bg-slate-50 text-[9.5px] font-black text-slate-500 uppercase tracking-wider shadow-[2px_0_5px_-2px_rgba(0,0,0,0.08)] align-middle text-center">
                   KHUNG CA
                 </th>
                 {weekDays.map((day) => (
@@ -1413,25 +2876,26 @@ export default function ShiftScheduleView({
                 .filter((s) => shiftTypeFilter === 'ALL' || s.type === shiftTypeFilter)
                 .map((shiftRow) => (
                   <tr key={shiftRow.type} className="hover:bg-slate-50/30 transition">
-                    {/* Sticky Left Column: Shift Info */}
-                    <td className="sticky left-0 z-10 w-32 md:w-36 p-2 border-b border-r border-slate-200 align-middle bg-white shadow-[2px_0_5px_-2px_rgba(0,0,0,0.08)]">
-                      <div className="flex flex-col items-center text-center gap-1">
+                    {/* Sticky Left Column: Shift Info (Thu gọn bề ngang) */}
+                    <td className="sticky left-0 z-10 w-[84px] sm:w-[92px] p-1 sm:p-1.5 border-b border-r border-slate-200 align-middle bg-white shadow-[2px_0_5px_-2px_rgba(0,0,0,0.08)]">
+                      <div className="flex flex-col items-center text-center gap-0.5 min-w-0">
                         <div
-                          className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 shadow-2xs ${shiftRow.color}`}
+                          className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 shadow-2xs ${shiftRow.color}`}
+                          title={shiftRow.name}
                         >
-                          <shiftRow.icon className="w-3.5 h-3.5" />
+                          <shiftRow.icon className="w-3 h-3" />
                         </div>
-                        <div className="min-w-0 w-full px-0.5">
-                          <div className={`text-xs font-black leading-tight truncate ${shiftRow.accentColor}`}>
-                            {shiftRow.name.split(':')[0]}
-                          </div>
-                          <div className="text-[10px] font-bold text-slate-700 leading-tight mt-0.5 whitespace-normal">
-                            {shiftRow.name.split(':')[1]?.trim() || ''}
-                          </div>
-                          <div className="text-[8.5px] text-slate-500 font-semibold mt-1 leading-tight flex items-center justify-center gap-0.5">
-                            <Clock className="w-2.5 h-2.5 text-slate-400 shrink-0" />
-                            <span>{shiftRow.time}</span>
-                          </div>
+                        <div className={`text-[11px] font-black leading-tight truncate w-full ${shiftRow.accentColor}`}>
+                          {shiftRow.name.split(':')[0]}
+                        </div>
+                        <div
+                          className="text-[9px] font-medium text-slate-600 leading-tight truncate w-full px-0.5"
+                          title={shiftRow.name.split(':')[1]?.trim() || ''}
+                        >
+                          {shiftRow.name.split(':')[1]?.trim() || ''}
+                        </div>
+                        <div className="text-[8px] sm:text-[8.5px] text-slate-500 font-semibold leading-tight mt-0.5 whitespace-nowrap">
+                          {shiftRow.time}
                         </div>
                       </div>
                     </td>
@@ -1451,13 +2915,7 @@ export default function ShiftScheduleView({
                       );
                       const isMyShift = !isAdmin && (!!myShiftInCell || isNewlyAssigned);
 
-                      // Filter view if employee chose "Chỉ ca của tôi"
-                      const displayShifts =
-                        !isAdmin && viewFilter === 'my'
-                          ? allCellShifts.filter(
-                              (s) => s.employeeName === 'Nguyễn Văn An' || s.employeeId === 'NV01'
-                            )
-                          : allCellShifts;
+                      const displayShifts = allCellShifts;
 
                       const dayDate = new Date(day.date);
                       const today = new Date('2026-10-16');
@@ -1473,7 +2931,26 @@ export default function ShiftScheduleView({
                         >
                           {/* Case 1: My Shift for Employee */}
                           {isMyShift ? (
-                            <div className="w-full h-full rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-600 shadow-md p-1.5 flex flex-col justify-between text-center relative overflow-hidden min-h-[75px] min-w-0">
+                            <div
+                              onClick={() => {
+                                setSelectedShiftDetail(
+                                  myShiftInCell || {
+                                    id: `SH-${shiftRow.type}-${day.date}`,
+                                    employeeId: 'NV01',
+                                    employeeName: 'Nguyễn Văn An',
+                                    date: day.date,
+                                    dayOfWeek: day.day,
+                                    shiftType: shiftRow.type,
+                                    shiftName: shiftRow.name,
+                                    timeRange: shiftRow.time,
+                                    status: 'scheduled',
+                                    courtArea: 'Toàn bộ 8 sân',
+                                  }
+                                );
+                              }}
+                              className="w-full h-full rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-600 shadow-md p-1.5 flex flex-col justify-between text-center relative overflow-hidden min-h-[75px] min-w-0 cursor-pointer hover:brightness-105 transition active:scale-[0.99]"
+                              title="Bấm để xem chi tiết ca trực của bạn"
+                            >
                               <div className="flex flex-col items-center min-w-0">
                                 <span className="text-[10px] font-black text-white flex items-center gap-1 drop-shadow-sm truncate">
                                   <CheckCircle2 className="w-3 h-3 shrink-0" />
@@ -1495,7 +2972,8 @@ export default function ShiftScheduleView({
 
                               <button
                                 type="button"
-                                onClick={() => {
+                                onClick={(e) => {
+                                  e.stopPropagation();
                                   setSelectedShiftForDelete(
                                     myShiftInCell || {
                                       id: `SH-${shiftRow.type}-${day.date}`,
@@ -1522,12 +3000,14 @@ export default function ShiftScheduleView({
                               </button>
                             </div>
                           ) : displayShifts.length > 0 ? (
-                            /* Case 2: Assigned Shift(s) in cell */
+                            /* Case 2: Assigned Shift(s) in cell - Bấm vào cục ca trực để hiện thông tin chi tiết */
                             <div className="flex flex-col gap-1 w-full h-full justify-center min-w-0 overflow-hidden">
                               {displayShifts.map((s) => (
                                 <div
                                   key={s.id}
-                                  className="group relative flex flex-col gap-1 bg-slate-50 hover:bg-slate-100/90 border border-slate-200/90 rounded-xl p-1.5 shadow-2xs transition min-w-0 overflow-hidden"
+                                  onClick={() => setSelectedShiftDetail(s)}
+                                  className="group relative flex flex-col gap-1 bg-slate-50 hover:bg-slate-100/90 border border-slate-200/90 hover:border-emerald-400 hover:shadow-xs rounded-xl p-1.5 shadow-2xs transition min-w-0 overflow-hidden cursor-pointer active:scale-[0.99]"
+                                  title="Nhấn để xem chi tiết ca trực này"
                                 >
                                   {/* Staff info row */}
                                   <div className="flex items-center justify-between gap-1 min-w-0">
@@ -1536,11 +3016,11 @@ export default function ShiftScheduleView({
                                         {s.employeeName.charAt(0)}
                                       </div>
                                       <div className="min-w-0 flex-1">
-                                        <p className="text-[10.5px] font-bold text-slate-800 truncate leading-tight" title={s.employeeName}>
+                                        <p className="text-[10px] font-bold text-slate-800 truncate leading-tight" title={s.employeeName}>
                                           {s.employeeName}
                                         </p>
                                         {s.courtArea && (
-                                          <p className="text-[8.5px] text-slate-400 font-medium truncate leading-tight" title={s.courtArea}>
+                                          <p className="text-[8px] text-slate-400 font-medium truncate leading-tight" title={s.courtArea}>
                                             {s.courtArea}
                                           </p>
                                         )}
@@ -1551,7 +3031,8 @@ export default function ShiftScheduleView({
                                     {isAdmin && (
                                       <button
                                         type="button"
-                                        onClick={() => {
+                                        onClick={(e) => {
+                                          e.stopPropagation();
                                           setSelectedShiftForDelete(s);
                                           setDeleteActionContext('unassign_employee');
                                           setIsPermanentDelete(true);
@@ -1587,11 +3068,30 @@ export default function ShiftScheduleView({
                                     </div>
                                   )}
 
+                                  {/* Nếu là ca chờ nhận người thì Admin có thể bấm Phân công nhân viên */}
+                                  {isAdmin && s.employeeId === 'PENDING' && (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleOpenAssignShift(shiftRow.type, day.date, s);
+                                      }}
+                                      className="w-full mt-0.5 py-0.5 text-[9px] font-black text-emerald-800 bg-emerald-100/90 hover:bg-emerald-200 rounded-md transition flex items-center justify-center gap-1 cursor-pointer active:scale-95 shadow-2xs"
+                                      title="Phân công nhân viên cho ca trực này"
+                                    >
+                                      <UserCheck className="w-2.5 h-2.5" />
+                                      <span>Phân công NV</span>
+                                    </button>
+                                  )}
+
                                   {/* Admin Nút Dấu Cộng: Thêm công việc cho ca đó */}
                                   {isAdmin && (
                                     <button
                                       type="button"
-                                      onClick={() => handleOpenAddTaskModal(shiftRow.type, day.date, s)}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleOpenAddTaskModal(shiftRow.type, day.date, s);
+                                      }}
                                       className="w-full mt-0.5 py-0.5 text-[9px] font-black text-emerald-700 hover:text-emerald-800 bg-emerald-50/90 hover:bg-emerald-100 rounded-md border border-dashed border-emerald-300 transition flex items-center justify-center gap-1 cursor-pointer active:scale-95 shadow-2xs"
                                       title="Thêm công việc cho ca trực này"
                                     >
@@ -1620,12 +3120,12 @@ export default function ShiftScheduleView({
                                   </span>
                                   <button
                                     type="button"
-                                    onClick={() => handleOpenCreateShiftModal(shiftRow.type, day.date)}
+                                    onClick={() => handleOpenAssignShift(shiftRow.type, day.date)}
                                     className="mt-0.5 py-0.5 px-2 bg-white hover:bg-emerald-600 hover:text-white text-emerald-700 font-black text-[8.5px] rounded-lg border border-emerald-300 shadow-2xs transition active:scale-95 cursor-pointer flex items-center justify-center gap-0.5"
-                                    title="Thêm lại ca trực cho khung giờ này"
+                                    title="Phân công lại ca trực cho khung giờ này"
                                   >
                                     <Plus className="w-2.5 h-2.5 stroke-[2.5]" />
-                                    <span>Thêm lại ca</span>
+                                    <span>Phân công lại</span>
                                   </button>
                                 </div>
                               );
@@ -1638,7 +3138,7 @@ export default function ShiftScheduleView({
                                 </span>
                                 <button
                                   type="button"
-                                  onClick={() => handleOpenCreateShiftModal(shiftRow.type, day.date)}
+                                  onClick={() => handleOpenAssignShift(shiftRow.type, day.date)}
                                   className="w-full py-1 px-1.5 bg-white hover:bg-emerald-600 hover:text-white text-emerald-700 font-bold text-[9px] rounded-lg border border-emerald-300 shadow-2xs transition active:scale-95 cursor-pointer flex items-center justify-center gap-1 truncate"
                                   title="Phân công nhân viên cho ca trực này"
                                 >
@@ -1675,726 +3175,12 @@ export default function ShiftScheduleView({
             </tbody>
           </table>
         </div>
-      )}
-
-      {/* 🟢 VIEW 2: LỊCH BIỂU CHI TIẾT THEO NGÀY (LỊCH TRỰC QUAN THAY CHO BẢNG CŨ) */}
-      {isAdmin && adminViewMode === 'list' && (
-        <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-2xs space-y-4">
-          {/* Top Title & Search & Quick Date Picker & Bulk Actions */}
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pb-3 border-b border-slate-100">
-            <div>
-              <div className="flex items-center gap-2">
-                <Calendar className="w-4 h-4 text-emerald-600" />
-                <h2 className="text-sm font-black text-slate-900 uppercase tracking-tight">
-                  Lịch trực & Giao việc
-                </h2>
-                <span className="text-[10px] font-black text-emerald-800 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
-                  {viewDaysSpan === 7 ? 'Tuần (7 ngày)' : '2 tuần (14 ngày)'}
-                </span>
-                <span className="text-[10px] font-bold text-slate-500 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-full">
-                  {standardShifts.length} khung ca
-                </span>
-              </div>
-              <p className="text-[11px] text-slate-500 mt-0.5">
-                Xem lịch trực quan theo ngày, thêm công việc và quản lý ca trực đã tạo
-              </p>
-            </div>
-
-            {/* Right: Actions + Quick Date Picker + Search Box */}
-            <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
-              {isAdmin && (
-                <div className="flex items-center gap-1.5 shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setBulkTab('delete');
-                      setBulkDeleteStartDate(displayDays[0].date);
-                      setBulkDeleteEndDate(displayDays[displayDays.length - 1].date);
-                      setShowBulkModal(true);
-                    }}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold active:scale-95 transition cursor-pointer"
-                    title="Xoá ca trực hàng loạt trong khoảng thời gian đã chọn"
-                  >
-                    <Trash2 className="w-3.5 h-3.5 text-rose-600" />
-                    <span>Xoá ca hàng loạt</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setEditingShifts(standardShifts);
-                      setStructureStartDate(displayDays[0]?.date || '2026-10-15');
-                      setStructureEndDate(displayDays[displayDays.length - 1]?.date || '2026-10-21');
-                      setStructureDaysOfWeek(['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN']);
-                      setStructureShiftTypes(standardShifts.map((s) => s.type));
-                      setBulkTab('structure');
-                      setShowBulkModal(true);
-                    }}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-black text-white text-xs font-black shadow-sm active:scale-95 transition cursor-pointer"
-                    title="Thay đổi cơ cấu khung ca của sân (số lượng ca, giờ bắt đầu/kết thúc)"
-                  >
-                    <Sliders className="w-3.5 h-3.5 text-amber-400" />
-                    <span>Đổi cơ cấu ca</span>
-                  </button>
-                </div>
-              )}
-
-              {/* Direct HTML5 Date Picker */}
-              <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs hover:border-emerald-400 transition">
-                <Calendar className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                <span className="text-[11px] font-bold text-slate-500 whitespace-nowrap">Chọn ngày:</span>
-                <input
-                  type="date"
-                  value={calendarSelectedDate === 'ALL' ? '' : calendarSelectedDate}
-                  onChange={(e) => {
-                    if (e.target.value) {
-                      const pickedDateStr = e.target.value;
-                      setCalendarSelectedDate(pickedDateStr);
-                      const picked = new Date(pickedDateStr);
-                      setCurrentWeekStart(picked);
-                    }
-                  }}
-                  className="text-xs font-bold text-slate-800 bg-transparent outline-none cursor-pointer"
-                />
-              </div>
-
-              {/* Search Box */}
-              <div className="relative min-w-[180px]">
-                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                <input
-                  type="text"
-                  placeholder="Tìm nhân viên, ca..."
-                  value={listSearchQuery}
-                  onChange={(e) => setListSearchQuery(e.target.value)}
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 pl-8 pr-3 py-1.5 text-xs font-medium text-slate-800 outline-none focus:border-emerald-500 focus:bg-white transition"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* 🟢 Quick Bulk Actions Bar (Cơ cấu ca & Xóa ca hàng loạt) */}
-          {isAdmin && (
-            <div className="flex items-center gap-1.5 flex-wrap pt-0.5 pb-1">
-              <span className="text-[10.5px] font-black text-slate-500 uppercase tracking-wider flex items-center gap-1 shrink-0">
-                <Zap className="w-3 h-3 text-amber-500 fill-amber-500" />
-                <span>Thao tác nhanh:</span>
-              </span>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setEditingShifts(standardShifts);
-                  setStructureStartDate(displayDays[0]?.date || '2026-10-15');
-                  setStructureEndDate(displayDays[displayDays.length - 1]?.date || '2026-10-21');
-                  setStructureDaysOfWeek(['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN']);
-                  setStructureShiftTypes(standardShifts.map((s) => s.type));
-                  setBulkTab('structure');
-                  setShowBulkModal(true);
-                }}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-black text-white text-xs font-bold shadow-2xs transition cursor-pointer active:scale-95"
-                title="Cấu hình cơ cấu ca trực (số ca, khung giờ, hệ số lương)"
-              >
-                <Sliders className="w-3.5 h-3.5 text-amber-400" />
-                <span>⚙️ Cấu hình cơ cấu ca</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setBulkTab('delete');
-                  setBulkDeleteStartDate(displayDays[0].date);
-                  setBulkDeleteEndDate(displayDays[displayDays.length - 1].date);
-                  setShowBulkModal(true);
-                }}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold border border-rose-200 transition cursor-pointer active:scale-95"
-                title="Xóa nhanh các ca trực trong kỳ này"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-                <span>Xóa ca hàng loạt</span>
-              </button>
-            </div>
-          )}
-
-          {/* 🟢 Thanh điều hướng tuần & Chế độ xem ngày (7 ngày / 14 ngày) */}
-          <div className="flex items-center justify-between flex-wrap gap-2 pt-1">
-            {/* Week navigation buttons */}
-            <div className="flex items-center gap-1.5">
-              <button
-                type="button"
-                onClick={() => {
-                  const d = new Date(currentWeekStart);
-                  d.setDate(d.getDate() - viewDaysSpan);
-                  setCurrentWeekStart(d);
-                }}
-                className="h-8 w-8 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center transition active:scale-95 cursor-pointer"
-                title={viewDaysSpan === 7 ? 'Tuần trước' : 'Kỳ trước'}
-              >
-                <ChevronLeft className="w-4 h-4 stroke-[2.5]" />
-              </button>
-
-              <div className="px-3 py-1.5 bg-slate-50 rounded-xl border border-slate-200 text-xs font-black text-slate-800 flex items-center gap-1.5">
-                <Calendar className="w-3.5 h-3.5 text-emerald-600" />
-                <span>
-                  {displayDays[0].label} – {displayDays[displayDays.length - 1].label}/{displayDays[0].year}
-                </span>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => {
-                  const d = new Date(currentWeekStart);
-                  d.setDate(d.getDate() + viewDaysSpan);
-                  setCurrentWeekStart(d);
-                }}
-                className="h-8 w-8 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center transition active:scale-95 cursor-pointer"
-                title={viewDaysSpan === 7 ? 'Tuần sau' : 'Kỳ sau'}
-              >
-                <ChevronRight className="w-4 h-4 stroke-[2.5]" />
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setCurrentWeekStart(new Date('2026-10-15'));
-                  setCalendarSelectedDate('2026-10-16');
-                }}
-                className="px-2.5 py-1.5 rounded-xl text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 transition cursor-pointer active:scale-95 ml-0.5"
-              >
-                Hôm nay
-              </button>
-            </div>
-
-            {/* View options: Span toggle (7 ngày / 14 ngày) & Xem tất cả */}
-            <div className="flex items-center gap-1.5">
-              <div className="flex items-center bg-slate-100 p-0.5 rounded-xl border border-slate-200 text-[11px] font-bold">
-                <button
-                  type="button"
-                  onClick={() => setViewDaysSpan(7)}
-                  className={`px-3 py-1 rounded-lg transition cursor-pointer ${
-                    viewDaysSpan === 7
-                      ? 'bg-white text-emerald-700 font-black shadow-2xs'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  7 ngày
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setViewDaysSpan(14)}
-                  className={`px-3 py-1 rounded-lg transition cursor-pointer ${
-                    viewDaysSpan === 14
-                      ? 'bg-white text-emerald-700 font-black shadow-2xs'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  14 ngày (2 tuần)
-                </button>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setCalendarSelectedDate('ALL')}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer shrink-0 ${
-                  calendarSelectedDate === 'ALL'
-                    ? 'bg-slate-900 text-white shadow-2xs font-black'
-                    : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
-                }`}
-              >
-                Xem tất cả ({viewDaysSpan} ngày)
-              </button>
-            </div>
-          </div>
-
-          {/* 🟢 Khung chọn ngày dạng LỊCH TUẦN 7 CỘT (Tất cả ngày luôn hiển thị đồng đều 100%, không bị cắt ngang) */}
-          <div className="grid grid-cols-7 gap-1.5 sm:gap-2">
-            {displayDays.map((day) => {
-              const dayShiftsCount = effectiveShifts.filter(
-                (s) => s.date === day.date && s.status !== 'cancelled'
-              ).length;
-              const isSelected = calendarSelectedDate === day.date;
-
-              return (
-                <button
-                  key={day.date}
-                  type="button"
-                  onClick={() => setCalendarSelectedDate(day.date)}
-                  className={`relative p-2 sm:p-2.5 rounded-2xl flex flex-col items-center justify-between text-center transition-all cursor-pointer group border ${
-                    isSelected
-                      ? 'bg-emerald-600 text-white border-emerald-600 shadow-md shadow-emerald-600/30 scale-[1.02] ring-2 ring-emerald-400/40'
-                      : day.isToday
-                      ? 'bg-emerald-50/70 text-slate-800 border-emerald-300 hover:bg-emerald-100/70 hover:border-emerald-400'
-                      : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50 hover:border-slate-300'
-                  }`}
-                >
-                  {/* Day of Week */}
-                  <span
-                    className={`text-[10px] sm:text-[11px] font-black uppercase tracking-wider ${
-                      isSelected
-                        ? 'text-emerald-100'
-                        : day.isToday
-                        ? 'text-emerald-700 font-extrabold'
-                        : 'text-slate-500'
-                    }`}
-                  >
-                    {day.day}
-                  </span>
-
-                  {/* Date Number */}
-                  <div className="my-0.5 flex items-baseline gap-0.5">
-                    <span
-                      className={`text-sm sm:text-base font-black ${
-                        isSelected
-                          ? 'text-white'
-                          : day.isToday
-                          ? 'text-emerald-950 font-black'
-                          : 'text-slate-800'
-                      }`}
-                    >
-                      {day.dayNum}
-                    </span>
-                    <span
-                      className={`text-[9px] font-bold ${
-                        isSelected ? 'text-emerald-200' : 'text-slate-400'
-                      }`}
-                    >
-                      /{day.monthNum}
-                    </span>
-                  </div>
-
-                  {/* Shift count or Today badge */}
-                  <div className="w-full mt-0.5">
-                    {day.isToday && !isSelected ? (
-                      <span className="inline-block text-[9px] font-extrabold px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
-                        Hôm nay
-                      </span>
-                    ) : (
-                      <span
-                        className={`inline-block text-[9.5px] font-bold px-1.5 py-0.5 rounded-full ${
-                          isSelected
-                            ? 'bg-white/20 text-white'
-                            : dayShiftsCount > 0
-                            ? 'bg-slate-100 text-slate-700 border border-slate-200'
-                            : 'bg-slate-50 text-slate-400 border border-slate-100'
-                        }`}
-                      >
-                        {dayShiftsCount}/{standardShifts.length} ca
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Top-right Today pulse indicator */}
-                  {day.isToday && (
-                    <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-emerald-500 ring-2 ring-emerald-300 animate-pulse" />
-                  )}
-                </button>
-              );
-            })}
-          </div>
-
-          {/* 🟢 Danh sách các ngày theo định dạng LỊCH TRỰC QUAN */}
-          <div className="space-y-4">
-            {(calendarSelectedDate === 'ALL'
-              ? displayDays
-              : displayDays.filter((d) => d.date === calendarSelectedDate).length > 0
-              ? displayDays.filter((d) => d.date === calendarSelectedDate)
-              : [
-                  {
-                    date: calendarSelectedDate,
-                    day: ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'][new Date(calendarSelectedDate).getDay()] || 'Ngày',
-                    label: `${calendarSelectedDate.split('-')[2]}/${calendarSelectedDate.split('-')[1]}`,
-                    dayNum: calendarSelectedDate.split('-')[2],
-                    monthNum: calendarSelectedDate.split('-')[1],
-                    year: parseInt(calendarSelectedDate.split('-')[0]),
-                    isToday: calendarSelectedDate === '2026-10-16',
-                  },
-                ]
-            ).map((day) => {
-              // Lấy các khung ca của ngày
-              const dayShifts = standardShifts
-                .filter((st) => shiftTypeFilter === 'ALL' || st.type === shiftTypeFilter)
-                .map((st) => {
-                  const assignedShift = effectiveShifts.find(
-                    (s) => s.date === day.date && s.shiftType === st.type && s.status !== 'cancelled'
-                  );
-                  return {
-                    meta: st,
-                    shift: assignedShift,
-                  };
-                });
-
-              // Lọc theo từ khóa tìm kiếm nếu có
-              const visibleShifts = dayShifts.filter(({ shift, meta }) => {
-                if (!listSearchQuery.trim()) return true;
-                const q = listSearchQuery.toLowerCase();
-                return (
-                  meta.name.toLowerCase().includes(q) ||
-                  (shift &&
-                    (shift.employeeName.toLowerCase().includes(q) ||
-                      (shift.courtArea && shift.courtArea.toLowerCase().includes(q)) ||
-                      (shift.taskDescription && shift.taskDescription.toLowerCase().includes(q))))
-                );
-              });
-
-              if (visibleShifts.length === 0 && listSearchQuery.trim()) {
-                return null;
-              }
-
-              return (
-                <div
-                  key={day.date}
-                  className="rounded-2xl border border-slate-200 bg-slate-50/60 p-3 sm:p-4 space-y-3"
-                >
-                  {/* Day Header */}
-                  <div className="flex items-center justify-between flex-wrap gap-2 pb-2 border-b border-slate-200/80">
-                    <div className="flex items-center gap-2">
-                      <div
-                        className={`w-8 h-8 rounded-xl flex items-center justify-center font-black text-xs ${
-                          day.isToday
-                            ? 'bg-emerald-600 text-white shadow-2xs'
-                            : 'bg-white text-slate-800 border border-slate-200'
-                        }`}
-                      >
-                        {day.day}
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs sm:text-sm font-black text-slate-900">
-                            {day.day === 'CN' ? 'Chủ Nhật' : `Thứ ${day.day.replace('T', '')}`},{' '}
-                            {day.date.split('-').reverse().join('/')}
-                          </span>
-                          {day.isToday && (
-                            <span className="text-[10px] font-black text-emerald-800 bg-emerald-100 border border-emerald-300 px-2 py-0.5 rounded-full">
-                              Hôm nay
-                            </span>
-                          )}
-                        </div>
-                        <span className="text-[10px] text-slate-500 font-medium">
-                          Khung giờ vận hành: {standardShifts[0]?.time.split('-')[0]?.trim() || '05:00'} - {standardShifts[standardShifts.length - 1]?.time.split('-')[1]?.trim() || '23:00'} ({standardShifts.length} ca tiêu chuẩn)
-                        </span>
-                      </div>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => handleOpenCreateShiftModal(undefined, day.date)}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black transition active:scale-95 cursor-pointer shadow-sm shadow-emerald-600/20"
-                      title={`Thêm ca trực mới cho ngày ${day.date.split('-').reverse().join('/')}`}
-                    >
-                      <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
-                      <span>+ Thêm ca trực</span>
-                    </button>
-                  </div>
-
-                  {/* Shifts Cards in a Responsive Grid */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                    {visibleShifts.map(({ meta, shift }) => {
-                      const hasShift = !!shift;
-                      const cellKey = `${meta.type}-${day.date}`;
-                      const isDeletedSlotInTab2 =
-                        !hasShift && !!deletedSlotsHistory[cellKey];
-
-                      const allTasks = [
-                        ...(shift?.tasks || []),
-                        ...(localAssignedTasks[shift?.id || ''] || []),
-                        shift?.taskDescription,
-                      ].filter(Boolean) as string[];
-
-                      return (
-                        <div
-                          key={meta.type}
-                          className={`rounded-2xl border p-3 flex flex-col justify-between transition-all ${
-                            hasShift
-                              ? 'bg-white border-slate-200 shadow-2xs hover:border-emerald-300 hover:shadow-sm'
-                              : isDeletedSlotInTab2
-                              ? 'bg-rose-50/30 border-dashed border-rose-300'
-                              : 'bg-white/60 border-dashed border-slate-300/80'
-                          }`}
-                        >
-                          {/* Card Top: Shift Type & Time */}
-                          <div>
-                            <div className="flex items-center justify-between gap-1.5 pb-2 border-b border-slate-100">
-                              <div className="flex items-center gap-2 min-w-0">
-                                <div
-                                  className={`w-7 h-7 rounded-xl flex items-center justify-center shrink-0 ${meta.color}`}
-                                >
-                                  <meta.icon className="w-3.5 h-3.5" />
-                                </div>
-                                <div className="min-w-0">
-                                  <div className="text-xs font-black text-slate-900 leading-tight truncate">
-                                    {meta.name}
-                                  </div>
-                                  <div className="text-[10px] font-bold text-slate-500 flex items-center gap-1 mt-0.5">
-                                    <Clock className="w-3 h-3 text-slate-400" />
-                                    <span>{meta.time} ({meta.hours || 6}h)</span>
-                                  </div>
-                                </div>
-                              </div>
-
-                              <span
-                                className={`text-[10px] font-black px-2 py-0.5 rounded-full shrink-0 ${
-                                  hasShift
-                                    ? shift.status === 'in_progress'
-                                      ? 'bg-emerald-100 text-emerald-800 animate-pulse'
-                                      : shift.status === 'completed'
-                                      ? 'bg-slate-100 text-slate-700'
-                                      : 'bg-blue-100 text-blue-800'
-                                    : isDeletedSlotInTab2
-                                    ? 'bg-rose-100 text-rose-700 border border-rose-200'
-                                    : 'bg-slate-100 text-slate-400 border border-slate-200'
-                                }`}
-                              >
-                                {hasShift
-                                  ? shift.status === 'in_progress'
-                                    ? 'Đang trực'
-                                    : shift.status === 'completed'
-                                    ? 'Đã xong'
-                                    : 'Đã nhận ca'
-                                  : isDeletedSlotInTab2
-                                  ? 'Đã xóa ca'
-                                  : 'Chưa có ca'}
-                              </span>
-                            </div>
-
-                            {/* Card Body: Staff & Tasks */}
-                            <div className="py-2.5 space-y-2">
-                              {hasShift ? (
-                                <>
-                                  {/* Nhân viên trực */}
-                                  <div className="flex items-center justify-between gap-2 p-2 rounded-xl bg-slate-50 border border-slate-100">
-                                    <div className="flex items-center gap-2 min-w-0">
-                                      <div className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-800 flex items-center justify-center font-black text-[10px] shrink-0">
-                                        {shift.employeeName.charAt(0)}
-                                      </div>
-                                      <div className="min-w-0">
-                                        <div className="text-xs font-bold text-slate-900 truncate">
-                                          {shift.employeeName}
-                                        </div>
-                                        <div className="text-[10px] text-slate-500 font-medium flex items-center gap-1 truncate">
-                                          <MapPin className="w-3 h-3 text-slate-400 shrink-0" />
-                                          <span className="truncate">
-                                            {shift.courtArea || 'Toàn bộ 8 sân'}
-                                          </span>
-                                        </div>
-                                      </div>
-                                    </div>
-                                    <span className="text-[9px] font-mono font-bold text-slate-400 bg-white px-1.5 py-0.5 rounded border border-slate-200/80">
-                                      {shift.id}
-                                    </span>
-                                  </div>
-
-                                  {/* Danh sách nhiệm vụ công việc */}
-                                  {allTasks.length > 0 && (
-                                    <div className="space-y-1">
-                                      <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider block">
-                                        Nhiệm vụ ca ({allTasks.length})
-                                      </span>
-                                      <div className="space-y-1">
-                                        {allTasks.map((t, idx) => (
-                                          <div
-                                            key={idx}
-                                            className="flex items-start gap-1.5 p-1.5 rounded-lg bg-emerald-50/70 border border-emerald-200/60 text-xs text-slate-800 font-medium"
-                                          >
-                                            <CheckSquare className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
-                                            <span className="text-[11px] leading-snug">{t}</span>
-                                          </div>
-                                        ))}
-                                      </div>
-                                    </div>
-                                  )}
-                                </>
-                              ) : isDeletedSlotInTab2 ? (
-                                <div className="p-3.5 rounded-xl bg-rose-50/60 border border-dashed border-rose-300 text-center space-y-1">
-                                  <div className="text-xs font-black text-rose-700 flex items-center justify-center gap-1">
-                                    <Trash2 className="w-3.5 h-3.5 text-rose-600 shrink-0" />
-                                    <span>Ca trực đã xóa khỏi lịch</span>
-                                  </div>
-                                  <span className="text-[10px] text-slate-500 font-medium block">
-                                    Khung giờ đang trống, có thể bấm nút bên dưới để thêm lại
-                                  </span>
-                                </div>
-                              ) : (
-                                <div className="p-3.5 rounded-xl bg-slate-50/70 border border-dashed border-slate-300/80 text-center space-y-1">
-                                  <span className="text-xs font-bold text-slate-500 block">
-                                    Chưa kích hoạt ca này
-                                  </span>
-                                  <span className="text-[10px] text-slate-400 font-medium block">
-                                    Khung giờ trống chưa có ca trực trên lịch
-                                  </span>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-
-                          {/* Card Bottom: Chỉ THÊM CA hoặc XÓA CA KHỎI LỊCH */}
-                          <div className="pt-2 border-t border-slate-100">
-                            {hasShift ? (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setSelectedShiftForDelete(shift);
-                                  setDeleteActionContext('delete_shift');
-                                  setIsPermanentDelete(true);
-                                  setCancelReason('Chủ sân xóa ca khỏi lịch');
-                                  setDeleteError(null);
-                                }}
-                                className="w-full inline-flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-rose-50 hover:bg-rose-600 hover:text-white active:scale-95 text-rose-600 font-bold text-xs border border-rose-200 transition cursor-pointer shadow-2xs"
-                                title={`Xóa ca trực ${shift.shiftName} (${shift.employeeName}) khỏi lịch`}
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                                <span>Xóa ca khỏi lịch</span>
-                              </button>
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={() => handleOpenCreateShiftModal(meta.type, day.date)}
-                                className="w-full inline-flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-black text-xs shadow-sm shadow-emerald-600/20 transition cursor-pointer"
-                                title={`Thêm ca trực ${meta.name} cho ngày ${day.date.split('-').reverse().join('/')}`}
-                              >
-                                <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
-                                <span>{isDeletedSlotInTab2 ? '+ Thêm lại ca trực này' : '+ Thêm ca trực này'}</span>
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* 🟢 KHU VỰC THÊM: CA TRỰC HÔM NAY & NHIỆM VỤ (DÀNH CHO NHÂN VIÊN) */}
-      {!isAdmin && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {/* Card Ca trực hôm nay */}
-          <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-2xs space-y-3">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
-              <div className="flex items-center gap-2">
-                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-200">
-                  <Flame className="w-4 h-4 text-emerald-600" />
-                </div>
-                <div>
-                  <h3 className="text-xs font-black uppercase text-slate-900 tracking-tight">
-                    Ca trực hôm nay của bạn
-                  </h3>
-                  <p className="text-[10px] text-slate-500 font-medium">Thứ 6, 16/10/2026</p>
-                </div>
-              </div>
-              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-black border border-emerald-200">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-600 animate-pulse" />
-                ĐANG DIỄN RA
-              </span>
-            </div>
-
-            <div className="rounded-2xl bg-slate-50 p-3 space-y-2.5 text-xs border border-slate-100">
-              <div className="flex items-start justify-between gap-2">
-                <span className="text-[11px] font-medium text-slate-500 shrink-0">Khung ca:</span>
-                <span className="font-black text-slate-900 text-right">Ca 2: Chiều & Giải đấu</span>
-              </div>
-              <div className="flex items-start justify-between gap-2">
-                <span className="text-[11px] font-medium text-slate-500 shrink-0">Giờ trực:</span>
-                <span className="font-bold text-emerald-700 text-right flex items-center gap-1">
-                  <Clock className="w-3.5 h-3.5 shrink-0" />
-                  11:00 – 17:00 (6h)
-                </span>
-              </div>
-              <div className="flex items-start justify-between gap-2">
-                <span className="text-[11px] font-medium text-slate-500 shrink-0">Khu vực:</span>
-                <span className="font-bold text-slate-800 text-right flex items-center gap-1">
-                  <MapPin className="w-3.5 h-3.5 shrink-0 text-slate-400" />
-                  Sân 01 - 04 & Kho thiết bị
-                </span>
-              </div>
-              <div className="flex items-start justify-between gap-2">
-                <span className="text-[11px] font-medium text-slate-500 shrink-0">Đồng nghiệp:</span>
-                <span className="font-bold text-slate-800 text-right">Trần Thị Bình (NV-02)</span>
-              </div>
-            </div>
-
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 pt-1">
-              <div className="flex-1 rounded-xl bg-emerald-50 border border-emerald-200 px-3 py-2 text-center">
-                <span className="text-[11px] font-bold text-emerald-800 block">
-                  ✓ Đã Check-in: 10:55 (Đúng giờ)
-                </span>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setSuccessToast('Đã lưu báo cáo & bàn giao ca trực thành công!');
-                  setTimeout(() => setSuccessToast(null), 3000);
-                }}
-                className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs shadow-2xs active:scale-95 transition cursor-pointer text-center shrink-0"
-              >
-                Báo cáo ca
-              </button>
-            </div>
-          </div>
-
-          {/* Checklist nhiệm vụ ca trực */}
-          <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-2xs space-y-3">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
-              <div className="flex items-center gap-2 min-w-0">
-                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-blue-50 text-blue-600 border border-blue-200 shrink-0">
-                  <ClipboardList className="w-4 h-4 text-blue-600" />
-                </div>
-                <div className="min-w-0">
-                  <h3 className="text-xs font-black uppercase text-slate-900 tracking-tight truncate">
-                    Checklist nhiệm vụ ca
-                  </h3>
-                  <p className="text-[10px] text-slate-500 font-medium truncate">
-                    Tiêu chuẩn vận hành CourtX
-                  </p>
-                </div>
-              </div>
-              <span className="text-[11px] font-black text-slate-700 bg-slate-100 px-2 py-0.5 rounded-lg shrink-0">
-                {Object.values(taskChecklist).filter(Boolean).length}/4
-              </span>
-            </div>
-
-            <div className="space-y-2 text-xs">
-              {[
-                { id: 't1', title: 'Nhận bàn giao ca 1 & kiểm kê số lượng thiết bị tại kho' },
-                { id: 't2', title: 'Đón tiếp các CLB chiều & chuẩn bị thiết bị giải đấu phong trào' },
-                { id: 't3', title: 'Kiểm tra điều phối thiết bị lưu động vào sân khi khách đặt' },
-                { id: 't4', title: 'Bàn giao ca 3 (17:00) cho ca trực tối & chuẩn bị đóng sân' },
-              ].map((task) => {
-                const isDone = taskChecklist[task.id];
-                return (
-                  <button
-                    key={task.id}
-                    type="button"
-                    onClick={() => toggleTask(task.id)}
-                    className={`w-full flex items-start gap-2.5 p-2 rounded-xl border text-left transition cursor-pointer ${
-                      isDone
-                        ? 'bg-emerald-50/60 border-emerald-200 text-emerald-900 font-medium'
-                        : 'bg-slate-50/70 border-slate-200 text-slate-700 hover:bg-slate-100'
-                    }`}
-                  >
-                    {isDone ? (
-                      <CheckSquare className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                    ) : (
-                      <Square className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
-                    )}
-                    <span className={`text-[11px] ${isDone ? 'line-through opacity-75' : ''}`}>
-                      {task.title}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* 🟢 KHU VỰC THÔNG TIN: QUY CHUẨN 3 KHUNG CA */}
       <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-2xs space-y-3">
         <div className="flex items-center gap-2">
           <Info className="w-4 h-4 text-slate-500" />
           <h3 className="text-xs font-black uppercase text-slate-900 tracking-tight">
-            Quy chuẩn 3 khung ca trực tại Nhà thi đấu CourtX
+            Quy chuẩn các khung ca trực tại Nhà thi đấu CourtX
           </h3>
         </div>
 
@@ -2599,199 +3385,7 @@ export default function ShiftScheduleView({
         </div>
       )}
 
-      {/* 🟢 MODAL THÊM CA TRỰC VÀO LỊCH (DÀNH CHO CHỦ SÂN / ADMIN) */}
-      {showCreateShiftModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="w-full max-w-lg rounded-3xl bg-white p-5 shadow-2xl space-y-4 animate-in zoom-in-95 duration-150 border border-slate-100 max-h-[90vh] overflow-y-auto">
-            {/* Header */}
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <div className="flex items-center gap-2.5">
-                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600 border border-emerald-200 shadow-2xs">
-                  <Calendar className="w-5 h-5 stroke-[2.2]" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-black text-slate-900 uppercase">
-                    Thêm ca trực vào lịch
-                  </h3>
-                  <p className="text-[10px] text-slate-500 font-medium">
-                    Khởi tạo ca làm việc và phân công nhân sự trên lịch vận hành
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowCreateShiftModal(false)}
-                className="text-slate-400 hover:text-slate-700 cursor-pointer p-1 rounded-lg hover:bg-slate-100 transition"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
 
-            {/* Form Fields */}
-            <div className="space-y-3.5 text-xs">
-              {/* 1. Chọn ngày trực */}
-              <div>
-                <label className="block text-xs font-bold text-slate-800 mb-1.5">
-                  Ngày trực <span className="text-rose-500">*</span>
-                </label>
-                {/* Quick date chips from current week */}
-                <div className="grid grid-cols-4 sm:grid-cols-7 gap-1.5 mb-2">
-                  {weekDays.map((d) => {
-                    const isSelected = createShiftDate === d.date;
-                    return (
-                      <button
-                        key={d.date}
-                        type="button"
-                        onClick={() => {
-                          setCreateShiftDate(d.date);
-                          setCreateShiftError(null);
-                        }}
-                        className={`py-1.5 px-1 rounded-xl border text-center transition cursor-pointer text-[10px] ${
-                          isSelected
-                            ? 'bg-emerald-600 border-emerald-600 text-white font-black shadow-2xs'
-                            : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100 font-bold'
-                        }`}
-                      >
-                        <div className="leading-tight">{d.day}</div>
-                        <div className="text-[9px] opacity-80">{d.label}</div>
-                      </button>
-                    );
-                  })}
-                </div>
-                <input
-                  type="date"
-                  value={createShiftDate}
-                  onChange={(e) => {
-                    setCreateShiftDate(e.target.value);
-                    setCreateShiftError(null);
-                  }}
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-xs font-bold text-slate-800 outline-none focus:border-emerald-500 focus:bg-white transition"
-                />
-              </div>
-
-              {/* 2. Chọn khung ca làm */}
-              <div>
-                <label className="block text-xs font-bold text-slate-800 mb-1.5">
-                  Khung ca trực tiêu chuẩn (05:00 - 23:00) <span className="text-rose-500">*</span>
-                </label>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                  {standardShifts.map((st) => {
-                    const isSelected = createShiftType === st.type;
-                    return (
-                      <button
-                        key={st.type}
-                        type="button"
-                        onClick={() => {
-                          setCreateShiftType(st.type);
-                          setCreateShiftError(null);
-                        }}
-                        className={`p-2.5 rounded-2xl border text-left transition cursor-pointer relative ${
-                          isSelected
-                            ? 'border-emerald-500 bg-emerald-50/60 shadow-2xs ring-1 ring-emerald-500'
-                            : 'border-slate-200 bg-slate-50 hover:bg-white'
-                        }`}
-                      >
-                        <div className="flex items-center gap-1.5 mb-1">
-                          <st.icon className={`w-3.5 h-3.5 ${isSelected ? 'text-emerald-700' : 'text-slate-500'}`} />
-                          <span className={`font-black text-xs ${isSelected ? 'text-emerald-900' : 'text-slate-800'}`}>
-                            {st.type}
-                          </span>
-                        </div>
-                        <div className="text-[10px] font-bold text-slate-500">
-                          {st.time} (6h)
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* 3. Phân công nhân sự */}
-              <div>
-                <label className="block text-xs font-bold text-slate-800 mb-1.5">
-                  Nhân sự trực ca
-                </label>
-                <select
-                  value={createShiftEmployeeId}
-                  onChange={(e) => setCreateShiftEmployeeId(e.target.value)}
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-xs font-bold text-slate-800 outline-none focus:border-emerald-500 focus:bg-white transition cursor-pointer"
-                >
-                  <option value="">-- Mở ca trống (Để nhân viên tự nhận ca) --</option>
-                  {employees.map((emp) => (
-                    <option key={emp.id} value={emp.id}>
-                      {emp.name} ({emp.role}) - SĐT: {emp.phone}
-                    </option>
-                  ))}
-                </select>
-                <p className="text-[10px] text-slate-400 mt-1 font-medium">
-                  {createShiftEmployeeId
-                    ? 'Nhân viên được chọn sẽ nhận ca và hiển thị phân công trên lịch.'
-                    : 'Nếu để trống, ca trực sẽ ở trạng thái mở cho nhân viên tự đăng ký.'}
-                </p>
-              </div>
-
-              {/* 4. Khu vực phụ trách */}
-              <div>
-                <label className="block text-xs font-bold text-slate-800 mb-1.5">
-                  Khu vực sân phụ trách
-                </label>
-                <select
-                  value={createShiftArea}
-                  onChange={(e) => setCreateShiftArea(e.target.value)}
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-xs font-bold text-slate-800 outline-none focus:border-emerald-500 focus:bg-white transition cursor-pointer"
-                >
-                  <option value="Toàn bộ 8 sân">Toàn bộ 8 sân (Sân 01 - 08)</option>
-                  <option value="Cụm Sân 01 - 04">Cụm Sân 01 - 04 (Khu A)</option>
-                  <option value="Cụm Sân 05 - 08">Cụm Sân 05 - 08 (Khu B)</option>
-                  <option value="Khu vực Sân VIP & Khán đài">Khu vực Sân VIP & Khán đài</option>
-                  <option value="Khu vực Quầy lễ tân & Dịch vụ">Khu vực Quầy lễ tân & Dịch vụ</option>
-                </select>
-              </div>
-
-              {/* 5. Ghi chú / Nhiệm vụ ban đầu */}
-              <div>
-                <label className="block text-xs font-bold text-slate-800 mb-1.5">
-                  Ghi chú hoặc nhiệm vụ ban đầu cho ca
-                </label>
-                <input
-                  type="text"
-                  placeholder="Ví dụ: Mở sân 05:00, kiểm tra hệ thống đèn chiếu sáng & chuẩn bị thảm..."
-                  value={createShiftNotes}
-                  onChange={(e) => setCreateShiftNotes(e.target.value)}
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-xs font-medium text-slate-800 outline-none focus:border-emerald-500 focus:bg-white transition"
-                />
-              </div>
-
-              {/* Error Message */}
-              {createShiftError && (
-                <div className="flex items-center gap-1.5 p-2.5 rounded-xl bg-rose-50 border border-rose-200 text-xs font-bold text-rose-700">
-                  <AlertTriangle className="w-4 h-4 shrink-0 text-rose-600" />
-                  <span>{createShiftError}</span>
-                </div>
-              )}
-            </div>
-
-            {/* Footer Buttons */}
-            <div className="grid grid-cols-2 gap-2.5 pt-2 border-t border-slate-100">
-              <button
-                type="button"
-                onClick={() => setShowCreateShiftModal(false)}
-                className="rounded-xl border border-slate-200 py-3 text-xs font-bold text-slate-600 hover:bg-slate-50 active:scale-95 transition cursor-pointer"
-              >
-                Hủy bỏ
-              </button>
-              <button
-                type="button"
-                onClick={handleConfirmCreateShift}
-                className="rounded-xl bg-emerald-600 hover:bg-emerald-700 py-3 text-xs font-black text-white shadow-md shadow-emerald-600/25 active:scale-95 transition cursor-pointer flex items-center justify-center gap-1.5"
-              >
-                <Plus className="w-4 h-4 stroke-[2.5]" />
-                <span>Xác nhận thêm ca</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* 🟢 MODAL 2: GIAO VIỆC / THÊM CÔNG VIỆC CHO CA TRỰC (DÀNH CHO ADMIN) */}
       {taskModalData && (
@@ -3058,663 +3652,16 @@ export default function ShiftScheduleView({
         </div>
       )}
 
-      {/* 🟢 MODAL QUẢN TRỊ CƠ CẤU CA & THAO TÁC CA HÀNG LOẠT (ĐỔI CƠ CẤU CA | XÓA CA HÀNG LOẠT) */}
-      {showBulkModal && (
-        <div className="fixed inset-0 z-[250] bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-in fade-in duration-200">
-          <div className="relative w-full max-w-2xl bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[92vh]">
-            {/* Modal Header */}
-            <div className="flex items-center justify-between p-3.5 sm:p-5 border-b border-slate-100 bg-slate-50/80">
-              <div className="flex items-center gap-2.5">
-                <div
-                  className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl flex items-center justify-center shadow-sm ${
-                    bulkTab === 'structure' ? 'bg-slate-900 text-white' : 'bg-rose-600 text-white'
-                  }`}
-                >
-                  {bulkTab === 'structure' ? (
-                    <Sliders className="w-4 h-4 sm:w-5 sm:h-5 text-amber-400" />
-                  ) : (
-                    <Trash2 className="w-4 h-4 sm:w-5 sm:h-5" />
-                  )}
-                </div>
-                <div>
-                  <h3 className="text-sm sm:text-base font-black text-slate-900">
-                    {bulkTab === 'structure'
-                      ? 'Cấu hình Cơ cấu Ca Trực (Shift Structure)'
-                      : 'Xóa Ca Trực Hàng Loạt'}
-                  </h3>
-                  <p className="text-[11px] sm:text-xs text-slate-500 font-medium">
-                    {bulkTab === 'structure'
-                      ? 'Tùy chỉnh số lượng khung ca, thời gian bắt đầu/kết thúc hoặc áp dụng mẫu quy chuẩn'
-                      : 'Dọn sạch ca trực theo khoảng ngày hoặc gỡ phân công nhân sự'}
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowBulkModal(false)}
-                className="h-8 w-8 rounded-full bg-slate-200/70 hover:bg-slate-300 text-slate-600 flex items-center justify-center transition cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
 
-            {/* 2 Tabs Navigation: Đổi cơ cấu ca | Xóa ca hàng loạt */}
-            <div className="flex items-center border-b border-slate-100 bg-white px-3 sm:px-4 pt-1.5 gap-1">
-              <button
-                type="button"
-                onClick={() => {
-                  setEditingShifts(standardShifts);
-                  setBulkTab('structure');
-                }}
-                className={`flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 sm:px-4 py-2.5 text-xs font-black border-b-2 transition cursor-pointer ${
-                  bulkTab === 'structure'
-                    ? 'border-slate-900 text-slate-900 bg-slate-100/70 rounded-t-xl'
-                    : 'border-transparent text-slate-500 hover:text-slate-800'
-                }`}
-              >
-                <Sliders className="w-3.5 h-3.5 text-amber-500" />
-                <span>Đổi cơ cấu ca</span>
-              </button>
 
-              <button
-                type="button"
-                onClick={() => setBulkTab('delete')}
-                className={`flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 sm:px-4 py-2.5 text-xs font-black border-b-2 transition cursor-pointer ${
-                  bulkTab === 'delete'
-                    ? 'border-rose-500 text-rose-700 bg-rose-50/60 rounded-t-xl'
-                    : 'border-transparent text-slate-500 hover:text-slate-800'
-                }`}
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-                <span>Xóa ca hàng loạt</span>
-              </button>
-            </div>
+      {/* 🟢 MODAL CHI TIẾT CA TRỰC (KHI BẤM VÀO CỤC CA TRỰC) */}
+      {renderShiftDetailModal()}
 
-            {/* Modal Body */}
-            {bulkTab === 'structure' ? (
-              <div className="p-4 sm:p-5 overflow-y-auto space-y-5 flex-1 custom-scrollbar">
-                {/* Preset Templates */}
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-black uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
-                      <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                      <span>Mẫu cơ cấu ca quy chuẩn (Chọn áp dụng nhanh):</span>
-                    </span>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {SHIFT_STRUCTURE_PRESETS.map((preset) => (
-                      <button
-                        key={preset.id}
-                        type="button"
-                        onClick={() => {
-                          setEditingShifts(preset.shifts);
-                          setStructureShiftTypes(preset.shifts.map((s) => s.type));
-                        }}
-                        className="p-3 rounded-2xl border text-left transition cursor-pointer bg-slate-50 hover:bg-emerald-50/50 hover:border-emerald-300 group border-slate-200"
-                      >
-                        <div className="flex items-center justify-between gap-1">
-                          <span className="text-xs font-black text-slate-900 group-hover:text-emerald-700">
-                            {preset.title}
-                          </span>
-                          <span className="text-[9px] font-extrabold px-1.5 py-0.2 rounded-full bg-slate-200 group-hover:bg-emerald-200 group-hover:text-emerald-800 text-slate-700">
-                            {preset.badge}
-                          </span>
-                        </div>
-                        <p className="text-[10.5px] text-slate-500 mt-1 leading-snug">
-                          {preset.desc}
-                        </p>
-                        <div className="flex items-center gap-1.5 mt-2 flex-wrap">
-                          {preset.shifts.map((s) => (
-                            <span
-                              key={s.type}
-                              className="text-[9.5px] font-bold px-1.5 py-0.5 rounded-lg bg-white border border-slate-200 text-slate-700"
-                            >
-                              {s.type}: {s.time}
-                            </span>
-                          ))}
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* List of Shifts in Structure */}
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-black uppercase tracking-wider text-slate-700">
-                      Chi tiết các khung ca đang áp dụng ({editingShifts.length} ca):
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const nextIdx = editingShifts.length + 1;
-                        const newShiftType = `Ca ${nextIdx}`;
-                        setEditingShifts([
-                          ...editingShifts,
-                          {
-                            type: newShiftType,
-                            name: `${newShiftType}: Ca tăng cường`,
-                            time: '18:00 - 22:00',
-                            hours: 4,
-                            icon: Sunset,
-                            color: 'border-indigo-200 bg-indigo-50/80 text-indigo-900',
-                            accentColor: 'text-indigo-700',
-                            badgeColor: 'bg-indigo-100 text-indigo-800',
-                            description: 'Ca tăng cường theo nhu cầu vận hành',
-                            subNote: 'Ca bổ sung',
-                            wageMultiplier: 1.0,
-                            isActive: true,
-                          },
-                        ]);
-                      }}
-                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-bold border border-emerald-200 transition cursor-pointer"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                      <span>Thêm khung ca mới</span>
-                    </button>
-                  </div>
-
-                  <div className="space-y-2.5">
-                    {editingShifts.map((sh, idx) => (
-                      <div
-                        key={idx}
-                        className="p-3 rounded-2xl border border-slate-200 bg-white shadow-2xs space-y-2"
-                      >
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="flex items-center gap-2">
-                            <span className="w-6 h-6 rounded-lg bg-slate-900 text-white text-[11px] font-black flex items-center justify-center">
-                              {idx + 1}
-                            </span>
-                            <input
-                              type="text"
-                              value={sh.name}
-                              onChange={(e) => {
-                                const updated = [...editingShifts];
-                                updated[idx] = { ...sh, name: e.target.value };
-                                setEditingShifts(updated);
-                              }}
-                              className="text-xs font-black text-slate-900 border-b border-dashed border-slate-300 focus:border-emerald-500 outline-none pb-0.5 bg-transparent"
-                              placeholder="Tên khung ca..."
-                            />
-                          </div>
-
-                          {editingShifts.length > 1 && (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setEditingShifts(editingShifts.filter((_, i) => i !== idx));
-                              }}
-                              className="h-6 w-6 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 flex items-center justify-center transition cursor-pointer"
-                              title="Xóa khung ca này khỏi cơ cấu"
-                            >
-                              <Trash2 className="w-3 h-3" />
-                            </button>
-                          )}
-                        </div>
-
-                        <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 pt-1 text-xs">
-                          <div className="sm:col-span-6">
-                            <label className="text-[10px] font-bold text-slate-500 uppercase">Khung giờ:</label>
-                            <input
-                              type="text"
-                              value={sh.time}
-                              onChange={(e) => {
-                                const updated = [...editingShifts];
-                                updated[idx] = { ...sh, time: e.target.value };
-                                setEditingShifts(updated);
-                              }}
-                              className="w-full mt-0.5 px-2.5 py-1.5 rounded-xl border border-slate-200 bg-slate-50 text-xs font-bold text-slate-800 outline-none focus:border-emerald-500"
-                              placeholder="VD: 06:00 - 14:00"
-                            />
-                          </div>
-
-                          <div className="grid grid-cols-2 gap-2 sm:col-span-6">
-                            <div>
-                              <label className="text-[10px] font-bold text-slate-500 uppercase">Giờ công:</label>
-                              <input
-                                type="number"
-                                step="0.5"
-                                value={sh.hours}
-                                onChange={(e) => {
-                                  const updated = [...editingShifts];
-                                  updated[idx] = { ...sh, hours: parseFloat(e.target.value) || 0 };
-                                  setEditingShifts(updated);
-                                }}
-                                className="w-full mt-0.5 px-2.5 py-1.5 rounded-xl border border-slate-200 bg-slate-50 text-xs font-bold text-slate-800 outline-none focus:border-emerald-500"
-                              />
-                            </div>
-
-                            <div>
-                              <label className="text-[10px] font-bold text-slate-500 uppercase">Hệ số lương:</label>
-                              <input
-                                type="number"
-                                step="0.1"
-                                value={sh.wageMultiplier || 1.0}
-                                onChange={(e) => {
-                                  const updated = [...editingShifts];
-                                  updated[idx] = { ...sh, wageMultiplier: parseFloat(e.target.value) || 1.0 };
-                                  setEditingShifts(updated);
-                                }}
-                                className="w-full mt-0.5 px-2.5 py-1.5 rounded-xl border border-slate-200 bg-slate-50 text-xs font-bold text-slate-800 outline-none focus:border-emerald-500"
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* 🟢 PHẠM VI ÁP DỤNG & NHIỆM VỤ BÀN GIAO (MỤC 1, 2, 3, 6) */}
-                <div className="pt-4 border-t border-slate-200 space-y-4">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-black uppercase tracking-wider text-slate-800">
-                      Thiết lập phạm vi áp dụng cơ cấu ca
-                    </span>
-                    <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">
-                      Linh hoạt theo ngày & thứ
-                    </span>
-                  </div>
-
-                  {/* 1. Khoảng ngày áp dụng */}
-                  <div>
-                    <label className="text-[11px] font-black uppercase text-slate-700 tracking-wider">
-                      1. Khoảng ngày áp dụng:
-                    </label>
-                    <div className="grid grid-cols-2 gap-2 mt-1.5">
-                      <div>
-                        <span className="text-[10px] font-bold text-slate-400">Từ ngày:</span>
-                        <input
-                          type="date"
-                          value={structureStartDate}
-                          onChange={(e) => setStructureStartDate(e.target.value)}
-                          className="w-full mt-0.5 px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-800 bg-slate-50 outline-none focus:border-amber-500"
-                        />
-                      </div>
-                      <div>
-                        <span className="text-[10px] font-bold text-slate-400">Đến ngày:</span>
-                        <input
-                          type="date"
-                          value={structureEndDate}
-                          onChange={(e) => setStructureEndDate(e.target.value)}
-                          className="w-full mt-0.5 px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-800 bg-slate-50 outline-none focus:border-amber-500"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* 2. Áp dụng cho các thứ trong tuần */}
-                  <div>
-                    <div className="flex items-center justify-between">
-                      <label className="text-[11px] font-black uppercase text-slate-700 tracking-wider">
-                        2. Áp dụng cho các thứ trong tuần:
-                      </label>
-                      <div className="flex items-center gap-2 text-xs font-bold text-emerald-700">
-                        <button
-                          type="button"
-                          onClick={() => setStructureDaysOfWeek(['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'])}
-                          className="hover:underline cursor-pointer"
-                        >
-                          Tất cả
-                        </button>
-                        <span>•</span>
-                        <button
-                          type="button"
-                          onClick={() => setStructureDaysOfWeek(['T2', 'T3', 'T4', 'T5', 'T6'])}
-                          className="hover:underline cursor-pointer"
-                        >
-                          T2 – T6
-                        </button>
-                        <span>•</span>
-                        <button
-                          type="button"
-                          onClick={() => setStructureDaysOfWeek(['T7', 'CN'])}
-                          className="hover:underline cursor-pointer"
-                        >
-                          T7, CN
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-7 gap-1.5 mt-2">
-                      {['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'].map((d) => {
-                        const isSelected = structureDaysOfWeek.includes(d);
-                        return (
-                          <button
-                            key={d}
-                            type="button"
-                            onClick={() => {
-                              if (isSelected) {
-                                if (structureDaysOfWeek.length > 1) {
-                                  setStructureDaysOfWeek(structureDaysOfWeek.filter((item) => item !== d));
-                                }
-                              } else {
-                                setStructureDaysOfWeek([...structureDaysOfWeek, d]);
-                              }
-                            }}
-                            className={`py-2 px-1 rounded-xl text-xs font-black transition cursor-pointer text-center ${
-                              isSelected
-                                ? 'bg-amber-500 text-white shadow-sm'
-                                : 'bg-slate-50 border border-slate-200 text-slate-700 hover:bg-slate-100'
-                            }`}
-                          >
-                            {d}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* 3. Chọn các khung ca áp dụng */}
-                  <div>
-                    <div className="flex items-center justify-between">
-                      <label className="text-[11px] font-black uppercase text-slate-700 tracking-wider">
-                        3. Chọn các khung ca muốn áp dụng:
-                      </label>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const allTypes = editingShifts.map((s) => s.type);
-                          if (structureShiftTypes.length === allTypes.length) {
-                            setStructureShiftTypes([allTypes[0]]);
-                          } else {
-                            setStructureShiftTypes(allTypes);
-                          }
-                        }}
-                        className="text-xs font-bold text-emerald-700 hover:underline cursor-pointer"
-                      >
-                        {structureShiftTypes.length === editingShifts.length ? 'Chọn lại' : 'Chọn tất cả'}
-                      </button>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-1.5">
-                      {editingShifts.map((st) => {
-                        const checked = structureShiftTypes.includes(st.type);
-                        return (
-                          <button
-                            key={st.type}
-                            type="button"
-                            onClick={() => {
-                              if (checked) {
-                                if (structureShiftTypes.length > 1) {
-                                  setStructureShiftTypes(structureShiftTypes.filter((t) => t !== st.type));
-                                }
-                              } else {
-                                setStructureShiftTypes([...structureShiftTypes, st.type]);
-                              }
-                            }}
-                            className={`p-2.5 rounded-2xl border text-left transition cursor-pointer flex items-center justify-between ${
-                              checked
-                                ? 'bg-amber-50/70 border-amber-400 text-amber-950 shadow-2xs'
-                                : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
-                            }`}
-                          >
-                            <div>
-                              <div className="text-xs font-black">{st.name.split(':')[0]}</div>
-                              <div className="text-[10px] text-slate-500 font-bold">{st.time}</div>
-                            </div>
-                            {checked ? (
-                              <CheckCircle2 className="w-4 h-4 text-amber-600 shrink-0" />
-                            ) : (
-                              <div className="w-4 h-4 rounded-full border border-slate-300 shrink-0" />
-                            )}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* 6. Nhiệm vụ mẫu bàn giao cho ca */}
-                  <div>
-                    <label className="text-[11px] font-black uppercase text-slate-700 tracking-wider">
-                      6. Nhiệm vụ mẫu bàn giao cho ca:
-                    </label>
-                    <div className="space-y-1.5 mt-1.5">
-                      {structureTasks.map((t, idx) => {
-                        const isChecked = selectedStructureTasks.includes(t);
-                        return (
-                          <label
-                            key={idx}
-                            className={`flex items-center gap-2.5 p-2.5 rounded-2xl border transition cursor-pointer ${
-                              isChecked
-                                ? 'bg-amber-50/50 border-amber-300 text-slate-900'
-                                : 'bg-slate-50 border-slate-200 text-slate-500'
-                            }`}
-                          >
-                            <input
-                              type="checkbox"
-                              checked={isChecked}
-                              onChange={() => {
-                                if (isChecked) {
-                                  setSelectedStructureTasks(selectedStructureTasks.filter((item) => item !== t));
-                                } else {
-                                  setSelectedStructureTasks([...selectedStructureTasks, t]);
-                                }
-                              }}
-                              className="w-4 h-4 rounded accent-amber-600 cursor-pointer shrink-0"
-                            />
-                            <span className="flex-1 text-xs font-semibold leading-snug">{t}</span>
-                            {structureTasks.length > 1 && (
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  setStructureTasks(structureTasks.filter((_, i) => i !== idx));
-                                  setSelectedStructureTasks(selectedStructureTasks.filter((item) => item !== t));
-                                }}
-                                className="text-slate-400 hover:text-rose-500 p-0.5 transition cursor-pointer shrink-0"
-                                title="Xóa nhiệm vụ này khỏi mẫu"
-                              >
-                                <X className="w-3.5 h-3.5" />
-                              </button>
-                            )}
-                          </label>
-                        );
-                      })}
-                    </div>
-
-                    <div className="flex gap-2 mt-2">
-                      <input
-                        type="text"
-                        placeholder="Thêm nhiệm vụ tùy biến khác..."
-                        value={structureCustomTaskInput}
-                        onChange={(e) => setStructureCustomTaskInput(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            e.preventDefault();
-                            handleAddStructureTask();
-                          }
-                        }}
-                        className="flex-1 px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-xs font-medium text-slate-800 outline-none focus:border-amber-500 focus:bg-white"
-                      />
-                      <button
-                        type="button"
-                        onClick={handleAddStructureTask}
-                        className="px-3.5 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-black transition active:scale-95 cursor-pointer whitespace-nowrap shadow-sm shadow-amber-600/20"
-                      >
-                        Thêm việc
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="p-4 sm:p-5 overflow-y-auto space-y-4 flex-1 custom-scrollbar">
-                <div className="rounded-2xl bg-rose-50 border border-rose-200 p-3 flex items-start gap-2.5">
-                  <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
-                  <p className="text-xs text-rose-900 leading-relaxed font-medium">
-                    <strong>Lưu ý quan trọng:</strong> Chức năng này cho phép dọn sạch hoặc hủy hàng loạt các ca trực trên lịch theo khoảng ngày mà không cần bấm xóa từng ô.
-                  </p>
-                </div>
-
-                <div>
-                  <label className="text-[11px] font-black uppercase text-slate-700 tracking-wider">
-                    1. Khoảng ngày cần xóa:
-                  </label>
-                  <div className="grid grid-cols-2 gap-2 mt-1.5">
-                    <div>
-                      <span className="text-[10px] font-bold text-slate-400">Từ ngày:</span>
-                      <input
-                        type="date"
-                        value={bulkDeleteStartDate}
-                        onChange={(e) => setBulkDeleteStartDate(e.target.value)}
-                        className="w-full mt-0.5 px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-800 bg-slate-50 outline-none focus:border-rose-500"
-                      />
-                    </div>
-                    <div>
-                      <span className="text-[10px] font-bold text-slate-400">Đến ngày:</span>
-                      <input
-                        type="date"
-                        value={bulkDeleteEndDate}
-                        onChange={(e) => setBulkDeleteEndDate(e.target.value)}
-                        className="w-full mt-0.5 px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-800 bg-slate-50 outline-none focus:border-rose-500"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="text-[11px] font-black uppercase text-slate-700 tracking-wider">
-                    2. Chọn các khung ca cần xóa:
-                  </label>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-1.5">
-                    {standardShifts.map((st) => {
-                      const checked = bulkDeleteShiftTypes.includes(st.type);
-                      return (
-                        <button
-                          key={st.type}
-                          type="button"
-                          onClick={() => {
-                            if (checked) {
-                              setBulkDeleteShiftTypes(bulkDeleteShiftTypes.filter((t) => t !== st.type));
-                            } else {
-                              setBulkDeleteShiftTypes([...bulkDeleteShiftTypes, st.type]);
-                            }
-                          }}
-                          className={`p-2.5 rounded-2xl border text-left transition cursor-pointer flex items-center justify-between ${
-                            checked
-                              ? 'bg-rose-50 border-rose-300 text-rose-900 shadow-2xs'
-                              : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
-                          }`}
-                        >
-                          <div>
-                            <div className="text-xs font-black">{st.name.split(':')[0]}</div>
-                            <div className="text-[10px] text-slate-500 font-bold">{st.time}</div>
-                          </div>
-                          {checked ? (
-                            <CheckCircle2 className="w-4 h-4 text-rose-600" />
-                          ) : (
-                            <div className="w-4 h-4 rounded-full border border-slate-300" />
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                <div>
-                  <label className="text-[11px] font-black uppercase text-slate-700 tracking-wider">
-                    3. Hình thức xóa:
-                  </label>
-                  <div className="grid grid-cols-2 gap-2 mt-1.5">
-                    <label
-                      className={`p-3 rounded-2xl border cursor-pointer transition flex flex-col justify-between ${
-                        bulkDeleteMode === 'full_delete'
-                          ? 'bg-rose-50 border-rose-300 text-rose-900'
-                          : 'bg-slate-50 border-slate-200 text-slate-700'
-                      }`}
-                    >
-                      <div className="flex items-center gap-1.5">
-                        <input
-                          type="radio"
-                          name="bulkDeleteMode"
-                          checked={bulkDeleteMode === 'full_delete'}
-                          onChange={() => setBulkDeleteMode('full_delete')}
-                          className="accent-rose-600"
-                        />
-                        <span className="text-xs font-black">Xóa hoàn toàn ca</span>
-                      </div>
-                      <span className="text-[10px] text-slate-500 mt-1">Đóng ca, đưa về trạng thái trống chưa mở</span>
-                    </label>
-
-                    <label
-                      className={`p-3 rounded-2xl border cursor-pointer transition flex flex-col justify-between ${
-                        bulkDeleteMode === 'unassign_only'
-                          ? 'bg-amber-50 border-amber-300 text-amber-900'
-                          : 'bg-slate-50 border-slate-200 text-slate-700'
-                      }`}
-                    >
-                      <div className="flex items-center gap-1.5">
-                        <input
-                          type="radio"
-                          name="bulkDeleteMode"
-                          checked={bulkDeleteMode === 'unassign_only'}
-                          onChange={() => setBulkDeleteMode('unassign_only')}
-                          className="accent-amber-600"
-                        />
-                        <span className="text-xs font-black">Chỉ gỡ nhân viên</span>
-                      </div>
-                      <span className="text-[10px] text-slate-500 mt-1">Giữ lại ca trống để nhân viên khác đăng ký</span>
-                    </label>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="text-[11px] font-black uppercase text-slate-700 tracking-wider">
-                    4. Lý do điều chỉnh:
-                  </label>
-                  <input
-                    type="text"
-                    value={bulkDeleteReason}
-                    onChange={(e) => setBulkDeleteReason(e.target.value)}
-                    className="w-full mt-1.5 px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-xs font-bold text-slate-800 outline-none focus:border-rose-500"
-                    placeholder="Nhập lý do xóa hàng loạt..."
-                  />
-                </div>
-              </div>
-            )}
-
-            {/* Modal Footer */}
-            <div className="p-3 sm:p-4 border-t border-slate-100 bg-slate-50 flex items-center justify-between gap-2 sm:gap-3">
-              <button
-                type="button"
-                onClick={() => setShowBulkModal(false)}
-                className="flex-1 sm:flex-none px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-700 hover:bg-slate-100 transition cursor-pointer text-center"
-              >
-                Hủy bỏ
-              </button>
-
-              {bulkTab === 'structure' ? (
-                <button
-                  type="button"
-                  onClick={() => handleSaveShiftStructure(editingShifts)}
-                  className="flex-1 sm:flex-none px-4 sm:px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-black text-white text-xs font-black shadow-md transition active:scale-95 cursor-pointer flex items-center justify-center gap-1.5"
-                >
-                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                  <span>Lưu & Áp dụng cơ cấu ca</span>
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={handleExecuteBulkDelete}
-                  className="flex-1 sm:flex-none px-4 sm:px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-black shadow-md shadow-rose-600/25 active:scale-95 transition cursor-pointer flex items-center justify-center gap-1.5"
-                >
-                  <Trash2 className="w-4 h-4" />
-                  <span>Xác nhận xóa hàng loạt</span>
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+      {/* 🟣 POPUP THÔNG BÁO & XÁC NHẬN CHUNG (THEO THIẾT KẾ CHUẨN) */}
+      {renderCommonPopupModal()}
 
       {/* 🟢 Toast thông báo thành công */}
-      {successToast && (
-        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 rounded-2xl bg-slate-900/95 text-white px-4 py-2.5 text-xs font-bold shadow-xl backdrop-blur-sm animate-in fade-in slide-in-from-bottom-2 duration-200">
-          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-          <span>{successToast}</span>
-        </div>
-      )}
+      {renderSuccessToast()}
     </div>
   );
 }

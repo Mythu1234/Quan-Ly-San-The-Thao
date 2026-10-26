@@ -1,0 +1,33 @@
+[
+  {
+    "id": "LOG-1792749371179-407",
+    "timestamp": "2026-10-23T09:56:11.179Z",
+    "action": "cancel",
+    "shiftId": "SH-261025-2843",
+    "employeeId": "NV02",
+    "employeeName": "Tran Thi Binh",
+    "date": "2026-10-25",
+    "shiftType": "Ca 1",
+    "reason": "Ban viec dot xuat",
+    "performedBy": "Quản lý ca"
+  },
+  {
+    "id": "LOG-1792749371128-216",
+    "timestamp": "2026-10-23T09:56:11.128Z",
+    "action": "create",
+    "shiftId": "SH-261025-2843",
+    "employeeId": "NV02",
+    "employeeName": "Tran Thi Binh",
+    "date": "2026-10-25",
+    "shiftType": "Ca 1",
+    "reason": "Phân ca trực mới",
+    "performedBy": "Quản lý sân"
+  },
+  {
+    "id": "LOG-001",
+    "action": "create",
+    "performedBy": "Hệ thống CourtX (Khởi tạo)",
+    "timestamp": "2026-10-23T09:29:48.224Z",
+    "reason": "Dữ liệu mẫu bảng phân ca trực tháng 10/2026"
+  }
+]

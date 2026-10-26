@@ -20,6 +20,8 @@ import type { FacilityEquipment, CourtStatusItem, FacilityIncident } from '../..
 import ReportIncidentView from './ReportIncidentView';
 import IncidentDetailView from './IncidentDetailView';
 import AddEquipmentView from './AddEquipmentView';
+import EquipmentDetailView from './EquipmentDetailView';
+import NotificationModal from './NotificationModal';
 
 interface FacilityManagementViewProps {
   equipments: FacilityEquipment[];
@@ -38,6 +40,9 @@ interface FacilityManagementViewProps {
     bookingCode: string,
     customerName: string
   ) => void;
+  onCompleteEquipmentWarranty?: (equipmentCode: string, equipmentName?: string) => void;
+  onAddTimelineLog?: (incidentId: string, title: string, description: string) => void;
+  isBackendOnline?: boolean;
 }
 
 export default function FacilityManagementView({
@@ -51,14 +56,18 @@ export default function FacilityManagementView({
   onUpdateIncidentStatus,
   onReturnToWarehouse,
   onAssignBookingToEquipment,
+  onCompleteEquipmentWarranty,
+  onAddTimelineLog,
+  isBackendOnline: _isBackendOnline = false,
 }: FacilityManagementViewProps) {
-  // Navigation sub-views: 'main' | 'report_incident' | 'incident_detail' | 'add_equipment'
-  const [subView, setSubView] = useState<'main' | 'report_incident' | 'incident_detail' | 'add_equipment'>('main');
+  // Navigation sub-views: 'main' | 'report_incident' | 'incident_detail' | 'add_equipment' | 'equipment_detail' | 'notifications'
+  const [subView, setSubView] = useState<'main' | 'report_incident' | 'incident_detail' | 'add_equipment' | 'equipment_detail' | 'notifications'>('main');
   const [selectedIncidentId, setSelectedIncidentId] = useState<string>('SC-8921');
 
   // Filter & Search
   const [locationFilter, setLocationFilter] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [selectedEquipmentDetail, setSelectedEquipmentDetail] = useState<FacilityEquipment | null>(null);
 
   // Court Lock Dialog
   const [lockingCourt, setLockingCourt] = useState<CourtStatusItem | null>(null);
@@ -180,6 +189,28 @@ export default function FacilityManagementView({
     }
   };
 
+  const handleCompleteEquipmentWarranty = (equipmentCode: string, equipmentName?: string) => {
+    const today = new Date().toLocaleDateString('vi-VN');
+    const formattedDate = `Hôm nay (${today})`;
+
+    // Update selectedEquipmentDetail if currently open
+    if (selectedEquipmentDetail && selectedEquipmentDetail.code === equipmentCode) {
+      setSelectedEquipmentDetail({
+        ...selectedEquipmentDetail,
+        status: 'san_sang',
+        statusLabel: 'Sẵn sàng',
+        healthRate: 'Tốt (Đã nghiệm thu bảo hành)',
+        lastMaintenance: formattedDate,
+      });
+    }
+
+    if (onCompleteEquipmentWarranty) {
+      onCompleteEquipmentWarranty(equipmentCode, equipmentName);
+    }
+
+    showToast(`Đã nghiệm thu thiết bị [${equipmentCode}] và cập nhật vào Nhật ký xử lý sự cố!`);
+  };
+
   // ==========================================
   // RENDER SUB-VIEWS
   // ==========================================
@@ -204,6 +235,8 @@ export default function FacilityManagementView({
           onUpdateIncidentStatus(id, st, unlock);
           showToast(`Đã cập nhật trạng thái sự cố #${id}!`);
         }}
+        onAddTimelineLog={onAddTimelineLog}
+        onCompleteEquipmentWarranty={handleCompleteEquipmentWarranty}
       />
     );
   }
@@ -218,6 +251,39 @@ export default function FacilityManagementView({
     );
   }
 
+  if (subView === 'notifications') {
+    return (
+      <NotificationModal
+        onBack={() => setSubView('main')}
+        onClose={() => setSubView('main')}
+      />
+    );
+  }
+
+  if (subView === 'equipment_detail' && selectedEquipmentDetail) {
+    return (
+      <EquipmentDetailView
+        equipment={selectedEquipmentDetail}
+        onBack={() => {
+          setSubView('main');
+          setSelectedEquipmentDetail(null);
+        }}
+        onRelocate={(eq) => {
+          setSubView('main');
+          setSelectedEquipmentDetail(null);
+          setRelocatingEq(eq);
+          setTargetLocation(eq.currentLocation === 'Kho chung' ? 'Sân 01' : 'Kho chung');
+          setIsAssignBooking(false);
+        }}
+        onReportIncident={() => {
+          setSelectedEquipmentDetail(null);
+          setSubView('report_incident');
+        }}
+        onCompleteMaintenance={(eq) => handleCompleteEquipmentWarranty(eq.code, eq.name)}
+      />
+    );
+  }
+
   // ==========================================
   // RENDER MAIN VIEW
   // ==========================================
@@ -225,124 +291,43 @@ export default function FacilityManagementView({
     <div className="flex-1 space-y-4 p-4 pb-28 animate-in fade-in duration-200 w-full max-w-full min-w-0">
       {/* Toast Notification */}
       {toastMessage && (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 rounded-2xl bg-slate-900 text-white px-4 py-2.5 text-xs font-black shadow-xl flex items-center gap-2 animate-in fade-in slide-in-from-top duration-200">
-          <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-          <span>{toastMessage}</span>
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 rounded-2xl bg-emerald-600 text-white border border-emerald-500 px-4 py-2.5 text-xs font-black shadow-2xl shadow-emerald-900/30 flex items-center gap-2 animate-in fade-in slide-in-from-top duration-200 w-[90%] max-w-[360px] justify-center text-center">
+          <CheckCircle2 className="w-4 h-4 text-white shrink-0" />
+          <span className="leading-snug break-words whitespace-normal text-left">{toastMessage}</span>
         </div>
       )}
 
-      {/* 🟢 Top Header matching mockup */}
-      <div className="flex items-center justify-between rounded-2xl bg-white border border-slate-200 px-3.5 py-2.5 shadow-2xs">
-        <div className="flex items-center gap-2.5">
-          <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-700 text-white font-black text-xs shadow-sm">
-            CX
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="text-sm font-black text-slate-900 tracking-tight">COURTX</span>
-            <span className="text-slate-300 font-normal">|</span>
-            <span className="text-xs font-extrabold text-slate-700">Cơ Sở Vật Chất</span>
+      {/* 🟢 Top Badge */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <div className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-xs font-black text-emerald-800 border border-emerald-200 shadow-2xs">
+            <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+            QUẢN TRỊ CƠ SỞ VẬT CHẤT
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => {
-              if (incidents.length > 0) handleOpenIncidentDetail(incidents[0].id);
-            }}
-            className="relative flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-700 hover:bg-slate-200 transition cursor-pointer"
-            title="Thông báo sự cố"
-          >
-            <Bell className="w-4 h-4" />
-            {urgentIncidentsCount > 0 && (
-              <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-rose-600 ring-2 ring-white" />
-            )}
-          </button>
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-700 text-white font-black text-xs">
-            AD
-          </div>
-        </div>
+        <button
+          type="button"
+          onClick={() => setSubView('notifications')}
+          className="relative flex h-8 w-8 items-center justify-center rounded-full bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 transition cursor-pointer shadow-2xs"
+          title="Thông báo hệ thống"
+        >
+          <Bell className="w-4 h-4" />
+          {urgentIncidentsCount > 0 && (
+            <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-rose-600 ring-2 ring-white" />
+          )}
+        </button>
       </div>
 
-      {/* 1. Chỉ số vận hành (KPI Cards) */}
-      <div className="space-y-2">
-        <div className="flex items-center justify-between px-1">
-          <div className="flex items-center gap-1.5">
-            <span className="text-xs font-black text-slate-900 flex items-center gap-1.5">
-              <span className="text-emerald-700">📈</span> Chỉ số vận hành
-            </span>
-          </div>
-          <span className="text-[10px] font-bold text-slate-400">
-            Cập nhật vừa xong
-          </span>
-        </div>
-
-        <div className="grid grid-cols-3 gap-2">
-          {/* Card 1: Thiết bị */}
-          <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-2xs flex flex-col justify-between">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider">
-                THIẾT BỊ
-              </span>
-              <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-blue-50 text-blue-700">
-                <span className="text-xs">🏸</span>
-              </div>
-            </div>
-            <div className="mt-2">
-              <div className="text-xl font-black text-slate-900">
-                {equipments.length > 0 ? String(equipments.length).padStart(2, '0') : '42'}
-              </div>
-              <div className="text-[10px] text-slate-400 font-bold truncate mt-0.5">
-                Tổng tài sản lưu động
-              </div>
-            </div>
-          </div>
-
-          {/* Card 2: Cần xử lý */}
-          <div
-            onClick={() => {
-              if (incidents.length > 0) handleOpenIncidentDetail(incidents[0].id);
-            }}
-            className="rounded-2xl border border-rose-200 bg-rose-50/70 p-3 shadow-2xs flex flex-col justify-between cursor-pointer hover:bg-rose-100/70 transition"
-          >
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] font-black text-rose-700 uppercase tracking-wider">
-                CẦN XỬ LÝ
-              </span>
-              <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-rose-200 text-rose-700">
-                <AlertTriangle className="w-3.5 h-3.5" />
-              </div>
-            </div>
-            <div className="mt-2">
-              <div className="text-xl font-black text-rose-900">
-                {String(urgentIncidentsCount).padStart(2, '0')}
-              </div>
-              <div className="text-[10px] text-rose-700/80 font-bold truncate mt-0.5">
-                Sự cố khẩn cấp
-              </div>
-            </div>
-          </div>
-
-          {/* Card 3: Bảo trì */}
-          <div className="rounded-2xl border border-indigo-100 bg-indigo-50/70 p-3 shadow-2xs flex flex-col justify-between">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] font-black text-indigo-700 uppercase tracking-wider">
-                BẢO TRÌ
-              </span>
-              <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-indigo-200 text-indigo-700">
-                <Wrench className="w-3.5 h-3.5" />
-              </div>
-            </div>
-            <div className="mt-2">
-              <div className="text-base font-black text-indigo-900 truncate">
-                {lockedCourtNames}
-              </div>
-              <div className="text-[10px] text-indigo-700/80 font-bold truncate mt-0.5">
-                {lockedCourtsCount > 0 ? `${lockedCourtsCount} sân đang ngắt ca` : 'Các sân sẵn sàng'}
-              </div>
-            </div>
-          </div>
-        </div>
+      {/* 🟢 Main Title */}
+      <div>
+        <h1 className="text-2xl font-black tracking-tight text-slate-900 leading-tight">
+          QUẢN LÝ CƠ SỞ VẬT CHẤT <br />
+          <span className="text-emerald-600">& THIẾT BỊ</span>
+        </h1>
+        <p className="mt-1 text-xs text-slate-500 leading-relaxed font-medium">
+          Theo dõi trạng thái mặt sân, điều phối thiết bị thi đấu và xử lý sự cố kỹ thuật.
+        </p>
       </div>
 
       {/* 2. Thao tác cơ sở */}
@@ -535,14 +520,14 @@ export default function FacilityManagementView({
 
       {/* 5. Danh mục trang thiết bị (Lưu động) */}
       <div className="space-y-3">
-        <div className="flex items-center justify-between px-1">
-          <div className="flex items-center gap-2">
+        <div className="flex items-center justify-between px-1 gap-2">
+          <div className="flex items-center gap-2 shrink-0">
             <span className="text-base">📋</span>
             <h2 className="text-xs font-black uppercase tracking-wider text-slate-800">
               Danh mục trang thiết bị
             </h2>
           </div>
-          <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-200">
+          <span className="text-[10px] sm:text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-xl border border-emerald-200 text-center leading-tight">
             Tự động thu hồi khi Check-out sân
           </span>
         </div>
@@ -582,7 +567,11 @@ export default function FacilityManagementView({
           {filteredEquipments.map((eq) => (
             <div
               key={eq.id}
-              className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white p-3 shadow-2xs hover:border-slate-300 transition"
+              onClick={() => {
+                setSelectedEquipmentDetail(eq);
+                setSubView('equipment_detail');
+              }}
+              className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white p-3 shadow-2xs hover:border-emerald-300 hover:shadow-xs transition cursor-pointer active:scale-[0.99]"
             >
               <div className="flex items-center gap-3 min-w-0">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-50 border border-slate-100">
@@ -637,7 +626,8 @@ export default function FacilityManagementView({
                 {/* Nút Điều phối vị trí */}
                 <button
                   type="button"
-                  onClick={() => {
+                  onClick={(e) => {
+                    e.stopPropagation();
                     setRelocatingEq(eq);
                     setTargetLocation(eq.currentLocation === 'Kho chung' ? 'Sân 01' : 'Kho chung');
                     setIsAssignBooking(false);

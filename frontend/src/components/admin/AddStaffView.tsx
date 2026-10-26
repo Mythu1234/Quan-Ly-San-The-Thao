@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import {
-  X,
   User,
   Phone,
   Mail,
@@ -14,12 +13,13 @@ import {
   Circle,
   UserPlus,
   RotateCcw,
+  ChevronLeft,
 } from 'lucide-react';
 import type { Employee } from '../../types/admin';
 
 interface AddStaffViewProps {
   onBack: () => void;
-  onSaveEmployee: (newEmp: Employee) => void;
+  onSaveEmployee: (newEmp: Employee, password?: string) => void;
 }
 
 export default function AddStaffView({ onBack, onSaveEmployee }: AddStaffViewProps) {
@@ -127,43 +127,48 @@ export default function AddStaffView({ onBack, onSaveEmployee }: AddStaffViewPro
       ],
     };
 
-    onSaveEmployee(newEmp);
+    onSaveEmployee(newEmp, password);
   };
 
   return (
     <div className="flex-1 space-y-4 p-4 pb-28 animate-in fade-in duration-200">
-      {/* 🟢 Subheader Banner (Dismiss Bar) */}
-      <div className="flex items-center justify-between rounded-2xl bg-white border border-slate-200 px-3.5 py-2.5 shadow-2xs">
+      {/* 🟢 Top Badge & Navigation */}
+      <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <button
             type="button"
             onClick={onBack}
-            className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 transition cursor-pointer"
+            className="flex h-8 w-8 items-center justify-center rounded-full bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 transition active:scale-95 cursor-pointer shadow-2xs"
+            title="Quay lại"
           >
-            <X className="w-4 h-4" />
+            <ChevronLeft className="w-5 h-5 stroke-[2.5]" />
           </button>
-          <div>
-            <div className="flex items-center gap-1.5">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-600" />
-              <span className="text-[10px] font-black uppercase tracking-wider text-emerald-800">
-                HỆ THỐNG COURTX
-              </span>
-            </div>
-            <p className="text-xs font-bold text-slate-800">Thêm Nhân Viên Mới</p>
+
+          <div className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-xs font-black text-emerald-800 border border-emerald-200 shadow-2xs">
+            <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+            QUẢN TRỊ NHÂN VIÊN
           </div>
         </div>
 
         <button
           type="button"
           onClick={handleReset}
-          className="flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-bold text-slate-600 hover:bg-slate-100 active:scale-95 transition cursor-pointer"
+          className="flex items-center gap-1 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-bold text-slate-600 hover:bg-slate-50 active:scale-95 transition cursor-pointer shadow-2xs"
         >
           <RotateCcw className="w-3 h-3 text-slate-400" />
           <span>Đặt lại</span>
         </button>
       </div>
 
-
+      {/* 🟢 Main Title */}
+      <div>
+        <h1 className="text-2xl font-black tracking-tight text-slate-900 leading-tight">
+          THÊM NHÂN VIÊN <span className="text-emerald-600">MỚI</span>
+        </h1>
+        <p className="mt-1 text-xs text-slate-500 leading-relaxed font-medium">
+          Tạo tài khoản và phân quyền nhân viên vận hành sân thể thao đa năng CourtX.
+        </p>
+      </div>
 
       {/* 🟢 Avatar Preview Section */}
       <div className="flex flex-col items-center justify-center py-2">

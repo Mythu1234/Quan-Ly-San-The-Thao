@@ -390,6 +390,316 @@ export const INITIAL_SHIFTS: ShiftRegistration[] = [
     timeRange: '11:00 - 17:00',
     status: 'scheduled',
     courtArea: 'Cụm Sân 05 - 08'
+  },
+  {
+    id: 'SH-21-3',
+    employeeId: 'NV03',
+    employeeName: 'Lê Hoàng Long',
+    date: '2026-10-21',
+    dayOfWeek: 'Thứ 4',
+    shiftType: 'Ca 3',
+    shiftName: 'Ca 3: Tối Giờ Vàng & Đóng sân',
+    timeRange: '17:00 - 23:00',
+    status: 'scheduled',
+    courtArea: 'Toàn bộ 8 sân'
+  },
+
+  // --- TUẦN 1: 01/10 - 07/10/2026 (ĐÃ HOÀN THÀNH) ---
+  {
+    id: 'SH-01-1',
+    employeeId: 'NV01',
+    employeeName: 'Nguyễn Văn An',
+    date: '2026-10-01',
+    dayOfWeek: 'Thứ 5',
+    shiftType: 'Ca 1',
+    shiftName: 'Ca 1: Sáng sớm & Mở sân',
+    timeRange: '05:00 - 11:00',
+    status: 'completed',
+    courtArea: 'Cụm Sân 01 - 04',
+    taskDescription: 'Mở cửa sân, đón khách tập sáng'
+  },
+  {
+    id: 'SH-01-2',
+    employeeId: 'NV02',
+    employeeName: 'Trần Thị Bình',
+    date: '2026-10-01',
+    dayOfWeek: 'Thứ 5',
+    shiftType: 'Ca 2',
+    shiftName: 'Ca 2: Chiều & Giải đấu',
+    timeRange: '11:00 - 17:00',
+    status: 'completed',
+    courtArea: 'Cụm Sân 05 - 08'
+  },
+  {
+    id: 'SH-01-3',
+    employeeId: 'NV03',
+    employeeName: 'Lê Hoàng Long',
+    date: '2026-10-01',
+    dayOfWeek: 'Thứ 5',
+    shiftType: 'Ca 3',
+    shiftName: 'Ca 3: Tối Giờ Vàng & Đóng sân',
+    timeRange: '17:00 - 23:00',
+    status: 'completed',
+    courtArea: 'Toàn bộ 8 sân'
+  },
+  {
+    id: 'SH-03-1',
+    employeeId: 'NV04',
+    employeeName: 'Phạm Thu Trà',
+    date: '2026-10-03',
+    dayOfWeek: 'Thứ 7',
+    shiftType: 'Ca 1',
+    shiftName: 'Ca 1: Sáng sớm & Mở sân',
+    timeRange: '05:00 - 11:00',
+    status: 'completed',
+    courtArea: 'Cụm Sân 01 - 04'
+  },
+  {
+    id: 'SH-03-2',
+    employeeId: 'NV05',
+    employeeName: 'Hoàng Công Tiến',
+    date: '2026-10-03',
+    dayOfWeek: 'Thứ 7',
+    shiftType: 'Ca 2',
+    shiftName: 'Ca 2: Chiều & Giải đấu',
+    timeRange: '11:00 - 17:00',
+    status: 'completed',
+    courtArea: 'Cụm Sân 05 - 08'
+  },
+  {
+    id: 'SH-05-1',
+    employeeId: 'NV01',
+    employeeName: 'Nguyễn Văn An',
+    date: '2026-10-05',
+    dayOfWeek: 'Thứ 2',
+    shiftType: 'Ca 1',
+    shiftName: 'Ca 1: Sáng sớm & Mở sân',
+    timeRange: '05:00 - 11:00',
+    status: 'completed',
+    courtArea: 'Cụm Sân 01 - 04'
+  },
+  {
+    id: 'SH-05-2',
+    employeeId: 'NV03',
+    employeeName: 'Lê Hoàng Long',
+    date: '2026-10-05',
+    dayOfWeek: 'Thứ 2',
+    shiftType: 'Ca 3',
+    shiftName: 'Ca 3: Tối Giờ Vàng & Đóng sân',
+    timeRange: '17:00 - 23:00',
+    status: 'completed',
+    courtArea: 'Toàn bộ 8 sân'
+  },
+
+  // --- TUẦN 2: 08/10 - 14/10/2026 (ĐÃ HOÀN THÀNH) ---
+  {
+    id: 'SH-08-1',
+    employeeId: 'NV02',
+    employeeName: 'Trần Thị Bình',
+    date: '2026-10-08',
+    dayOfWeek: 'Thứ 5',
+    shiftType: 'Ca 1',
+    shiftName: 'Ca 1: Sáng sớm & Mở sân',
+    timeRange: '05:00 - 11:00',
+    status: 'completed',
+    courtArea: 'Cụm Sân 01 - 04'
+  },
+  {
+    id: 'SH-08-2',
+    employeeId: 'NV01',
+    employeeName: 'Nguyễn Văn An',
+    date: '2026-10-08',
+    dayOfWeek: 'Thứ 5',
+    shiftType: 'Ca 2',
+    shiftName: 'Ca 2: Chiều & Giải đấu',
+    timeRange: '11:00 - 17:00',
+    status: 'completed',
+    courtArea: 'Cụm Sân 05 - 08'
+  },
+  {
+    id: 'SH-08-3',
+    employeeId: 'NV05',
+    employeeName: 'Hoàng Công Tiến',
+    date: '2026-10-08',
+    dayOfWeek: 'Thứ 5',
+    shiftType: 'Ca 3',
+    shiftName: 'Ca 3: Tối Giờ Vàng & Đóng sân',
+    timeRange: '17:00 - 23:00',
+    status: 'completed',
+    courtArea: 'Toàn bộ 8 sân'
+  },
+  {
+    id: 'SH-10-1',
+    employeeId: 'NV04',
+    employeeName: 'Phạm Thu Trà',
+    date: '2026-10-10',
+    dayOfWeek: 'Thứ 7',
+    shiftType: 'Ca 1',
+    shiftName: 'Ca 1: Sáng sớm & Mở sân',
+    timeRange: '05:00 - 11:00',
+    status: 'completed',
+    courtArea: 'Cụm Sân 01 - 04'
+  },
+  {
+    id: 'SH-10-2',
+    employeeId: 'NV03',
+    employeeName: 'Lê Hoàng Long',
+    date: '2026-10-10',
+    dayOfWeek: 'Thứ 7',
+    shiftType: 'Ca 2',
+    shiftName: 'Ca 2: Chiều & Giải đấu',
+    timeRange: '11:00 - 17:00',
+    status: 'completed',
+    courtArea: 'Cụm Sân 05 - 08'
+  },
+  {
+    id: 'SH-12-1',
+    employeeId: 'NV01',
+    employeeName: 'Nguyễn Văn An',
+    date: '2026-10-12',
+    dayOfWeek: 'Thứ 2',
+    shiftType: 'Ca 1',
+    shiftName: 'Ca 1: Sáng sớm & Mở sân',
+    timeRange: '05:00 - 11:00',
+    status: 'completed',
+    courtArea: 'Cụm Sân 01 - 04'
+  },
+  {
+    id: 'SH-12-2',
+    employeeId: 'NV02',
+    employeeName: 'Trần Thị Bình',
+    date: '2026-10-12',
+    dayOfWeek: 'Thứ 2',
+    shiftType: 'Ca 3',
+    shiftName: 'Ca 3: Tối Giờ Vàng & Đóng sân',
+    timeRange: '17:00 - 23:00',
+    status: 'completed',
+    courtArea: 'Toàn bộ 8 sân'
+  },
+
+  // --- TUẦN 4: 22/10 - 28/10/2026 (KẾ HOẠCH PHÂN CA) ---
+  {
+    id: 'SH-22-1',
+    employeeId: 'NV01',
+    employeeName: 'Nguyễn Văn An',
+    date: '2026-10-22',
+    dayOfWeek: 'Thứ 5',
+    shiftType: 'Ca 1',
+    shiftName: 'Ca 1: Sáng sớm & Mở sân',
+    timeRange: '05:00 - 11:00',
+    status: 'scheduled',
+    courtArea: 'Cụm Sân 01 - 04',
+    taskDescription: 'Mở cửa ca sáng, đón khách Pickleball'
+  },
+  {
+    id: 'SH-22-2',
+    employeeId: 'NV02',
+    employeeName: 'Trần Thị Bình',
+    date: '2026-10-22',
+    dayOfWeek: 'Thứ 5',
+    shiftType: 'Ca 2',
+    shiftName: 'Ca 2: Chiều & Giải đấu',
+    timeRange: '11:00 - 17:00',
+    status: 'scheduled',
+    courtArea: 'Cụm Sân 05 - 08'
+  },
+  {
+    id: 'SH-22-3',
+    employeeId: 'NV03',
+    employeeName: 'Lê Hoàng Long',
+    date: '2026-10-22',
+    dayOfWeek: 'Thứ 5',
+    shiftType: 'Ca 3',
+    shiftName: 'Ca 3: Tối Giờ Vàng & Đóng sân',
+    timeRange: '17:00 - 23:00',
+    status: 'scheduled',
+    courtArea: 'Toàn bộ 8 sân'
+  },
+  {
+    id: 'SH-24-1',
+    employeeId: 'NV04',
+    employeeName: 'Phạm Thu Trà',
+    date: '2026-10-24',
+    dayOfWeek: 'Thứ 7',
+    shiftType: 'Ca 1',
+    shiftName: 'Ca 1: Sáng sớm & Mở sân',
+    timeRange: '05:00 - 11:00',
+    status: 'scheduled',
+    courtArea: 'Cụm Sân 01 - 04'
+  },
+  {
+    id: 'SH-24-2',
+    employeeId: 'NV05',
+    employeeName: 'Hoàng Công Tiến',
+    date: '2026-10-24',
+    dayOfWeek: 'Thứ 7',
+    shiftType: 'Ca 2',
+    shiftName: 'Ca 2: Chiều & Giải đấu',
+    timeRange: '11:00 - 17:00',
+    status: 'scheduled',
+    courtArea: 'Cụm Sân 05 - 08'
+  },
+  {
+    id: 'SH-26-1',
+    employeeId: 'NV01',
+    employeeName: 'Nguyễn Văn An',
+    date: '2026-10-26',
+    dayOfWeek: 'Thứ 2',
+    shiftType: 'Ca 1',
+    shiftName: 'Ca 1: Sáng sớm & Mở sân',
+    timeRange: '05:00 - 11:00',
+    status: 'scheduled',
+    courtArea: 'Cụm Sân 01 - 04'
+  },
+  {
+    id: 'SH-26-2',
+    employeeId: 'NV02',
+    employeeName: 'Trần Thị Bình',
+    date: '2026-10-26',
+    dayOfWeek: 'Thứ 2',
+    shiftType: 'Ca 3',
+    shiftName: 'Ca 3: Tối Giờ Vàng & Đóng sân',
+    timeRange: '17:00 - 23:00',
+    status: 'scheduled',
+    courtArea: 'Toàn bộ 8 sân'
+  },
+
+  // --- TUẦN 5: 29/10 - 31/10/2026 ---
+  {
+    id: 'SH-29-1',
+    employeeId: 'NV03',
+    employeeName: 'Lê Hoàng Long',
+    date: '2026-10-29',
+    dayOfWeek: 'Thứ 5',
+    shiftType: 'Ca 1',
+    shiftName: 'Ca 1: Sáng sớm & Mở sân',
+    timeRange: '05:00 - 11:00',
+    status: 'scheduled',
+    courtArea: 'Cụm Sân 01 - 04'
+  },
+  {
+    id: 'SH-30-2',
+    employeeId: 'NV01',
+    employeeName: 'Nguyễn Văn An',
+    date: '2026-10-30',
+    dayOfWeek: 'Thứ 6',
+    shiftType: 'Ca 2',
+    shiftName: 'Ca 2: Chiều & Giải đấu',
+    timeRange: '11:00 - 17:00',
+    status: 'scheduled',
+    courtArea: 'Cụm Sân 05 - 08'
+  },
+  {
+    id: 'SH-31-3',
+    employeeId: 'NV05',
+    employeeName: 'Hoàng Công Tiến',
+    date: '2026-10-31',
+    dayOfWeek: 'Thứ 7',
+    shiftType: 'Ca 3',
+    shiftName: 'Ca 3: Tối Giờ Vàng & Đóng sân',
+    timeRange: '17:00 - 23:00',
+    status: 'scheduled',
+    courtArea: 'Toàn bộ 8 sân'
   }
 ];
 
@@ -463,6 +773,9 @@ export interface FacilityEquipment {
   healthRate: string;       // Mới 95%, Tốt, Cần bảo trì ngay, Đạt 500 Lux...
   purchaseDate: string;     // Ngày nhập
   warrantyExpire: string;   // Hạn bảo hành
+  supplier?: string;        // Hãng / Nhà cung cấp bảo hành
+  supplierPhone?: string;   // Hotline bảo hành
+  serialNumber?: string;    // Số Seri / Model
   lastMaintenance?: string; // Ngày bảo dưỡng gần nhất
   notes?: string;
 
@@ -524,6 +837,8 @@ export interface FacilityIncident {
   damageItems?: IncidentDamageItem[];
   timelineLogs?: IncidentTimelineLog[];
   technicianNote?: string;
+  imageUrl?: string;
+  images?: string[];
 }
 
 export const INITIAL_COURT_STATUSES: CourtStatusItem[] = [
