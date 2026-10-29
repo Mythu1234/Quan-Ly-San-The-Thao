@@ -3,8 +3,7 @@ import {
   ChevronLeft,
   Bell,
   AlertTriangle,
-  CalendarClock,
-  Wrench,
+  Calendar,
   UserCheck,
   CheckCheck,
   CheckCircle2,
@@ -12,7 +11,7 @@ import {
 
 export interface SystemNotification {
   id: string;
-  type: 'incident' | 'shift' | 'equipment' | 'staff' | 'system';
+  type: 'incident' | 'booking' | 'staff' | 'system';
   typeLabel: string;
   title: string;
   message: string;
@@ -25,30 +24,20 @@ const DEFAULT_NOTIFICATIONS: SystemNotification[] = [
   {
     id: 'NOTIF-01',
     type: 'incident',
-    typeLabel: 'Cơ sở vật chất',
-    title: 'Sự cố đèn chiếu sáng tại Sân 03',
-    message: 'Bóng cao áp số 2 bị chập chờn. Hệ thống đã kích hoạt khóa bảo trì Sân 03.',
+    typeLabel: 'Sự cố sân',
+    title: 'Sự cố đèn chiếu sáng tại Sân CL-03',
+    message: 'Bóng cao áp số 2 bị chập chờn. Hệ thống đã kích hoạt khóa bảo trì Sân CL-03.',
     time: '5 phút trước',
     isRead: false,
     priority: 'high',
   },
   {
     id: 'NOTIF-02',
-    type: 'shift',
-    typeLabel: 'Lịch ca trực',
-    title: 'Phân công ca trực hôm nay hoàn tất',
-    message: 'Toàn bộ 3 ca (Sáng, Chiều, Tối) đã được phân công đủ nhân viên vận hành.',
+    type: 'booking',
+    typeLabel: 'Lịch đặt sân',
+    title: 'Khách hàng đặt trước Sân CL-02',
+    message: 'Khách hàng vừa hoàn tất thanh toán cọc cho khung giờ 18:00 - 20:00 tối nay.',
     time: '25 phút trước',
-    isRead: false,
-    priority: 'normal',
-  },
-  {
-    id: 'NOTIF-03',
-    type: 'equipment',
-    typeLabel: 'Thiết bị lưu động',
-    title: 'Thu hồi thiết bị về Kho chung',
-    message: 'Bộ trụ lưới di động [MATB-02] đã được nhân viên hoàn trả về Kho chung.',
-    time: '1 giờ trước',
     isRead: false,
     priority: 'normal',
   },
@@ -56,8 +45,8 @@ const DEFAULT_NOTIFICATIONS: SystemNotification[] = [
     id: 'NOTIF-04',
     type: 'staff',
     typeLabel: 'Nhân sự',
-    title: 'Nguyễn Văn An đăng ký ca trực mới',
-    message: 'Nhân viên đã tự đăng ký ca trực sáng sớm ngày 16/10/2026.',
+    title: 'Cập nhật thông tin nhân viên',
+    message: 'Nhân viên Nguyễn Văn An vừa cập nhật số điện thoại liên hệ cá nhân.',
     time: '3 giờ trước',
     isRead: true,
     priority: 'normal',
@@ -66,8 +55,8 @@ const DEFAULT_NOTIFICATIONS: SystemNotification[] = [
     id: 'NOTIF-05',
     type: 'system',
     typeLabel: 'Hệ thống CourtX',
-    title: 'Cập nhật cấu hình cơ cấu ca',
-    message: 'Chủ sân đã cập nhật cơ cấu 3 ca/ngày áp dụng từ ngày 15/10/2026.',
+    title: 'Cập nhật bảng giá niêm yết sân',
+    message: 'Chủ sân đã cập nhật đơn giá giờ cao điểm áp dụng từ ngày 15/10/2026.',
     time: 'Hôm qua',
     isRead: true,
     priority: 'normal',
@@ -108,10 +97,8 @@ export default function NotificationModal({ isOpen, onClose, onBack }: Notificat
     switch (type) {
       case 'incident':
         return <AlertTriangle className="w-5 h-5 text-rose-600" />;
-      case 'shift':
-        return <CalendarClock className="w-5 h-5 text-emerald-600" />;
-      case 'equipment':
-        return <Wrench className="w-5 h-5 text-blue-600" />;
+      case 'booking':
+        return <Calendar className="w-5 h-5 text-emerald-600" />;
       case 'staff':
         return <UserCheck className="w-5 h-5 text-purple-600" />;
       default:
@@ -123,10 +110,8 @@ export default function NotificationModal({ isOpen, onClose, onBack }: Notificat
     switch (type) {
       case 'incident':
         return 'bg-rose-50 text-rose-700 border-rose-200';
-      case 'shift':
+      case 'booking':
         return 'bg-emerald-50 text-emerald-700 border-emerald-200';
-      case 'equipment':
-        return 'bg-blue-50 text-blue-700 border-blue-200';
       case 'staff':
         return 'bg-purple-50 text-purple-700 border-purple-200';
       default:
@@ -166,7 +151,7 @@ export default function NotificationModal({ isOpen, onClose, onBack }: Notificat
           THÔNG BÁO <span className="text-emerald-600">HỆ THỐNG</span>
         </h1>
         <p className="mt-1 text-xs text-slate-500 leading-relaxed font-medium">
-          Cập nhật vận hành sân thể thao, lịch trực, bảo trì cơ sở vật chất và phân công ca.
+          Cập nhật vận hành sân thể thao, lịch đặt sân và thông báo quản trị.
         </p>
       </div>
 

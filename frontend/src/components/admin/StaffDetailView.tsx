@@ -1,15 +1,12 @@
 import { useState } from 'react';
 import {
-  Clock,
   Pencil,
-  Calendar,
   Phone,
   PhoneCall,
   Mail,
   Copy,
   Check,
   CheckCircle2,
-  ArrowRight,
   Trash2,
   AlertTriangle,
   Shield,
@@ -20,7 +17,6 @@ import type { Employee } from '../../types/admin';
 interface StaffDetailViewProps {
   employee: Employee;
   onBack?: () => void;
-  onViewSchedule: () => void;
   onDeleteEmployee: (empId: string, empName: string, reason?: string) => void;
   onEditEmployee: (emp: Employee) => void;
 }
@@ -28,7 +24,6 @@ interface StaffDetailViewProps {
 export default function StaffDetailView({
   employee,
   onBack,
-  onViewSchedule,
   onDeleteEmployee,
   onEditEmployee,
 }: StaffDetailViewProps) {
@@ -87,10 +82,10 @@ export default function StaffDetailView({
       {/* 🟢 Main Title */}
       <div>
         <h1 className="text-2xl font-black tracking-tight text-slate-900 leading-tight">
-          CHI TIẾT NHÂN VIÊN <span className="text-emerald-600">& CA LÀM</span>
+          CHI TIẾT NHÂN VIÊN
         </h1>
         <p className="mt-1 text-xs text-slate-500 leading-relaxed font-medium">
-          Xem thông tin liên hệ cá nhân, trạng thái công việc và lịch trực 5 ngày gần nhất.
+          Xem thông tin liên hệ cá nhân, vai trò và trạng thái công việc của nhân sự #{employee.id}.
         </p>
       </div>
 
@@ -123,68 +118,17 @@ export default function StaffDetailView({
           <span>{employee.status === 'active' ? 'ĐANG HOẠT ĐỘNG' : 'NGỪNG HOẠT ĐỘNG'}</span>
         </div>
 
-        {/* 2 Main Action Buttons */}
-        <div className="mt-5 grid grid-cols-2 gap-3 w-full">
+        {/* Main Action Button */}
+        <div className="mt-5 w-full">
           <button
             type="button"
             onClick={() => onEditEmployee(employee)}
-            className="flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 py-3 text-xs font-black text-slate-700 hover:bg-slate-100 active:scale-95 transition cursor-pointer"
+            className="w-full flex items-center justify-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 py-3 text-xs font-black text-white shadow-sm shadow-emerald-600/20 active:scale-95 transition cursor-pointer"
           >
             <Pencil className="w-3.5 h-3.5" />
-            <span>Chỉnh sửa</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={onViewSchedule}
-            className="flex items-center justify-center gap-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 py-3 text-xs font-black text-white shadow-sm shadow-emerald-500/20 active:scale-95 transition cursor-pointer"
-          >
-            <Calendar className="w-3.5 h-3.5" />
-            <span>Xem lịch trực</span>
+            <span>Chỉnh sửa thông tin nhân viên</span>
           </button>
         </div>
-      </div>
-
-      {/* 🟢 CA LÀM HÔM NAY */}
-      <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-2xs space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700">
-              <Clock className="w-4 h-4 stroke-[2.2]" />
-            </div>
-            <span className="text-xs font-black uppercase tracking-wider text-slate-800">
-              CA LÀM HÔM NAY
-            </span>
-          </div>
-          <span className="rounded-md bg-indigo-50 px-2 py-0.5 text-[11px] font-bold text-indigo-700">
-            {employee.currentShift?.title || 'Ca sáng'}
-          </span>
-        </div>
-
-        <div className="rounded-2xl bg-slate-50 p-4 border border-slate-100 flex items-center justify-between">
-          <div>
-            <span className="text-2xl font-black text-slate-900 tracking-tight block">
-              {employee.currentShift?.time || '04:00 - 10:00'}
-            </span>
-            <span className="text-[11px] text-slate-500 font-semibold mt-0.5 block">
-              Thứ Năm, 01/10/2026
-            </span>
-          </div>
-
-          <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-700 bg-emerald-50/80 px-2.5 py-1 rounded-full border border-emerald-200">
-            <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span>{employee.currentShift?.statusLabel || 'Đang trong ca trực'}</span>
-          </div>
-        </div>
-
-        <button
-          type="button"
-          onClick={onViewSchedule}
-          className="flex w-full items-center justify-end gap-1 text-xs font-bold text-emerald-600 hover:underline pt-1 cursor-pointer"
-        >
-          <span>Xem lịch làm việc</span>
-          <ArrowRight className="w-3.5 h-3.5" />
-        </button>
       </div>
 
       {/* 🟢 THÔNG TIN NHÂN VIÊN */}
@@ -288,63 +232,6 @@ export default function StaffDetailView({
         </div>
       </div>
 
-      {/* 🟢 LỊCH TRỰC 5 NGÀY TỚI */}
-      <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-2xs space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="h-3.5 w-1 rounded-full bg-emerald-500" />
-            <span className="text-xs font-black uppercase tracking-wider text-slate-800">
-              LỊCH TRỰC 5 NGÀY TỚI
-            </span>
-          </div>
-          <span className="text-[11px] font-bold text-slate-400">01/10 - 05/10</span>
-        </div>
-
-        <div className="space-y-2">
-          {employee.schedule5Days.map((item, idx) => {
-            const isWorking = item.status === 'working';
-            return (
-              <div
-                key={idx}
-                className={[
-                  'flex items-center justify-between rounded-2xl p-3 border transition',
-                  isWorking
-                    ? 'border-emerald-200 bg-emerald-50/60'
-                    : 'border-slate-100 bg-slate-50/60',
-                ].join(' ')}
-              >
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-black text-slate-800">{item.dayLabel}</span>
-                    {item.shiftName && item.status !== 'off' && (
-                      <span className="rounded-md bg-white border border-slate-200 px-1.5 py-0.5 text-[10px] font-bold text-slate-700">
-                        {item.shiftName}
-                      </span>
-                    )}
-                  </div>
-                  <span className="text-[11px] font-semibold text-slate-500 mt-0.5 block">
-                    {item.time || 'Nghỉ ca thường lệ'}
-                  </span>
-                </div>
-
-                <span
-                  className={[
-                    'rounded-lg px-2.5 py-1 text-[11px] font-bold',
-                    isWorking
-                      ? 'bg-white text-emerald-800 border border-emerald-200 shadow-2xs'
-                      : item.status === 'off'
-                      ? 'text-slate-400 font-medium'
-                      : 'text-slate-600 bg-slate-100',
-                  ].join(' ')}
-                >
-                  {item.statusLabel}
-                </span>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
       {/* 🔴 VÔ HIỆU HÓA NHÂN VIÊN */}
       <div className="rounded-3xl border border-rose-200 bg-rose-50/50 p-4 space-y-3">
         <div className="flex items-center gap-2 text-rose-800 font-bold text-xs uppercase tracking-wider">
@@ -352,7 +239,7 @@ export default function StaffDetailView({
           <span>VÔ HIỆU HÓA NHÂN VIÊN</span>
         </div>
         <p className="text-[11px] text-slate-600 leading-relaxed font-medium">
-          Tài khoản nhân viên sẽ bị khóa quyền truy cập và gỡ bỏ khỏi toàn bộ ca trực trong tương lai.
+          Tài khoản nhân viên sẽ bị khóa quyền truy cập hệ thống và chuyển sang trạng thái ngưng hoạt động.
         </p>
 
         <button
@@ -380,7 +267,7 @@ export default function StaffDetailView({
                 Lưu ý quan trọng:
               </p>
               <p className="text-[11px] leading-relaxed text-amber-800">
-                Tài khoản của <strong className="font-black text-slate-900">{employee.name}</strong> sẽ bị khóa đăng nhập ngay lập tức. Toàn bộ các ca trực trong tương lai của nhân viên này sẽ được tự động giải phóng để phân công người khác. Lịch sử làm việc cũ vẫn được lưu trữ đối soát.
+                Tài khoản của <strong className="font-black text-slate-900">{employee.name}</strong> sẽ bị khóa đăng nhập ngay lập tức. Lịch sử hoạt động và dữ liệu cũ của nhân sự vẫn được lưu trữ đối soát đầy đủ trong hệ thống theo cơ chế Soft Delete.
               </p>
             </div>
 

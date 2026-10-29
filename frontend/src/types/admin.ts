@@ -16,7 +16,7 @@ export interface Employee {
     status: 'working' | 'upcoming' | 'completed' | 'off';
     statusLabel: string;
   };
-  schedule5Days: {
+  schedule5Days?: {
     dayLabel: string;
     date: string;
     shiftName?: string;
@@ -73,20 +73,6 @@ export const INITIAL_EMPLOYEES: Employee[] = [
     status: 'active',
     role: 'Nhân viên vận hành sân COURTX',
     joinDate: '15/08/2026',
-    currentShift: {
-      type: 'afternoon',
-      title: 'Ca 2: Chiều & Giải đấu',
-      time: '11:00 - 17:00',
-      status: 'working',
-      statusLabel: 'ĐANG TRỰC'
-    },
-    schedule5Days: [
-      { dayLabel: 'Hôm nay (16/10)', date: '16/10', shiftName: 'Ca 2: Chiều', time: '11:00 - 17:00', status: 'working', statusLabel: 'Đang trực' },
-      { dayLabel: 'Ngày mai (17/10)', date: '17/10', shiftName: 'Nghỉ ca', time: '', status: 'off', statusLabel: 'Nghỉ ca' },
-      { dayLabel: 'Chủ Nhật (18/10)', date: '18/10', shiftName: 'Ca 3: Tối', time: '17:00 - 23:00', status: 'scheduled', statusLabel: 'Đã phân ca' },
-      { dayLabel: 'Thứ Hai (19/10)', date: '19/10', shiftName: 'Nghỉ ca', time: '', status: 'off', statusLabel: 'Nghỉ ca' },
-      { dayLabel: 'Thứ Ba (20/10)', date: '20/10', shiftName: 'Ca 1: Sáng', time: '05:00 - 11:00', status: 'scheduled', statusLabel: 'Đã phân ca' }
-    ]
   },
   {
     id: 'NV02',
@@ -98,14 +84,6 @@ export const INITIAL_EMPLOYEES: Employee[] = [
     status: 'active',
     role: 'Nhân viên lễ tân & chăm sóc khách',
     joinDate: '01/09/2026',
-    currentShift: {
-      type: 'morning',
-      title: 'Ca 1: Sáng sớm',
-      time: '05:00 - 11:00',
-      status: 'working',
-      statusLabel: 'HOÀN THÀNH'
-    },
-    schedule5Days: []
   },
   {
     id: 'NV03',
@@ -117,14 +95,6 @@ export const INITIAL_EMPLOYEES: Employee[] = [
     status: 'active',
     role: 'Quản lý bảo trì sân',
     joinDate: '20/07/2026',
-    currentShift: {
-      type: 'evening',
-      title: 'Ca 3: Tối Giờ Vàng',
-      time: '17:00 - 23:00',
-      status: 'upcoming',
-      statusLabel: 'SẮP TỚI'
-    },
-    schedule5Days: []
   },
   {
     id: 'NV04',
@@ -136,7 +106,6 @@ export const INITIAL_EMPLOYEES: Employee[] = [
     status: 'inactive',
     role: 'Nhân viên phục vụ',
     joinDate: '05/10/2025',
-    schedule5Days: []
   },
   {
     id: 'NV05',
@@ -148,7 +117,6 @@ export const INITIAL_EMPLOYEES: Employee[] = [
     status: 'active',
     role: 'Nhân viên bảo vệ',
     joinDate: '10/01/2024',
-    schedule5Days: []
   }
 ];
 

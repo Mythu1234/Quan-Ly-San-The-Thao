@@ -2,33 +2,46 @@ import { useState } from 'react';
 import {
   Phone,
   Mail,
-  Calendar,
-  Clock,
   CheckCircle2,
   Copy,
   Check,
   ShieldCheck,
-  ArrowRight,
   Sparkles,
   Lock,
+  Key,
+  Eye,
+  EyeOff,
+  AlertCircle,
 } from 'lucide-react';
 import type { Employee } from '../../types/admin';
 
 interface EmployeeProfileViewProps {
   employee: Employee;
-  onViewMyShifts: () => void;
+  onViewMyShifts?: () => void;
   onUpdatePhone?: (newPhone: string) => void;
+  onChangePassword?: (newPassword: string) => Promise<void> | void;
 }
 
 export default function EmployeeProfileView({
   employee,
-  onViewMyShifts,
   onUpdatePhone,
+  onChangePassword,
 }: EmployeeProfileViewProps) {
   const [copiedField, setCopiedField] = useState<'phone' | 'email' | null>(null);
   const [isEditingPhone, setIsEditingPhone] = useState(false);
   const [phoneNumber, setPhoneNumber] = useState(employee.phone || '0912.345.678');
   const [saveToast, setSaveToast] = useState<string | null>(null);
+
+  // States for Change Password
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [isSubmittingPassword, setIsSubmittingPassword] = useState(false);
 
   const handleCopy = (text: string, field: 'phone' | 'email') => {
     navigator.clipboard.writeText(text);
@@ -44,6 +57,45 @@ export default function EmployeeProfileView({
     setIsEditingPhone(false);
     setSaveToast('Đã cập nhật số điện thoại cá nhân thành công!');
     setTimeout(() => setSaveToast(null), 3000);
+  };
+
+  const handleSavePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPasswordError(null);
+
+    if (!currentPassword.trim()) {
+      setPasswordError('Vui lòng nhập mật khẩu hiện tại!');
+      return;
+    }
+    if (newPassword.length < 6) {
+      setPasswordError('Mật khẩu mới phải có ít nhất 6 ký tự!');
+      return;
+    }
+    if (newPassword === currentPassword) {
+      setPasswordError('Mật khẩu mới không được trùng với mật khẩu hiện tại!');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordError('Xác nhận mật khẩu mới không khớp!');
+      return;
+    }
+
+    try {
+      setIsSubmittingPassword(true);
+      if (onChangePassword) {
+        await onChangePassword(newPassword);
+      }
+      setIsChangingPassword(false);
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      setSaveToast('Đã đổi mật khẩu cá nhân thành công!');
+      setTimeout(() => setSaveToast(null), 3500);
+    } catch (err: any) {
+      setPasswordError(err?.message || 'Có lỗi xảy ra khi đổi mật khẩu!');
+    } finally {
+      setIsSubmittingPassword(false);
+    }
   };
 
   return (
@@ -74,7 +126,7 @@ export default function EmployeeProfileView({
           HỒ SƠ CÁ NHÂN <span className="text-emerald-600">CỦA TÔI</span>
         </h1>
         <p className="mt-1 text-xs text-slate-500 leading-relaxed font-medium">
-          Xem thông tin liên hệ cá nhân, phân quyền tài khoản và lịch trực phân công.
+          Xem thông tin liên hệ cá nhân, phân quyền tài khoản và nhiệm vụ vận hành.
         </p>
       </div>
 
@@ -99,7 +151,7 @@ export default function EmployeeProfileView({
 
         <div className="mt-2.5 inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-800 border border-emerald-200">
           <span className="h-2 w-2 rounded-full bg-emerald-500" />
-          <span>ĐANG TRỰC CA 2 (11:00 - 17:00)</span>
+          <span>ĐANG HOẠT ĐỘNG</span>
         </div>
 
         <div className="mt-4 pt-4 border-t border-slate-100 w-full flex items-center justify-around text-center">
@@ -126,15 +178,15 @@ export default function EmployeeProfileView({
 
         <div className="grid grid-cols-3 gap-2">
           <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-2xs">
-            <span className="text-[10px] font-black text-slate-400 uppercase">GIỜ CÔNG</span>
+            <span className="text-[10px] font-black text-slate-400 uppercase">GIỜ VẬN HÀNH</span>
             <div className="text-lg font-black text-slate-900 mt-1">142h</div>
             <span className="text-[10px] text-emerald-600 font-bold">95% chỉ tiêu</span>
           </div>
 
           <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-2xs">
-            <span className="text-[10px] font-black text-slate-400 uppercase">CA HOÀN THÀNH</span>
-            <div className="text-lg font-black text-slate-900 mt-1">18 ca</div>
-            <span className="text-[10px] text-blue-600 font-bold">0 ca đi trễ</span>
+            <span className="text-[10px] font-black text-slate-400 uppercase">SỰ CỐ XỬ LÝ</span>
+            <div className="text-lg font-black text-slate-900 mt-1">18</div>
+            <span className="text-[10px] text-blue-600 font-bold">100% hoàn thành</span>
           </div>
 
           <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-2xs">
@@ -244,95 +296,165 @@ export default function EmployeeProfileView({
               )}
             </button>
           </div>
-        </div>
-      </div>
 
-      {/* 4. Lịch trực 5 ngày sắp tới của riêng tôi */}
-      <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-2xs space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Calendar className="w-4 h-4 text-emerald-700" />
-            <h2 className="text-xs font-black uppercase tracking-wider text-slate-800">
-              Lịch trực của tôi
-            </h2>
-          </div>
-          <button
-            type="button"
-            onClick={onViewMyShifts}
-            className="flex items-center gap-1 text-[11px] font-bold text-emerald-700 hover:underline cursor-pointer"
-          >
-            <span>Xem chi tiết</span>
-            <ArrowRight className="w-3 h-3" />
-          </button>
-        </div>
-
-        <div className="space-y-2">
-          {employee.schedule5Days && employee.schedule5Days.length > 0 ? (
-            employee.schedule5Days.map((sch, i) => (
-              <div
-                key={i}
-                className="flex items-center justify-between p-2.5 rounded-2xl border border-slate-100 bg-slate-50/70 hover:bg-slate-50 transition gap-2.5"
+          {/* Mật khẩu truy cập & Đổi mật khẩu */}
+          <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-100 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-100 text-amber-700">
+                  <Key className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="text-[10px] font-bold text-slate-400">Mật khẩu đăng nhập</div>
+                  <div className="text-xs font-black text-slate-900 tracking-widest">••••••••</div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsChangingPassword(!isChangingPassword);
+                  setPasswordError(null);
+                  setCurrentPassword('');
+                  setNewPassword('');
+                  setConfirmPassword('');
+                }}
+                className={`px-3 py-1.5 rounded-xl border text-[11px] font-bold transition shadow-2xs flex items-center gap-1.5 cursor-pointer active:scale-95 ${
+                  isChangingPassword
+                    ? 'bg-slate-200 border-slate-300 text-slate-700'
+                    : 'bg-white border-slate-200 text-emerald-700 hover:bg-emerald-50 hover:border-emerald-200'
+                }`}
               >
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="min-w-[80px] px-2.5 py-1.5 rounded-xl bg-white border border-slate-200 text-center shrink-0 shadow-2xs">
-                    <span className="text-[11px] font-black text-slate-800 block leading-tight whitespace-nowrap">
-                      {sch.dayLabel.includes('(') ? sch.dayLabel.replace(/\s*\([^)]*\)/, '') : sch.dayLabel}
-                    </span>
-                    <span className="text-[10px] font-bold text-slate-400 block leading-tight mt-0.5 whitespace-nowrap">
-                      {sch.date || (sch.dayLabel.match(/\(([^)]+)\)/)?.[1] || '')}
-                    </span>
+                <Lock className="w-3 h-3 text-amber-600" />
+                <span>{isChangingPassword ? 'Đóng form' : 'Đổi mật khẩu'}</span>
+              </button>
+            </div>
+
+            {/* Expandable Change Password Form */}
+            {isChangingPassword && (
+              <form onSubmit={handleSavePassword} className="pt-3 border-t border-slate-200/80 space-y-3 animate-in fade-in slide-in-from-top-1 duration-200">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-black uppercase text-slate-800 tracking-wider flex items-center gap-1.5">
+                    <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                    Cập nhật mật khẩu cá nhân
+                  </span>
+                  <span className="text-[10px] text-slate-400 font-medium">Bảo mật</span>
+                </div>
+
+                {passwordError && (
+                  <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700 flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 shrink-0" />
+                    <span>{passwordError}</span>
                   </div>
-                  <div className="min-w-0">
-                    <div className="text-xs font-black text-slate-900 truncate">
-                      {sch.shiftName || 'Nghỉ ca'}
-                    </div>
-                    <div className="text-[10px] text-slate-500 font-medium truncate mt-0.5">
-                      {sch.time || 'Không có ca trực'}
-                    </div>
+                )}
+
+                {/* Mật khẩu hiện tại */}
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                    Mật khẩu hiện tại <span className="text-rose-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showCurrentPassword ? 'text' : 'password'}
+                      placeholder="Nhập mật khẩu hiện tại"
+                      value={currentPassword}
+                      onChange={(e) => setCurrentPassword(e.target.value)}
+                      className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-3 pr-9 text-xs font-bold text-slate-800 placeholder-slate-400 outline-none transition focus:border-emerald-600"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                    >
+                      {showCurrentPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                    </button>
                   </div>
                 </div>
 
-                <span
-                  className={`px-2.5 py-1 rounded-lg text-[10px] font-black shrink-0 ${
-                    sch.status === 'working'
-                      ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
-                      : sch.status === 'scheduled'
-                      ? 'bg-blue-100 text-blue-800 border border-blue-200'
-                      : 'bg-slate-200 text-slate-600'
-                  }`}
-                >
-                  {sch.statusLabel}
-                </span>
-              </div>
-            ))
-          ) : (
-            <div className="text-center py-4 text-xs text-slate-400">
-              Chưa có lịch trực trong 5 ngày tới.
-            </div>
-          )}
+                {/* Mật khẩu mới */}
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-[11px] font-bold text-slate-700">
+                      Mật khẩu mới <span className="text-rose-500">*</span>
+                    </label>
+                    <span className="text-[10px] text-slate-400">Tối thiểu 6 ký tự</span>
+                  </div>
+                  <div className="relative">
+                    <input
+                      type={showNewPassword ? 'text' : 'password'}
+                      placeholder="Nhập mật khẩu mới (ít nhất 6 ký tự)"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-3 pr-9 text-xs font-bold text-slate-800 placeholder-slate-400 outline-none transition focus:border-emerald-600"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowNewPassword(!showNewPassword)}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                    >
+                      {showNewPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Xác nhận mật khẩu mới */}
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                    Xác nhận lại mật khẩu mới <span className="text-rose-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showConfirmPassword ? 'text' : 'password'}
+                      placeholder="Nhập lại mật khẩu mới"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-3 pr-9 text-xs font-bold text-slate-800 placeholder-slate-400 outline-none transition focus:border-emerald-600"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                    >
+                      {showConfirmPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Form Buttons */}
+                <div className="flex items-center justify-end gap-2 pt-1.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsChangingPassword(false);
+                      setPasswordError(null);
+                    }}
+                    className="px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-600 hover:bg-slate-50 transition cursor-pointer"
+                  >
+                    Hủy bỏ
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSubmittingPassword}
+                    className="px-4 py-1.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-xs font-black text-white shadow-xs active:scale-95 transition cursor-pointer disabled:opacity-50"
+                  >
+                    {isSubmittingPassword ? 'Đang lưu...' : 'Lưu mật khẩu mới'}
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* 5. Quick Security Notice */}
+      {/* 4. Quick Security Notice */}
       <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3.5 flex items-start gap-2.5">
         <Lock className="w-4 h-4 text-slate-500 shrink-0 mt-0.5" />
         <div className="text-xs">
           <span className="font-bold text-slate-800 block">Quyền hạn tài khoản</span>
           <p className="text-[11px] text-slate-500 leading-relaxed mt-0.5">
-            Tài khoản nhân viên được cấp quyền quản lý cơ sở vật chất, vận hành ca trực và theo dõi lịch sân. Mọi thay đổi về phân công nhân sự do Chủ sân phê duyệt.
+            Tài khoản nhân viên được cấp quyền quản lý cơ sở vật chất, xử lý sự cố thiết bị và theo dõi lịch sân. Mọi thay đổi về phân công nhân sự do Chủ sân phê duyệt.
           </p>
         </div>
       </div>
-
-      {/* 6. CTA to View Shifts */}
-      <button
-        type="button"
-        onClick={onViewMyShifts}
-        className="w-full flex items-center justify-center gap-2 rounded-2xl bg-emerald-700 hover:bg-emerald-800 py-3 text-xs font-black text-white shadow-md shadow-emerald-700/20 active:scale-95 transition cursor-pointer"
-      >
-        <Clock className="w-4 h-4" />
-        <span>Vào bảng lịch phân ca trực của tôi</span>
-      </button>
     </div>
   );
 }

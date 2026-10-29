@@ -15,11 +15,9 @@ import {
   ChevronLeft,
   ChevronRight,
   Sparkles,
-  Award,
   Trash2,
   UserMinus,
   Calendar,
-  CalendarCheck,
   CheckSquare,
   ClipboardList,
   Info,
@@ -633,31 +631,6 @@ export default function ShiftScheduleView({
 
   // Employee's shifts in current week
   const currentWeekDates = weekDays.map((d) => d.date);
-  const myShiftsInWeek = effectiveShifts.filter(
-    (s) =>
-      (s.employeeName === 'Nguyễn Văn An' || s.employeeId === 'NV01') &&
-      currentWeekDates.includes(s.date) &&
-      s.status !== 'cancelled'
-  );
-
-  const totalMyHoursInWeek = myShiftsInWeek.reduce((acc, s) => {
-    const shiftMeta = standardShifts.find((m) => m.type === s.shiftType);
-    return acc + (shiftMeta?.hours || 8);
-  }, 0);
-
-  // Số ngày có ca làm việc của nhân viên trong tuần
-  const myWorkingDaysInWeek = new Set(myShiftsInWeek.map((s) => s.date)).size;
-
-  // Active shifts in week for Admin
-  const activeWeekShifts = effectiveShifts.filter(
-    (s) => currentWeekDates.includes(s.date) && s.status !== 'cancelled'
-  );
-
-  // Unique employees working in this week
-  const activeStaffIds = new Set(activeWeekShifts.map((s) => s.employeeId));
-
-
-
   // Submit UC-09: Delete / Cancel Shift or Unassign Employee
   const handleConfirmDeleteShift = () => {
     if (!cancelReason.trim()) {

@@ -33,7 +33,7 @@ export default function ReportIncidentView({
   const [description, setDescription] = useState('');
   const [technicianNote, setTechnicianNote] = useState('');
   const [autoLockCourt, setAutoLockCourt] = useState(true);
-  const [reporterName] = useState('Nguyễn Văn An (NV ca trực)');
+  const [reporterName] = useState('Nguyễn Văn An (Nhân viên vận hành)');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // 🟢 Mandatory image upload states (UC-03)

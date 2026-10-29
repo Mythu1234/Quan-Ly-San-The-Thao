@@ -1,6 +1,6 @@
-import { LayoutGrid, Users, CalendarClock, Wallet } from 'lucide-react';
+import { LayoutGrid, Users, Wallet } from 'lucide-react';
 
-export type AdminTab = 'lich_san' | 'nhan_vien' | 'ca_truc' | 'vi_thu';
+export type AdminTab = 'lich_san' | 'nhan_vien' | 'vi_thu';
 
 interface AdminBottomNavProps {
   activeTab: AdminTab;
@@ -20,11 +20,6 @@ export default function AdminBottomNav({ activeTab, onTabChange }: AdminBottomNa
       icon: Users,
     },
     {
-      id: 'ca_truc' as AdminTab,
-      label: 'CA TRỰC',
-      icon: CalendarClock,
-    },
-    {
       id: 'vi_thu' as AdminTab,
       label: 'VÍ & THU',
       icon: Wallet,
@@ -33,7 +28,7 @@ export default function AdminBottomNav({ activeTab, onTabChange }: AdminBottomNa
 
   return (
     <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 z-40 w-full max-w-md px-2 py-2">
-      <div className="grid grid-cols-4 items-center justify-around text-center">
+      <div className="grid grid-cols-3 items-center justify-around text-center">
         {tabs.map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;

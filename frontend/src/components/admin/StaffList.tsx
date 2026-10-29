@@ -1,16 +1,13 @@
 import { useState } from 'react';
 import {
-  Clock,
+  Users,
   Search,
   X,
-  Sun,
-  Moon,
   MoreVertical,
   UserPlus,
   Phone,
   Trash2,
   Eye,
-  CalendarPlus,
   Ban,
   Bell,
 } from 'lucide-react';
@@ -89,10 +86,10 @@ export default function StaffList({
       {/* 🟢 Main Title */}
       <div>
         <h1 className="text-2xl font-black tracking-tight text-slate-900 leading-tight">
-          QUẢN LÝ NHÂN VIÊN <span className="text-emerald-600">& CA TRỰC</span>
+          QUẢN LÝ NHÂN VIÊN
         </h1>
         <p className="mt-1 text-xs text-slate-500 leading-relaxed font-medium">
-          Quản lý thông tin và điều phối lịch trực vận hành sân thể thao đa năng.
+          Quản lý tài khoản, thông tin liên hệ và phân quyền nhân sự sân CourtX.
         </p>
       </div>
 
@@ -279,16 +276,6 @@ export default function StaffList({
                           type="button"
                           onClick={() => {
                             setActiveMenuId(null);
-                            onSelectEmployee(emp);
-                          }}
-                          className="flex w-full items-center gap-2 px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 cursor-pointer"
-                        >
-                          <CalendarPlus className="w-3.5 h-3.5 text-slate-500" /> Phân ca trực
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setActiveMenuId(null);
                             onToggleStatus(emp.id);
                           }}
                           className="flex w-full items-center gap-2 px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 cursor-pointer"
@@ -312,43 +299,6 @@ export default function StaffList({
                   </div>
                   )}
                 </div>
-
-                {/* Shift Info Box (Inner Card) */}
-                {emp.currentShift && (
-                  <div
-                    onClick={() => onSelectEmployee(emp)}
-                    className="mt-3 flex items-center justify-between rounded-xl bg-slate-50 border border-slate-100 p-2.5 cursor-pointer hover:bg-slate-100/60 transition"
-                  >
-                    <div className="flex items-center gap-2">
-                      <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-white shadow-2xs text-slate-600">
-                        {emp.currentShift.type === 'morning' ? (
-                          <Sun className="w-3.5 h-3.5 text-amber-500" />
-                        ) : (
-                          <Moon className="w-3.5 h-3.5 text-indigo-500" />
-                        )}
-                      </div>
-                      <div>
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block leading-tight">
-                          {emp.currentShift.status === 'working' ? 'CA HÔM NAY' : 'CA TIẾP THEO'}
-                        </span>
-                        <span className="text-xs font-bold text-slate-800 leading-tight">
-                          {emp.currentShift.title} · {emp.currentShift.time}
-                        </span>
-                      </div>
-                    </div>
-
-                    <span
-                      className={[
-                        'rounded-md px-2 py-1 text-[10px] font-black uppercase tracking-wider',
-                        emp.currentShift.status === 'working'
-                          ? 'bg-emerald-500 text-white shadow-xs'
-                          : 'bg-indigo-100 text-indigo-700',
-                      ].join(' ')}
-                    >
-                      {emp.currentShift.statusLabel}
-                    </span>
-                  </div>
-                )}
               </div>
             );
           })

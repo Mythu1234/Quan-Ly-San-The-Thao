@@ -5,29 +5,25 @@ import {
   LogOut,
   AlertTriangle,
   Calendar,
-  CalendarClock,
   ChevronLeft,
   ChevronRight,
   LayoutGrid,
   Dumbbell,
-  Settings,
 } from 'lucide-react';
 import AdminSchedulePage from '../AdminSchedulePage';
 import AdminSetupReminderPage from '../AdminSetupReminderPage';
-import ShiftScheduleView from '../../components/admin/ShiftScheduleView';
 import EmployeeProfileView from '../../components/employee/EmployeeProfileView';
 import FacilityManagementView from '../../components/admin/FacilityManagementView';
-import type { Employee, ShiftRegistration, FacilityEquipment, CourtStatusItem, FacilityIncident } from '../../types/admin';
-import { INITIAL_EMPLOYEES, INITIAL_SHIFTS, INITIAL_EQUIPMENT, INITIAL_COURT_STATUSES, INITIAL_INCIDENTS } from '../../types/admin';
-import { shiftApiService } from '../../services/shiftService';
+import type { Employee, FacilityEquipment, CourtStatusItem, FacilityIncident } from '../../types/admin';
+import { INITIAL_EMPLOYEES, INITIAL_EQUIPMENT, INITIAL_COURT_STATUSES, INITIAL_INCIDENTS } from '../../types/admin';
+import { employeeApiService } from '../../services/employeeService';
 
-export type EmployeeTab = 'lich_san' | 'nhan_vien' | 'ca_truc' | 'co_so_vat_chat';
+export type EmployeeTab = 'lich_san' | 'nhan_vien' | 'co_so_vat_chat';
 
 export default function EmployeeDashboard({ onLogout }: { onLogout: () => void }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<EmployeeTab>('ca_truc');
-  const [employees] = useState<Employee[]>(INITIAL_EMPLOYEES);
-  const [shifts, setShifts] = useState<ShiftRegistration[]>(INITIAL_SHIFTS);
+  const [activeTab, setActiveTab] = useState<EmployeeTab>('lich_san');
+  const [employees, setEmployees] = useState<Employee[]>(INITIAL_EMPLOYEES);
 
   // Facility management states
   const [equipments, setEquipments] = useState<FacilityEquipment[]>(INITIAL_EQUIPMENT);
@@ -40,51 +36,46 @@ export default function EmployeeDashboard({ onLogout }: { onLogout: () => void }
   const [isCheckoutMode, setIsCheckoutMode] = useState(false);
   const [isSetupMode, setIsSetupMode] = useState(false);
 
-  // Load backend shifts on mount
+  // Load backend data on mount
   useEffect(() => {
     let isMounted = true;
-    shiftApiService.getShifts().then((res) => {
-      if (isMounted && res.isBackendOnline) {
-        setShifts(res.shifts);
-      }
-    }).catch(console.warn);
+    employeeApiService
+      .getEmployees()
+      .then((empRes) => {
+        if (isMounted && empRes.isBackendOnline && empRes.employees.length > 0) {
+          setEmployees(empRes.employees);
+        }
+      })
+      .catch(console.warn);
+
     return () => {
       isMounted = false;
     };
   }, []);
 
-  // Shift handlers
-  const handleAddShift = async (shift: Omit<ShiftRegistration, 'id'>) => {
+  // Employee Profile Handlers
+  const handleUpdateCurrentEmployeePassword = async (newPassword: string) => {
+    const currentEmp = employees[0];
+    if (!currentEmp) return;
     try {
-      const created = await shiftApiService.createShift(shift as any, 'Nhân viên ca trực');
-      setShifts((prev) => [...prev.filter((s) => s.id !== created.id), created]);
+      await employeeApiService.updateEmployee(currentEmp.id, {
+        ...currentEmp,
+        password: newPassword,
+      });
     } catch (err) {
-      console.warn('Backend add shift error, saving locally:', err);
-      const newShift: ShiftRegistration = {
-        ...shift,
-        id: `SH-${Math.floor(Math.random() * 1000)}`
-      };
-      setShifts((prev) => [...prev, newShift]);
+      console.warn('Backend update password failed, keeping local state:', err);
     }
   };
 
-  const handleDeleteShift = async (id: string, reason?: string, permanent?: boolean) => {
+  const handleUpdateCurrentEmployeePhone = async (newPhone: string) => {
+    const currentEmp = employees[0];
+    if (!currentEmp) return;
+    const updated = { ...currentEmp, phone: newPhone };
+    setEmployees((prev) => [updated, ...prev.slice(1)]);
     try {
-      await shiftApiService.deleteShift(id, permanent, reason || 'Nhân viên xin hủy ca');
-      setShifts((prev) =>
-        permanent
-          ? prev.filter((s) => s.id !== id)
-          : prev.map((s) => (s.id === id ? { ...s, status: 'cancelled', cancelReason: reason || 'Nhân viên xin hủy ca' } : s))
-      );
+      await employeeApiService.updateEmployee(currentEmp.id, updated);
     } catch (err) {
-      console.warn('Backend delete shift error, deleting locally:', err);
-      if (permanent) {
-        setShifts((prev) => prev.filter((s) => s.id !== id));
-      } else {
-        setShifts(
-          shifts.map((s) => (s.id === id ? { ...s, status: 'cancelled', cancelReason: reason || 'Nhân viên hủy' } : s))
-        );
-      }
+      console.warn('Backend update phone failed, keeping local state:', err);
     }
   };
 
@@ -297,7 +288,7 @@ export default function EmployeeDashboard({ onLogout }: { onLogout: () => void }
               <span className="font-black text-white tracking-tight">COURTX SPORT</span>
             </div>
 
-            {/* Menu Items (Lịch sân, Nhân viên, Ca trực, Cơ sở vật chất, Cài đặt - KHÔNG CÓ VÍ & THU) */}
+            {/* Menu Items (Lịch sân, Cơ sở vật chất, Hồ sơ cá nhân) */}
             <div className="flex-1 py-4 px-3 space-y-1">
               <div
                 onClick={() => handleTabChange('lich_san')}
@@ -311,28 +302,6 @@ export default function EmployeeDashboard({ onLogout }: { onLogout: () => void }
               </div>
 
               <div
-                onClick={() => handleTabChange('nhan_vien')}
-                className={`flex items-center gap-3 px-3 py-3 rounded-xl font-bold text-sm cursor-pointer ${
-                  activeTab === 'nhan_vien'
-                    ? 'bg-emerald-700 text-white shadow-sm'
-                    : 'text-slate-600 hover:bg-slate-50'
-                }`}
-              >
-                <UserIcon className="w-4 h-4" /> Hồ sơ cá nhân
-              </div>
-
-              <div
-                onClick={() => handleTabChange('ca_truc')}
-                className={`flex items-center gap-3 px-3 py-3 rounded-xl font-bold text-sm cursor-pointer ${
-                  activeTab === 'ca_truc'
-                    ? 'bg-emerald-700 text-white shadow-sm'
-                    : 'text-slate-600 hover:bg-slate-50'
-                }`}
-              >
-                <CalendarClock className="w-4 h-4" /> Ca trực
-              </div>
-
-              <div
                 onClick={() => handleTabChange('co_so_vat_chat')}
                 className={`flex items-center gap-3 px-3 py-3 rounded-xl font-bold text-sm cursor-pointer ${
                   activeTab === 'co_so_vat_chat'
@@ -343,13 +312,24 @@ export default function EmployeeDashboard({ onLogout }: { onLogout: () => void }
                 <Dumbbell className="w-4 h-4" /> Cơ sở vật chất
               </div>
 
-              <div className="flex items-center gap-3 text-slate-600 px-3 py-3 rounded-xl font-bold text-sm hover:bg-slate-50 cursor-pointer">
-                <Settings className="w-4 h-4" /> Cài đặt
+              <div
+                onClick={() => handleTabChange('nhan_vien')}
+                className={`flex items-center gap-3 px-3 py-3 rounded-xl font-bold text-sm cursor-pointer ${
+                  activeTab === 'nhan_vien'
+                    ? 'bg-emerald-700 text-white shadow-sm'
+                    : 'text-slate-600 hover:bg-slate-50'
+                }`}
+              >
+                <UserIcon className="w-4 h-4" /> Hồ sơ cá nhân
               </div>
             </div>
 
             {/* Drawer User Info Footer */}
-            <div className="p-4 border-t border-slate-100 flex items-center justify-between bg-slate-50">
+            <div
+              onClick={() => handleTabChange('nhan_vien')}
+              className="p-4 border-t border-slate-100 flex items-center justify-between bg-slate-50 cursor-pointer hover:bg-emerald-50/50 transition"
+              title="Xem Hồ sơ cá nhân"
+            >
               <div className="flex items-center gap-2">
                 <div className="w-9 h-9 rounded-full bg-emerald-100 flex items-center justify-center border border-emerald-200">
                   <UserIcon className="w-4 h-4 text-emerald-700" />
@@ -487,29 +467,7 @@ export default function EmployeeDashboard({ onLogout }: { onLogout: () => void }
           </div>
         )}
 
-        {/* 🟢 2. CA TRỰC TAB */}
-        {activeTab === 'ca_truc' && (
-          <div className="flex-1 overflow-auto bg-slate-50 relative custom-scrollbar">
-            <ShiftScheduleView
-              employees={employees}
-              shifts={shifts}
-              onAddShift={handleAddShift}
-              onDeleteShift={handleDeleteShift}
-            />
-          </div>
-        )}
-
-        {/* 🟢 3. HỒ SƠ CÁ NHÂN (CHỈ HIỂN THỊ THÔNG TIN RIÊNG CỦA NHÂN VIÊN ĐÓ) */}
-        {activeTab === 'nhan_vien' && (
-          <div className="flex-1 overflow-auto bg-slate-50 relative custom-scrollbar">
-            <EmployeeProfileView
-              employee={employees[0]}
-              onViewMyShifts={() => setActiveTab('ca_truc')}
-            />
-          </div>
-        )}
-
-        {/* 🟢 4. CƠ SỞ VẬT CHẤT TAB (Giống chủ) */}
+        {/* 🟢 2. CƠ SỞ VẬT CHẤT TAB (Giống chủ) */}
         {activeTab === 'co_so_vat_chat' && (
           <div className="flex-1 overflow-auto bg-slate-50 relative custom-scrollbar">
             <FacilityManagementView
@@ -525,6 +483,17 @@ export default function EmployeeDashboard({ onLogout }: { onLogout: () => void }
               onAssignBookingToEquipment={handleAssignBookingToEquipment}
               onCompleteEquipmentWarranty={handleCompleteEquipmentWarranty}
               onAddTimelineLog={handleAddTimelineLog}
+            />
+          </div>
+        )}
+
+        {/* 🟢 3. HỒ SƠ CÁ NHÂN (CHỈ HIỂN THỊ THÔNG TIN RIÊNG CỦA NHÂN VIÊN ĐÓ) */}
+        {activeTab === 'nhan_vien' && (
+          <div className="flex-1 overflow-auto bg-slate-50 relative custom-scrollbar">
+            <EmployeeProfileView
+              employee={employees[0]}
+              onUpdatePhone={handleUpdateCurrentEmployeePhone}
+              onChangePassword={handleUpdateCurrentEmployeePassword}
             />
           </div>
         )}

@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import {
   Wrench,
-  AlertTriangle,
   Plus,
   Bell,
   Search,
@@ -160,8 +159,6 @@ export default function FacilityManagementView({
 
   // KPI Calculations
   const urgentIncidentsCount = incidents.filter(i => i.status !== 'da_khac_phuc').length;
-  const lockedCourtsCount = courts.filter(c => c.isLocked).length;
-  const lockedCourtNames = courts.filter(c => c.isLocked).map(c => `Sân 0${c.courtNumber}`).join(', ') || 'Không có';
 
   // Filtered Equipment List
   const filteredEquipments = equipments.filter((eq) => {

@@ -7,18 +7,23 @@ Before analyzing, designing, writing code, or answering questions in this reposi
 
 ### Key Business Rules & Invariants:
 1. **Core Pricing:**
-   - Cầu lông: `120.000 VNĐ / giờ` (1 ô sân cơ sở)
-   - Bóng chuyền: `150.000 VNĐ / giờ` (4 ô sân liên tiếp bất kỳ)
-   - Bóng đá mini: `200.000 VNĐ / giờ` (toàn bộ 8 ô sân)
-2. **Dynamic Spatial Conversion:**
-   - 8 physical court units (`SAN_01` to `SAN_08`).
-   - Free conversion throughout operating hours (05:00 - 23:00). NO fixed badminton hours anymore.
+   - Cầu lông: `120.000 VNĐ / giờ / sân`
+   - Bóng chuyền: `150.000 VNĐ / giờ / sân`
+   - Bóng đá mini: `200.000 VNĐ / giờ / sân`
+2. **Court Structure & Admin Management:**
+   - 5 Sân Cầu lông: `Sân CL-01` đến `Sân CL-05`
+   - 5 Sân Bóng chuyền: `Sân BC-01` đến `Sân BC-05`
+   - 4 Sân Bóng đá mini: `Sân BD-01` đến `Sân BD-04`
+   - Chủ sân (Admin) có chức năng Thêm / Sửa / Xóa sân linh hoạt theo nhu cầu cơ sở.
 3. **VIP Monthly Subscriptions:**
    - 3 - 6 months: -10% discount.
    - > 6 months: -15% discount.
    - Booked only by Staff / Admin at the desk. Flexible installment payments.
-4. **Asset & Maintenance:**
+4. **Asset & Incident Liability (Bồi thường & Bảo hành):**
    - Tracked individually by Serial/Asset ID (no total quantities).
-   - Warranty & maintenance history tracked in dedicated tables.
-5. **Staff & Shift Tasks:**
-   - Daily shift task checklist assigned by Admin and completed by Staff.
+   - Incident classification: **Do khách làm hỏng** (áp dụng bồi thường theo Bảng giá niêm yết thu lúc Checkout) vs **Bảo hành của sân** (sân chịu 100% chi phí).
+   - Automatic equipment recall to warehouse upon checkout.
+5. **Staff & Account Management:**
+   - Soft delete / account deactivation to preserve financial, incident, and operation history.
+   - Staff accounts managed with credential setup and self-service password update.
+   - No shift management in project scope.

@@ -7,7 +7,6 @@ import {
   ChevronLeft,
   ChevronRight,
   LogOut,
-  Settings,
   LayoutGrid,
   Users,
   Wallet,
@@ -19,7 +18,6 @@ import {
 import AdminSchedulePage from './AdminSchedulePage';
 import AdminSetupReminderPage from './AdminSetupReminderPage';
 import AdminBookingRequestsView from '../components/admin/AdminBookingRequestsView';
-import ShiftScheduleView from '../components/admin/ShiftScheduleView';
 import StaffList from '../components/admin/StaffList';
 import AddStaffView from '../components/admin/AddStaffView';
 import StaffDetailView from '../components/admin/StaffDetailView';
@@ -27,11 +25,10 @@ import EditStaffView from '../components/admin/EditStaffView';
 import WalletRevenueView from '../components/admin/WalletRevenueView';
 import FacilityManagementView from '../components/admin/FacilityManagementView';
 import { getStoredBookingRequests } from '../types/bookingRequest';
-import type { Employee, ShiftRegistration, Transaction, FacilityEquipment, CourtStatusItem, FacilityIncident } from '../types/admin';
-import { INITIAL_EMPLOYEES, INITIAL_SHIFTS, INITIAL_TRANSACTIONS, INITIAL_EQUIPMENT, INITIAL_COURT_STATUSES, INITIAL_INCIDENTS } from '../types/admin';
+import type { Employee, Transaction, FacilityEquipment, CourtStatusItem, FacilityIncident } from '../types/admin';
+import { INITIAL_EMPLOYEES, INITIAL_TRANSACTIONS, INITIAL_EQUIPMENT, INITIAL_COURT_STATUSES, INITIAL_INCIDENTS } from '../types/admin';
 import { employeeApiService } from '../services/employeeService';
 import { facilityApiService } from '../services/facilityService';
-import { shiftApiService } from '../services/shiftService';
 
 export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -41,9 +38,8 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   const [isSetupMode, setIsSetupMode] = useState(false);
   
   // My states
-  const [activeTab, setActiveTab] = useState<'lich_san' | 'yeu_cau_dat_san' | 'nhan_vien' | 'ca_truc' | 'vi_thu' | 'co_so_vat_chat'>('lich_san');
+  const [activeTab, setActiveTab] = useState<'lich_san' | 'yeu_cau_dat_san' | 'nhan_vien' | 'vi_thu' | 'co_so_vat_chat'>('lich_san');
   const [employees, setEmployees] = useState<Employee[]>(INITIAL_EMPLOYEES);
-  const [shifts, setShifts] = useState<ShiftRegistration[]>(INITIAL_SHIFTS);
   const [transactions, setTransactions] = useState<Transaction[]>(INITIAL_TRANSACTIONS);
   const [equipments, setEquipments] = useState<FacilityEquipment[]>(INITIAL_EQUIPMENT);
   const [courtStatuses, setCourtStatuses] = useState<CourtStatusItem[]>(INITIAL_COURT_STATUSES);
@@ -88,7 +84,7 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
     }
   }, [activeTab]);
 
-  const handleTabChange = (tabId: 'lich_san' | 'yeu_cau_dat_san' | 'nhan_vien' | 'ca_truc' | 'vi_thu' | 'co_so_vat_chat') => {
+  const handleTabChange = (tabId: 'lich_san' | 'yeu_cau_dat_san' | 'nhan_vien' | 'vi_thu' | 'co_so_vat_chat') => {
     setActiveTab(tabId);
     setSidebarOpen(false);
     if (tabId === 'nhan_vien') setStaffSubView('list');
@@ -102,17 +98,13 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
     let isMounted = true;
     const loadInitialData = async () => {
       try {
-        const [empRes, facRes, shiftRes] = await Promise.all([
+        const [empRes, facRes] = await Promise.all([
           employeeApiService.getEmployees(),
           facilityApiService.loadAllFacilityData(),
-          shiftApiService.getShifts(),
         ]);
         if (isMounted) {
           setEmployees(empRes.employees);
-          setIsBackendOnline(empRes.isBackendOnline || facRes.isBackendOnline || shiftRes.isBackendOnline);
-          if (shiftRes.isBackendOnline) {
-            setShifts(shiftRes.shifts);
-          }
+          setIsBackendOnline(empRes.isBackendOnline || facRes.isBackendOnline);
           if (facRes.isBackendOnline) {
             setEquipments(facRes.equipments);
             setCourtStatuses(facRes.courts);
@@ -206,7 +198,7 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
     setPopup({
       type: 'danger',
       title: 'Vô hiệu hóa nhân viên (UC-11)',
-      message: `Bạn có chắc chắn muốn vô hiệu hóa tài khoản của nhân viên "${name}" khỏi hệ thống không? (Hệ thống sẽ chuyển trạng thái sang Đã nghỉ việc, thu hồi ca trực tương lai và bảo lưu toàn bộ lịch sử theo quy tắc Soft Delete).`,
+      message: `Bạn có chắc chắn muốn vô hiệu hóa tài khoản của nhân viên "${name}" khỏi hệ thống không? (Hệ thống sẽ chuyển trạng thái sang Đã nghỉ việc và bảo lưu toàn bộ lịch sử theo quy tắc Soft Delete).`,
       confirmText: 'Xác nhận vô hiệu hóa',
       cancelText: 'Hủy bỏ',
       onConfirm: async () => {
@@ -220,14 +212,6 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
           if (staffSubView === 'detail' && selectedEmployee?.id === id) {
             setStaffSubView('list');
           }
-          // UC-11: Revoke/cancel upcoming future shifts
-          setShifts((prev) =>
-            prev.map((s) =>
-              s.employeeId === id && s.status === 'scheduled'
-                ? { ...s, status: 'cancelled', cancelReason: reason || 'Nhân viên đã nghỉ việc (UC-11)' }
-                : s
-            )
-          );
         } catch (err: any) {
           console.warn('Backend delete failed, applying locally:', err);
           setEmployees((prev) => prev.map((e) => (e.id === id ? { ...e, status: 'inactive' } : e)));
@@ -543,73 +527,7 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
     }
   };
 
-  // Shift handlers connected to backend API
-  const handleAddShift = async (newShift: ShiftRegistration) => {
-    try {
-      const created = await shiftApiService.createShift(newShift);
-      setShifts((prev) => [...prev.filter((s) => s.id !== created.id), created]);
-    } catch (err) {
-      console.warn('Backend add shift failed, saving locally:', err);
-      setShifts((prev) => [...prev, newShift]);
-    }
-  };
 
-  const handleAddMultipleShifts = async (newShifts: ShiftRegistration[]) => {
-    try {
-      const res = await shiftApiService.createBatchShifts(newShifts);
-      const createdIds = new Set(res.createdShifts.map((s) => s.id));
-      setShifts((prev) => [...prev.filter((s) => !createdIds.has(s.id)), ...res.createdShifts]);
-    } catch (err) {
-      console.warn('Backend batch shifts failed, saving locally:', err);
-      setShifts((prev) => [...prev, ...newShifts]);
-    }
-  };
-
-  const handleUpdateShift = async (updatedShift: ShiftRegistration) => {
-    try {
-      const saved = await shiftApiService.updateShift(updatedShift.id, updatedShift);
-      setShifts((prev) => prev.map((s) => (s.id === saved.id ? saved : s)));
-    } catch (err) {
-      console.warn('Backend update shift failed, applying locally:', err);
-      setShifts((prev) => prev.map((s) => (s.id === updatedShift.id ? updatedShift : s)));
-    }
-  };
-
-  const handleDeleteShift = async (shiftId: string, reason: string, permanent?: boolean) => {
-    try {
-      await shiftApiService.deleteShift(shiftId, permanent, reason);
-      setShifts((prev) =>
-        permanent
-          ? prev.filter((s) => s.id !== shiftId)
-          : prev.map((s) => (s.id === shiftId ? { ...s, status: 'cancelled', cancelReason: reason } : s))
-      );
-    } catch (err) {
-      console.warn('Backend delete shift failed, applying locally:', err);
-      setShifts((prev) =>
-        permanent
-          ? prev.filter((s) => s.id !== shiftId)
-          : prev.map((s) => (s.id === shiftId ? { ...s, status: 'cancelled', cancelReason: reason } : s))
-      );
-    }
-  };
-
-  const handleDeleteMultipleShifts = async (shiftIds: string[], permanent?: boolean, reason?: string) => {
-    try {
-      await shiftApiService.deleteBatchShifts(shiftIds, permanent, reason);
-      setShifts((prev) =>
-        permanent
-          ? prev.filter((s) => !shiftIds.includes(s.id))
-          : prev.map((s) => (shiftIds.includes(s.id) ? { ...s, status: 'cancelled', cancelReason: reason } : s))
-      );
-    } catch (err) {
-      console.warn('Backend batch delete shifts failed, applying locally:', err);
-      setShifts((prev) =>
-        permanent
-          ? prev.filter((s) => !shiftIds.includes(s.id))
-          : prev.map((s) => (shiftIds.includes(s.id) ? { ...s, status: 'cancelled', cancelReason: reason } : s))
-      );
-    }
-  };
 
   return (
     <div className="flex h-screen bg-slate-50 text-slate-900 w-full animate-in fade-in zoom-in-95 duration-300 relative overflow-hidden">
@@ -659,9 +577,6 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                 className={`flex items-center gap-3 px-3 py-3 rounded-xl font-bold text-sm cursor-pointer ${activeTab === 'co_so_vat_chat' ? 'bg-emerald-700 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50'}`}
               >
                 <Dumbbell className="w-4 h-4" /> Cơ sở vật chất
-              </div>
-              <div className="flex items-center gap-3 text-slate-600 px-3 py-3 rounded-xl font-bold text-sm hover:bg-slate-50 cursor-pointer">
-                <Settings className="w-4 h-4" /> Cài đặt
               </div>
             </div>
             <div className="p-4 border-t border-slate-100 flex items-center justify-between bg-slate-50">
@@ -827,7 +742,6 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
               <StaffDetailView
                 employee={selectedEmployee}
                 onBack={() => setStaffSubView('list')}
-                onViewSchedule={() => setActiveTab('ca_truc')}
                 onDeleteEmployee={handleDeleteEmployee}
                 onEditEmployee={handleEditEmployee}
               />
@@ -839,21 +753,6 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                 onSaveEmployee={handleUpdateEmployee}
               />
             )}
-          </div>
-        )}
-
-        {activeTab === 'ca_truc' && (
-          <div className="flex-1 overflow-auto bg-slate-50 relative custom-scrollbar">
-            <ShiftScheduleView
-              employees={employees}
-              shifts={shifts}
-              onAddShift={handleAddShift}
-              onAddMultipleShifts={handleAddMultipleShifts}
-              onDeleteMultipleShifts={handleDeleteMultipleShifts}
-              onUpdateShift={handleUpdateShift}
-              onDeleteShift={handleDeleteShift}
-              isAdmin={true}
-            />
           </div>
         )}
 

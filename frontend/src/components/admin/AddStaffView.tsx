@@ -111,20 +111,7 @@ export default function AddStaffView({ onBack, onSaveEmployee }: AddStaffViewPro
       status,
       role: 'Nhân viên vận hành sân COURTX',
       joinDate: new Date().toLocaleDateString('vi-VN'),
-      currentShift: {
-        type: 'morning',
-        title: 'Ca 1: Sáng sớm',
-        time: '05:00 - 11:00',
-        status: 'working',
-        statusLabel: 'SẴN SÀNG',
-      },
-      schedule5Days: [
-        { dayLabel: 'Hôm nay (01/10)', date: '01/10', shiftName: 'Ca 1: Sáng sớm', time: '05:00 - 11:00', status: 'scheduled', statusLabel: 'Đã phân ca' },
-        { dayLabel: 'Ngày mai (02/10)', date: '02/10', shiftName: 'Ca 2: Chiều', time: '11:00 - 17:00', status: 'scheduled', statusLabel: 'Đã phân ca' },
-        { dayLabel: 'Thứ Bảy (03/10)', date: '03/10', shiftName: 'Nghỉ ca thường lệ', time: '', status: 'off', statusLabel: 'Nghỉ ca' },
-        { dayLabel: 'Chủ Nhật (04/10)', date: '04/10', shiftName: 'Ca 3: Tối', time: '17:00 - 23:00', status: 'scheduled', statusLabel: 'Đã phân ca' },
-        { dayLabel: 'Thứ Hai (05/10)', date: '05/10', shiftName: 'Ca 1: Sáng sớm', time: '05:00 - 11:00', status: 'scheduled', statusLabel: 'Đã phân ca' },
-      ],
+      schedule5Days: [],
     };
 
     onSaveEmployee(newEmp, password);
@@ -351,7 +338,7 @@ export default function AddStaffView({ onBack, onSaveEmployee }: AddStaffViewPro
                 )}
               </div>
               <span className="text-[10px] text-slate-500 leading-tight">
-                Cho phép truy cập ca trực
+                Được phép đăng nhập hệ thống
               </span>
             </div>
 

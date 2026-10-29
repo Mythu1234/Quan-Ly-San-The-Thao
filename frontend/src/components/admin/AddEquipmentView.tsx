@@ -5,7 +5,6 @@ import {
   Tag,
   Dumbbell,
   MapPin,
-  Calendar,
   Check,
   ShieldCheck,
   Phone,

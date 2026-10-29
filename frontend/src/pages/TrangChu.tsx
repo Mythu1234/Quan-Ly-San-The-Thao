@@ -5,7 +5,7 @@ import EmployeeDashboard from './employee/EmployeeDashboard';
 import VipCustomerDashboard from './VipCustomerDashboard';
 import { addBookingRequest } from '../types/bookingRequest';
 import { useState, useRef, useEffect, useMemo } from 'react';
-import { Search, MapPin, Phone, Clock, Play, Home, Calendar as CalendarIcon, X, Zap , User, Lock, Eye, Bell, Key, ArrowLeft, Trophy, LayoutGrid } from 'lucide-react';
+import { Search, MapPin, Phone, Clock, Play, Home, Calendar as CalendarIcon, X, Zap , User, Lock, Eye, EyeOff, Bell, Key, ArrowLeft, Trophy, LayoutGrid, CheckCircle2, RefreshCw, MessageSquare, Copy, Check } from 'lucide-react';
 
 // Custom SVG Icons matching Figma design
 const ShuttlecockIcon = () => (
@@ -72,6 +72,207 @@ export default function TrangChu() {
   const [isVipLoggedIn, setIsVipLoggedIn] = useState<boolean>(false);
   const [username, setUsername] = useState<string>('');
   const [passwordInput, setPasswordInput] = useState<string>('');
+
+  // User Credentials for Authentication & Password Recovery
+  const [accountCredentials, setAccountCredentials] = useState<{
+    [key: string]: { role: 'admin' | 'employee' | 'vip'; password: string; name: string; phone: string; email: string };
+  }>({
+    admin: {
+      role: 'admin',
+      password: 'admin',
+      name: 'Ban Quản Trị (Admin)',
+      phone: '0901234567',
+      email: 'admin@courtx.vn',
+    },
+    nhanvien: {
+      role: 'employee',
+      password: 'nhanvien',
+      name: 'Nguyễn Văn An (Nhân viên)',
+      phone: '0912345678',
+      email: 'nhanvien@courtx.vn',
+    },
+    vip: {
+      role: 'vip',
+      password: 'vip',
+      name: 'Trần Văn Hoàng (Khách VIP)',
+      phone: '0988888888',
+      email: 'vip@courtx.vn',
+    },
+    khachvip: {
+      role: 'vip',
+      password: '123456',
+      name: 'Trần Văn Hoàng (Khách VIP)',
+      phone: '0988888888',
+      email: 'khachvip@courtx.vn',
+    },
+  });
+
+  // Forgot Password Flow State
+  const [loginView, setLoginView] = useState<'login' | 'forgot_password'>('login');
+  const [forgotStep, setForgotStep] = useState<'account' | 'otp' | 'success'>('account');
+  const [forgotAccountInput, setForgotAccountInput] = useState<string>('');
+  const [matchedAccountKey, setMatchedAccountKey] = useState<string>('');
+  const [forgotOtpInput, setForgotOtpInput] = useState<string>('');
+  const [forgotOtpCountdown, setForgotOtpCountdown] = useState<number>(60);
+  const [generatedOtp, setGeneratedOtp] = useState<string>('');
+  const [generatedNewPassword, setGeneratedNewPassword] = useState<string>('');
+  const [forgotNewPassword, setForgotNewPassword] = useState<string>('');
+  const [copiedPassword, setCopiedPassword] = useState<boolean>(false);
+  const [customPasswordInput, setCustomPasswordInput] = useState<string>('');
+  const [showCustomPasswordForm, setShowCustomPasswordForm] = useState<boolean>(false);
+  const [forgotError, setForgotError] = useState<string | null>(null);
+  const [smsToast, setSmsToast] = useState<{
+    sender: string;
+    phone: string;
+    message: string;
+    otp?: string;
+    newPassword?: string;
+  } | null>(null);
+
+  // Auto-dismiss SMS toast after 15s
+  useEffect(() => {
+    if (smsToast) {
+      const t = setTimeout(() => {
+        setSmsToast(null);
+      }, 15000);
+      return () => clearTimeout(t);
+    }
+  }, [smsToast]);
+
+  // Countdown timer for OTP
+  useEffect(() => {
+    let timer: any;
+    if (loginView === 'forgot_password' && forgotStep === 'otp' && forgotOtpCountdown > 0) {
+      timer = setInterval(() => {
+        setForgotOtpCountdown((prev) => (prev > 0 ? prev - 1 : 0));
+      }, 1000);
+    }
+    return () => {
+      if (timer) clearInterval(timer);
+    };
+  }, [loginView, forgotStep, forgotOtpCountdown]);
+
+  // Step 1: Send OTP to Phone
+  const handleSendForgotOtp = (targetPhone?: string) => {
+    const raw = (targetPhone !== undefined ? targetPhone : forgotAccountInput).trim().replace(/\s+/g, '');
+    if (!raw) {
+      setForgotError('Vui lòng nhập số điện thoại đã đăng ký!');
+      return;
+    }
+
+    const phoneClean = raw.replace(/\D/g, '');
+    if (!/^0[0-9]{9}$/.test(phoneClean)) {
+      setForgotError('Số điện thoại không hợp lệ! Vui lòng nhập số điện thoại gồm 10 chữ số bắt đầu bằng 0 (ví dụ: 0912345678).');
+      return;
+    }
+
+    // Match against accountCredentials by phone
+    let foundKey = Object.keys(accountCredentials).find(
+      (k) => accountCredentials[k].phone.replace(/\s+/g, '') === phoneClean
+    );
+
+    // If not found, match by standard demo phones
+    if (!foundKey) {
+      if (phoneClean === '0901234567') foundKey = 'admin';
+      else if (phoneClean === '0912345678') foundKey = 'nhanvien';
+      else if (phoneClean === '0988888888') foundKey = 'vip';
+    }
+
+    if (!foundKey) {
+      setForgotError(`Số điện thoại "${phoneClean}" chưa được đăng ký trong hệ thống CourtX! Vui lòng kiểm tra lại số điện thoại (Gợi ý: Quản trị 0901234567, Nhân viên 0912345678, Khách VIP 0988888888).`);
+      return;
+    }
+
+    // Generate real 6-digit random OTP
+    const newOtp = Math.floor(100000 + Math.random() * 900000).toString();
+    setGeneratedOtp(newOtp);
+    setMatchedAccountKey(foundKey);
+    setForgotError(null);
+    setForgotStep('otp');
+    setForgotOtpCountdown(60);
+    setForgotOtpInput('');
+
+    // Trigger SMS Push Notification banner
+    setSmsToast({
+      sender: 'COURTX-OTP',
+      phone: phoneClean,
+      message: `Mã OTP xác thực đặt lại mật khẩu cho số điện thoại ${phoneClean} là: ${newOtp} (hiệu lực 60s). Tuyệt đối không chia sẻ mã này cho người khác.`,
+      otp: newOtp,
+    });
+  };
+
+  // Step 2: Verify OTP and automatically send new password via SMS
+  const handleVerifyForgotOtp = () => {
+    if (!forgotOtpInput.trim()) {
+      setForgotError('Vui lòng nhập mã OTP xác thực (6 số) được gửi về tin nhắn SMS!');
+      return;
+    }
+
+    if (forgotOtpInput.trim() !== generatedOtp) {
+      setForgotError(`Mã OTP không chính xác! Vui lòng kiểm tra lại tin nhắn SMS vừa được gửi tới số điện thoại ${accountCredentials[matchedAccountKey]?.phone || forgotAccountInput}.`);
+      return;
+    }
+
+    // Generate secure new password: CX@ + 4 random digits
+    const randomSuffix = Math.floor(1000 + Math.random() * 9000).toString();
+    const newPass = `CX@${randomSuffix}`;
+    setGeneratedNewPassword(newPass);
+    setForgotNewPassword(newPass);
+
+    // Save directly to accountCredentials
+    if (matchedAccountKey) {
+      setAccountCredentials((prev) => ({
+        ...prev,
+        [matchedAccountKey]: {
+          ...prev[matchedAccountKey],
+          password: newPass,
+        },
+      }));
+    }
+
+    setForgotError(null);
+    setForgotStep('success');
+
+    // Send new password via SMS to user's phone ("gửi mật khẩu về đoàng hoàng")
+    const phone = accountCredentials[matchedAccountKey]?.phone || forgotAccountInput;
+    setSmsToast({
+      sender: 'COURTX-SECURITY',
+      phone: phone,
+      message: `COURTX: Mật khẩu mới cho tài khoản SĐT ${phone} của quý khách là: ${newPass}. Vui lòng sử dụng mật khẩu này để đăng nhập ngay.`,
+      newPassword: newPass,
+    });
+  };
+
+  // Optional: User custom password update
+  const handleSaveCustomPassword = () => {
+    if (!customPasswordInput || customPasswordInput.length < 6) {
+      setForgotError('Mật khẩu tự chọn phải có tối thiểu 6 ký tự!');
+      return;
+    }
+
+    if (matchedAccountKey) {
+      setAccountCredentials((prev) => ({
+        ...prev,
+        [matchedAccountKey]: {
+          ...prev[matchedAccountKey],
+          password: customPasswordInput,
+        },
+      }));
+    }
+
+    setGeneratedNewPassword(customPasswordInput);
+    setForgotNewPassword(customPasswordInput);
+    setShowCustomPasswordForm(false);
+    setForgotError(null);
+
+    const phone = accountCredentials[matchedAccountKey]?.phone || forgotAccountInput;
+    setSmsToast({
+      sender: 'COURTX-SECURITY',
+      phone: phone,
+      message: `COURTX: Quý khách đã đổi sang mật khẩu tùy chỉnh: ${customPasswordInput}. Vui lòng ghi nhớ để đăng nhập.`,
+      newPassword: customPasswordInput,
+    });
+  };
 
   const [otpInput, setOtpInput] = useState<string>('');
   const [otpError, setOtpError] = useState<boolean>(false);
@@ -1650,6 +1851,52 @@ export default function TrangChu() {
       
       
       
+      {/* 🟢 SMS TOAST PUSH NOTIFICATION */}
+      {smsToast && (
+        <div className="fixed top-3 left-1/2 -translate-x-1/2 z-[200] w-[94%] max-w-md animate-in slide-in-from-top-4 duration-300 pointer-events-auto">
+          <div 
+            onClick={() => {
+              if (smsToast.otp && forgotStep === 'otp') {
+                setForgotOtpInput(smsToast.otp);
+                setForgotError(null);
+              }
+            }}
+            className="flex items-start gap-3 rounded-2xl bg-slate-900/95 text-white p-3.5 shadow-2xl border border-slate-700/80 backdrop-blur-md cursor-pointer hover:bg-slate-900 transition"
+          >
+            <div className="w-9 h-9 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 flex items-center justify-center shrink-0">
+              <MessageSquare className="w-5 h-5" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-black uppercase text-emerald-400 tracking-wide flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  TIN NHẮN SMS • {smsToast.sender}
+                </span>
+                <span className="text-[10px] text-slate-400">Vừa xong</span>
+              </div>
+              <p className="mt-1 text-xs text-slate-200 leading-snug font-medium">
+                {smsToast.message}
+              </p>
+              {smsToast.otp && forgotStep === 'otp' && (
+                <p className="mt-1.5 text-[11px] font-bold text-emerald-300">
+                  👉 Chạm vào đây để tự động điền mã OTP ({smsToast.otp})
+                </p>
+              )}
+            </div>
+            <button 
+              type="button" 
+              onClick={(e) => {
+                e.stopPropagation();
+                setSmsToast(null);
+              }}
+              className="text-slate-400 hover:text-white p-1 cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* 🟢 LOGIN SCREEN OVERLAY */}
       {showLogin && (
         <div className="fixed top-0 bottom-0 left-1/2 -translate-x-1/2 z-[100] w-full max-w-md flex flex-col bg-slate-50 animate-in fade-in slide-in-from-bottom-4 duration-300 overflow-y-auto shadow-2xl border-x border-slate-200">
@@ -1682,148 +1929,426 @@ export default function TrangChu() {
 
           {/* Content */}
           <div className="p-5 flex-1 flex flex-col max-w-md mx-auto w-full">
-            <h2 className="text-3xl font-black text-slate-900 uppercase tracking-tight">
-              ĐĂNG NHẬP HỆ THỐNG
-            </h2>
-            
-            {/* Banner */}
-            <div className="mt-5 flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
-              <div className="flex h-10 w-12 items-center justify-center rounded-xl bg-slate-900 text-white flex-shrink-0">
-                <Key className="w-5 h-5" />
-              </div>
-              <div>
-                <p className="text-xs font-bold text-slate-800">Cổng đăng nhập hệ thống</p>
-                <p className="text-[10px] text-slate-500">Khách VIP • Ban Quản lý • Nhân viên trực ca</p>
-              </div>
-            </div>
-
-            {/* Quick Demo Login Credentials Pills */}
-            <div className="mt-3 space-y-1.5">
-              <p className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Chọn nhanh tài khoản mẫu để trải nghiệm:</p>
-              <div className="grid grid-cols-3 gap-1.5 text-xs">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setUsername('vip');
-                    setPasswordInput('vip');
-                  }}
-                  className="rounded-xl border border-amber-300 bg-amber-50 p-2 text-center text-amber-900 hover:bg-amber-100 active:scale-95 transition cursor-pointer"
-                >
-                  <span className="block font-black text-[11px] text-amber-800">Khách VIP</span>
-                  <span className="text-[9px] text-amber-600 font-mono">vip / vip</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setUsername('admin');
-                    setPasswordInput('admin');
-                  }}
-                  className="rounded-xl border border-slate-300 bg-slate-100 p-2 text-center text-slate-900 hover:bg-slate-200 active:scale-95 transition cursor-pointer"
-                >
-                  <span className="block font-black text-[11px] text-slate-800">Quản lý</span>
-                  <span className="text-[9px] text-slate-500 font-mono">admin / admin</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setUsername('nhanvien');
-                    setPasswordInput('nhanvien');
-                  }}
-                  className="rounded-xl border border-emerald-300 bg-emerald-50 p-2 text-center text-emerald-900 hover:bg-emerald-100 active:scale-95 transition cursor-pointer"
-                >
-                  <span className="block font-black text-[11px] text-emerald-800">Nhân viên</span>
-                  <span className="text-[9px] text-emerald-600 font-mono">nhanvien</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Form Card */}
-            <div className="mt-4 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-              <div className="space-y-4">
-                {/* Username */}
-                <div>
-                  <label className="mb-1.5 block text-xs font-black text-slate-700 uppercase tracking-wider">
-                    Tài khoản <span className="text-red-500">*</span>
-                  </label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none text-slate-400">
-                      <User className="w-5 h-5" />
-                    </div>
-                    <input 
-                      type="text" 
-                      placeholder="Nhập tên tài khoản (vip / admin / nhanvien)" 
-                      value={username}
-                      onChange={(e) => setUsername(e.target.value)}
-                      className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-3.5 pl-12 pr-4 text-sm font-bold text-slate-900 placeholder-slate-400 outline-none focus:border-emerald-500 focus:bg-white transition"
-                    />
+            {loginView === 'login' ? (
+              <>
+                <h2 className="text-3xl font-black text-slate-900 uppercase tracking-tight">
+                  ĐĂNG NHẬP HỆ THỐNG
+                </h2>
+                
+                {/* Banner */}
+                <div className="mt-5 flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+                  <div className="flex h-10 w-12 items-center justify-center rounded-xl bg-slate-900 text-white flex-shrink-0">
+                    <Key className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-slate-800">Cổng đăng nhập hệ thống</p>
+                    <p className="text-[11px] text-slate-500">Đăng nhập bằng Tên tài khoản hoặc Số điện thoại</p>
                   </div>
                 </div>
 
-                {/* Password */}
-                <div>
-                  <label className="mb-1.5 block text-xs font-black text-slate-700 uppercase tracking-wider">
-                    Mật khẩu <span className="text-red-500">*</span>
-                  </label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none text-slate-400">
-                      <Lock className="w-5 h-5" />
+                {/* Form Card */}
+                <div className="mt-4 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+                  <div className="space-y-4">
+                    {/* Username or Phone */}
+                    <div>
+                      <label className="mb-1.5 block text-xs font-black text-slate-700 uppercase tracking-wider">
+                        Tài khoản hoặc Số điện thoại <span className="text-red-500">*</span>
+                      </label>
+                      <div className="relative">
+                        <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none text-slate-400">
+                          <User className="w-5 h-5" />
+                        </div>
+                        <input 
+                          type="text" 
+                          placeholder="Nhập số điện thoại hoặc tên tài khoản" 
+                          value={username}
+                          onChange={(e) => setUsername(e.target.value)}
+                          className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-3.5 pl-12 pr-4 text-sm font-bold text-slate-900 placeholder-slate-400 outline-none focus:border-emerald-500 focus:bg-white transition"
+                        />
+                      </div>
                     </div>
-                    <input 
-                      type={showPassword ? 'text' : 'password'} 
-                      placeholder="••••••••" 
-                      value={passwordInput}
-                      onChange={(e) => setPasswordInput(e.target.value)}
-                      className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-3.5 pl-12 pr-12 text-sm font-bold text-slate-900 placeholder-slate-400 outline-none focus:border-emerald-500 focus:bg-white transition tracking-widest"
-                    />
+
+                    {/* Password */}
+                    <div>
+                      <label className="mb-1.5 block text-xs font-black text-slate-700 uppercase tracking-wider">
+                        Mật khẩu <span className="text-red-500">*</span>
+                      </label>
+                      <div className="relative">
+                        <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none text-slate-400">
+                          <Lock className="w-5 h-5" />
+                        </div>
+                        <input 
+                          type={showPassword ? 'text' : 'password'} 
+                          placeholder="••••••••" 
+                          value={passwordInput}
+                          onChange={(e) => setPasswordInput(e.target.value)}
+                          className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-3.5 pl-12 pr-12 text-sm font-bold text-slate-900 placeholder-slate-400 outline-none focus:border-emerald-500 focus:bg-white transition tracking-widest"
+                        />
+                        <button 
+                          type="button" 
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute inset-y-0 right-0 flex items-center pr-4 text-slate-400 hover:text-slate-600 cursor-pointer"
+                        >
+                          {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Remember me & Forgot Password link */}
+                    <div className="flex items-center justify-between pt-2 pb-1">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <div className="flex h-4 w-4 items-center justify-center rounded bg-emerald-500 text-white flex-shrink-0">
+                          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"></path></svg>
+                        </div>
+                        <span className="text-xs font-semibold text-slate-600">Ghi nhớ đăng nhập</span>
+                      </label>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setLoginView('forgot_password');
+                          setForgotStep('account');
+                          setForgotError(null);
+                          setForgotAccountInput(username || '');
+                        }}
+                        className="text-xs font-black text-emerald-600 hover:text-emerald-700 hover:underline transition cursor-pointer"
+                      >
+                        Quên mật khẩu?
+                      </button>
+                    </div>
+
+                    {/* Submit Button */}
                     <button 
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute inset-y-0 right-0 flex items-center pr-4 text-slate-400 hover:text-slate-600"
+                      type="button" 
+                      onClick={() => {
+                        const rawUser = username.trim().toLowerCase();
+                        const phoneClean = username.trim().replace(/\s+/g, '');
+                        // Match key or phone in accountCredentials
+                        const targetKey = Object.keys(accountCredentials).find(
+                          (k) =>
+                            k.toLowerCase() === rawUser ||
+                            accountCredentials[k].phone.replace(/\s+/g, '') === phoneClean
+                        );
+                        const targetAcc = targetKey ? accountCredentials[targetKey] : null;
+
+                        // Match admin
+                        if (
+                          (rawUser === 'admin' && (passwordInput === 'admin' || (targetAcc && passwordInput === targetAcc.password))) ||
+                          (targetAcc && targetAcc.role === 'admin' && passwordInput === targetAcc.password)
+                        ) {
+                          setIsAdminLoggedIn(true);
+                          setShowLogin(false);
+                          setUsername('');
+                          setPasswordInput('');
+                        } else if (
+                          (rawUser === 'nhanvien' && (passwordInput === 'nhanvien' || (targetAcc && passwordInput === targetAcc.password))) ||
+                          (targetAcc && targetAcc.role === 'employee' && passwordInput === targetAcc.password)
+                        ) {
+                          setIsEmployeeLoggedIn(true);
+                          setShowLogin(false);
+                          setUsername('');
+                          setPasswordInput('');
+                        } else if (
+                          ((rawUser === 'vip' || rawUser === 'khachvip') && (passwordInput === 'vip' || passwordInput === '123456' || (targetAcc && passwordInput === targetAcc.password))) ||
+                          (targetAcc && targetAcc.role === 'vip' && passwordInput === targetAcc.password)
+                        ) {
+                          setIsVipLoggedIn(true);
+                          setShowLogin(false);
+                          setUsername('');
+                          setPasswordInput('');
+                        } else {
+                          showAlert('Sai thông tin đăng nhập', 'Tên tài khoản / số điện thoại hoặc mật khẩu không chính xác!\n\nNếu bạn vừa nhận mật khẩu mới qua SMS, hãy nhập số điện thoại và mật khẩu vừa nhận để đăng nhập.\nHoặc nhấn "Quên mật khẩu?" để hệ thống gửi lại mã OTP.');
+                        }
+                      }}
+                      className="mt-4 w-full flex items-center justify-center gap-2 rounded-2xl bg-emerald-500 py-4 text-sm font-black uppercase tracking-widest text-white shadow-lg shadow-emerald-500/30 transition hover:bg-emerald-600 active:scale-95 cursor-pointer"
                     >
-                      <Eye className="w-5 h-5" />
+                      ĐĂNG NHẬP HỆ THỐNG <Zap className="w-4 h-4 fill-current" />
                     </button>
                   </div>
                 </div>
-
-                {/* Remember me */}
-                <label className="flex items-center gap-2.5 pt-2 pb-1 cursor-pointer">
-                  <div className="flex h-5 w-5 items-center justify-center rounded bg-emerald-500 text-white flex-shrink-0">
-                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"></path></svg>
-                  </div>
-                  <span className="text-sm font-medium text-slate-700">Ghi nhớ đăng nhập trên thiết bị này</span>
-                </label>
-
-                {/* Submit Button */}
-                <button 
+              </>
+            ) : (
+              /* 🟣 FORGOT PASSWORD WORKFLOW */
+              <div className="space-y-4 animate-in fade-in duration-200">
+                {/* Back to Login link */}
+                <button
                   type="button"
                   onClick={() => {
-                  if (username === 'admin' && passwordInput === 'admin') {
-                    setIsAdminLoggedIn(true);
-                    setShowLogin(false);
-                    setUsername('');
-                    setPasswordInput('');
-                  } else if (username === 'nhanvien' && passwordInput === 'nhanvien') {
-                    setIsEmployeeLoggedIn(true);
-                    setShowLogin(false);
-                    setUsername('');
-                    setPasswordInput('');
-                  } else if ((username === 'vip' || username === 'khachvip') && (passwordInput === 'vip' || passwordInput === '123456')) {
-                    setIsVipLoggedIn(true);
-                    setShowLogin(false);
-                    setUsername('');
-                    setPasswordInput('');
-                  } else {
-                    showAlert('Sai thông tin đăng nhập', 'Vui lòng chọn tài khoản mẫu phía trên hoặc nhập:\n• Khách VIP: vip / vip (hoặc khachvip / 123456)\n• Quản lý: admin / admin\n• Nhân viên: nhanvien / nhanvien');
-                  }
-                }}
-                  className="mt-4 w-full flex items-center justify-center gap-2 rounded-2xl bg-emerald-500 py-4 text-sm font-black uppercase tracking-widest text-white shadow-lg shadow-emerald-500/30 transition hover:bg-emerald-600 active:scale-95 cursor-pointer"
+                    setLoginView('login');
+                    setForgotError(null);
+                  }}
+                  className="inline-flex items-center gap-1.5 text-xs font-black text-slate-500 hover:text-emerald-700 transition cursor-pointer"
                 >
-                  ĐĂNG NHẬP HỆ THỐNG <Zap className="w-4 h-4 fill-current" />
+                  <ArrowLeft className="w-4 h-4" /> Quay lại Đăng nhập
                 </button>
+
+                <div>
+                  <h2 className="text-2xl font-black text-slate-900 uppercase tracking-tight">
+                    QUÊN MẬT KHẨU
+                  </h2>
+                  <p className="mt-1 text-xs text-slate-500">
+                    Khôi phục mật khẩu tài khoản CourtX an toàn và nhanh chóng qua mã OTP.
+                  </p>
+                </div>
+
+                {/* Steps Indicator */}
+                <div className="grid grid-cols-3 gap-2 py-1">
+                  <div className={`flex flex-col gap-1 text-center border-b-2 pb-1.5 transition ${forgotStep === 'account' ? 'border-emerald-600 text-emerald-800' : 'border-slate-200 text-slate-400'}`}>
+                    <span className="text-[10px] font-black uppercase">1. Số điện thoại</span>
+                  </div>
+                  <div className={`flex flex-col gap-1 text-center border-b-2 pb-1.5 transition ${forgotStep === 'otp' ? 'border-emerald-600 text-emerald-800' : 'border-slate-200 text-slate-400'}`}>
+                    <span className="text-[10px] font-black uppercase">2. Mã OTP</span>
+                  </div>
+                  <div className={`flex flex-col gap-1 text-center border-b-2 pb-1.5 transition ${forgotStep === 'success' ? 'border-emerald-600 text-emerald-800' : 'border-slate-200 text-slate-400'}`}>
+                    <span className="text-[10px] font-black uppercase">3. Nhận mật khẩu</span>
+                  </div>
+                </div>
+
+                {/* Error Banner */}
+                {forgotError && (
+                  <div className="rounded-2xl border border-red-200 bg-red-50 p-3 text-xs font-bold text-red-700 animate-in fade-in">
+                    {forgotError}
+                  </div>
+                )}
+
+                {/* STEP 1: PHONE NUMBER */}
+                {forgotStep === 'account' && (
+                  <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
+                    <p className="text-xs font-bold text-slate-700">
+                      Nhập số điện thoại đã đăng ký để nhận mã OTP và mật khẩu mới qua SMS:
+                    </p>
+
+                    <div>
+                      <label className="mb-1.5 block text-xs font-black text-slate-700 uppercase tracking-wider">
+                        Số điện thoại đăng ký <span className="text-red-500">*</span>
+                      </label>
+                      <div className="relative">
+                        <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none text-slate-400">
+                          <Phone className="w-5 h-5" />
+                        </div>
+                        <input
+                          type="tel"
+                          placeholder="Ví dụ: 0912345678"
+                          value={forgotAccountInput}
+                          onChange={(e) => {
+                            setForgotAccountInput(e.target.value);
+                            setForgotError(null);
+                          }}
+                          className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-3.5 pl-12 pr-4 text-sm font-bold text-slate-900 placeholder-slate-400 outline-none focus:border-emerald-500 focus:bg-white transition"
+                        />
+                      </div>
+                      <p className="mt-1.5 text-[11px] text-slate-400 font-medium leading-relaxed">
+                        Hệ thống sẽ gửi mã xác thực 6 số qua tin nhắn SMS tới số điện thoại này.
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => handleSendForgotOtp()}
+                      className="w-full flex items-center justify-center gap-2 rounded-2xl bg-emerald-500 py-3.5 text-xs font-black uppercase tracking-wider text-white shadow-md shadow-emerald-500/20 hover:bg-emerald-600 active:scale-95 transition cursor-pointer"
+                    >
+                      Tiếp tục & Gửi mã OTP qua SMS <Zap className="w-4 h-4 fill-current" />
+                    </button>
+                  </div>
+                )}
+
+                {/* STEP 2: VERIFY OTP */}
+                {forgotStep === 'otp' && (
+                  <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
+                    {/* Header info */}
+                    <div className="rounded-2xl bg-emerald-50 border border-emerald-100 p-3.5 flex items-center justify-between text-xs font-bold text-emerald-900">
+                      <div>
+                        <span className="text-[10px] text-emerald-600 uppercase block font-black">Khôi phục tài khoản:</span>
+                        <span>{accountCredentials[matchedAccountKey]?.name || matchedAccountKey}</span>
+                      </div>
+                      <span className="font-mono text-xs px-2.5 py-1 rounded-lg bg-emerald-200/70 text-emerald-900 font-black">
+                        {accountCredentials[matchedAccountKey]?.phone || forgotAccountInput}
+                      </span>
+                    </div>
+
+                    <p className="text-xs text-slate-600 leading-relaxed font-medium">
+                      Mã xác thực OTP gồm 6 chữ số đã được gửi qua tin nhắn SMS tới số điện thoại{' '}
+                      <strong className="text-slate-900 font-black">{accountCredentials[matchedAccountKey]?.phone || forgotAccountInput}</strong>.
+                      Vui lòng kiểm tra tin nhắn và nhập mã xác thực bên dưới:
+                    </p>
+
+                    {/* OTP Input */}
+                    <div>
+                      <label className="mb-2 block text-xs font-black text-slate-700 uppercase tracking-wider text-center">
+                        Nhập mã xác thực 6 số (OTP) <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        maxLength={6}
+                        placeholder="••••••"
+                        value={forgotOtpInput}
+                        onChange={(e) => {
+                          setForgotOtpInput(e.target.value.replace(/\D/g, ''));
+                          setForgotError(null);
+                        }}
+                        className="w-full text-center text-3xl font-mono font-black tracking-[0.4em] rounded-2xl border border-slate-200 bg-slate-50 py-3.5 text-slate-900 placeholder-slate-300 outline-none focus:border-emerald-500 focus:bg-white transition"
+                      />
+                    </div>
+
+                    {/* Countdown / Resend */}
+                    <div className="flex items-center justify-between text-xs pt-1">
+                      {forgotOtpCountdown > 0 ? (
+                        <span className="text-slate-400 font-medium">
+                          Gửi lại mã sau: <span className="font-black text-slate-700">{forgotOtpCountdown}s</span>
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const newOtp = Math.floor(100000 + Math.random() * 900000).toString();
+                            setGeneratedOtp(newOtp);
+                            setForgotOtpCountdown(60);
+                            setForgotError(null);
+                            const phone = accountCredentials[matchedAccountKey]?.phone || forgotAccountInput;
+                            setSmsToast({
+                              sender: 'COURTX-OTP',
+                              phone: phone,
+                              message: `Mã OTP xác thực mới của quý khách là: ${newOtp} (hiệu lực 60s). Tuyệt đối không chia sẻ mã này.`,
+                              otp: newOtp,
+                            });
+                          }}
+                          className="inline-flex items-center gap-1 font-bold text-emerald-600 hover:underline cursor-pointer"
+                        >
+                          <RefreshCw className="w-3.5 h-3.5" /> Gửi lại mã OTP qua SMS
+                        </button>
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setForgotStep('account');
+                          setForgotError(null);
+                        }}
+                        className="text-slate-500 hover:text-slate-800 text-[11px] underline cursor-pointer"
+                      >
+                        Đổi số điện thoại khác
+                      </button>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={handleVerifyForgotOtp}
+                      className="w-full flex items-center justify-center gap-2 rounded-2xl bg-emerald-500 py-3.5 text-xs font-black uppercase tracking-wider text-white shadow-md shadow-emerald-500/20 hover:bg-emerald-600 active:scale-95 transition cursor-pointer"
+                    >
+                      Xác nhận mã OTP & Nhận mật khẩu mới <Zap className="w-4 h-4 fill-current" />
+                    </button>
+                  </div>
+                )}
+
+                {/* STEP 3: SUCCESS VIEW - RECEIVED NEW PASSWORD VIA SMS */}
+                {forgotStep === 'success' && (
+                  <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm text-center space-y-4 animate-in zoom-in-95">
+                    <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 border-2 border-emerald-300">
+                      <CheckCircle2 className="w-8 h-8" />
+                    </div>
+
+                    <div>
+                      <h3 className="text-lg font-black text-slate-900 uppercase">
+                        Mật khẩu mới đã được gửi về SMS!
+                      </h3>
+                      <p className="mt-1 text-xs text-slate-500 leading-relaxed font-medium">
+                        Hệ thống đã tạo và gửi mật khẩu mới qua tin nhắn SMS tới số điện thoại{' '}
+                        <strong className="text-emerald-700 font-black">{accountCredentials[matchedAccountKey]?.phone || forgotAccountInput}</strong>.
+                      </p>
+                    </div>
+
+                    {/* New Password Card */}
+                    <div className="rounded-2xl bg-slate-50 border border-slate-200 p-4 text-left space-y-2.5">
+                      <div className="flex items-center justify-between text-xs pb-1.5 border-b border-slate-200">
+                        <span className="text-slate-500 font-medium">Tài khoản:</span>
+                        <span className="font-black text-slate-800">{accountCredentials[matchedAccountKey]?.name || matchedAccountKey}</span>
+                      </div>
+                      <div className="flex items-center justify-between text-xs pb-1.5 border-b border-slate-200">
+                        <span className="text-slate-500 font-medium">Số điện thoại:</span>
+                        <span className="font-mono font-bold text-slate-700">{accountCredentials[matchedAccountKey]?.phone || forgotAccountInput}</span>
+                      </div>
+                      <div className="flex items-center justify-between pt-1">
+                        <div>
+                          <span className="text-[10px] text-slate-400 font-bold uppercase block">MẬT KHẨU MỚI:</span>
+                          <span className="font-mono font-black text-base text-emerald-700 tracking-wider">
+                            {generatedNewPassword || forgotNewPassword}
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigator.clipboard.writeText(generatedNewPassword || forgotNewPassword);
+                            setCopiedPassword(true);
+                            setTimeout(() => setCopiedPassword(false), 2000);
+                          }}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-emerald-300 bg-white text-emerald-700 hover:bg-emerald-50 text-xs font-bold transition active:scale-95 cursor-pointer shadow-2xs"
+                        >
+                          {copiedPassword ? (
+                            <>
+                              <Check className="w-3.5 h-3.5 text-emerald-600" />
+                              <span>Đã sao chép</span>
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="w-3.5 h-3.5" />
+                              <span>Sao chép</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Option to customize password */}
+                    {!showCustomPasswordForm ? (
+                      <button
+                        type="button"
+                        onClick={() => setShowCustomPasswordForm(true)}
+                        className="text-[11px] font-bold text-emerald-700 hover:underline cursor-pointer block mx-auto"
+                      >
+                        ✏️ Bạn muốn tự đổi mật khẩu theo ý muốn?
+                      </button>
+                    ) : (
+                      <div className="rounded-2xl border border-emerald-200 bg-emerald-50/50 p-3.5 text-left space-y-2 animate-in fade-in">
+                        <span className="text-xs font-black text-slate-800 block">Đặt mật khẩu tùy chỉnh của bạn:</span>
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            placeholder="Nhập mật khẩu mới (>= 6 ký tự)"
+                            value={customPasswordInput}
+                            onChange={(e) => setCustomPasswordInput(e.target.value)}
+                            className="flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-900 outline-none focus:border-emerald-600"
+                          />
+                          <button
+                            type="button"
+                            onClick={handleSaveCustomPassword}
+                            className="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 text-xs font-black active:scale-95 transition cursor-pointer"
+                          >
+                            Lưu
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="rounded-xl bg-amber-50 border border-amber-200 p-2.5 text-[11px] text-amber-800 text-left font-medium leading-relaxed">
+                      💡 <strong>Lưu ý:</strong> Vui lòng ghi nhớ mật khẩu trên hoặc kiểm tra tin nhắn SMS để sử dụng cho các lần đăng nhập tiếp theo.
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setLoginView('login');
+                        setUsername(accountCredentials[matchedAccountKey]?.phone || matchedAccountKey);
+                        setPasswordInput(generatedNewPassword || forgotNewPassword);
+                        setForgotStep('account');
+                      }}
+                      className="w-full flex items-center justify-center gap-2 rounded-2xl bg-emerald-500 py-3.5 text-xs font-black uppercase tracking-wider text-white shadow-md shadow-emerald-500/20 hover:bg-emerald-600 active:scale-95 transition cursor-pointer"
+                    >
+                      Đăng nhập ngay với mật khẩu mới <Zap className="w-4 h-4 fill-current" />
+                    </button>
+                  </div>
+                )}
               </div>
-            </div>
+            )}
           </div>
         </div>
       )}
