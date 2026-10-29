@@ -5,7 +5,7 @@ import EmployeeDashboard from './employee/EmployeeDashboard';
 import VipCustomerDashboard from './VipCustomerDashboard';
 import { addBookingRequest } from '../types/bookingRequest';
 import { useState, useRef, useEffect, useMemo } from 'react';
-import { Search, MapPin, Phone, Clock, Play, Home, Calendar as CalendarIcon, X, Zap , User, Lock, Eye, EyeOff, Bell, Key, ArrowLeft, Trophy, LayoutGrid, CheckCircle2, RefreshCw, MessageSquare, Copy, Check } from 'lucide-react';
+import { Search, MapPin, Phone, Clock, Play, Home, Calendar as CalendarIcon, X, Zap , User, Lock, Eye, EyeOff, Bell, Key, ArrowLeft, ArrowRight, Trophy, LayoutGrid, CheckCircle2, RefreshCw, MessageSquare, Copy, Check } from 'lucide-react';
 
 // Custom SVG Icons matching Figma design
 const ShuttlecockIcon = () => (
@@ -48,7 +48,7 @@ export default function TrangChu() {
 
   // Booking Form State
   const [selectedSportId, setSelectedSportId] = useState<'badminton' | 'football' | 'volleyball'>('badminton');
-  const [selectedDate, setSelectedDate] = useState<string>('');
+  const [selectedDate, setSelectedDate] = useState<string>('Hôm nay (29/10)');
   const [selectedCourt, setSelectedCourt] = useState<string>('');
   
   // Time Selection State
@@ -312,7 +312,18 @@ export default function TrangChu() {
     setSelectedStartTime(time);
     setSelectedCourt(courtName);
     if (dateStr) {
-      setSelectedDate(dateStr);
+      const match = dateStr.match(/(\d{1,2})\/(\d{1,2})/);
+      if (match) {
+        const short = `${match[1].padStart(2, '0')}/${match[2].padStart(2, '0')}`;
+        const found = availableDates.find((item) => item.date === short);
+        if (found) {
+          setSelectedDate(`${found.label} (${found.date})`);
+        } else {
+          setSelectedDate(dateStr);
+        }
+      } else {
+        setSelectedDate(dateStr);
+      }
     }
     handleTabChange('booking');
     setTimeout(() => {
@@ -332,42 +343,42 @@ export default function TrangChu() {
       name: 'Cầu Lông',
       badge: 'CẦU LÔNG',
       tagline: 'THI ĐẤU QUỐC TẾ',
-      title: 'Tổ hợp 6 sân Cầu Lông',
+      title: 'Tổ hợp 5 sân Cầu Lông (CL-01 -> CL-05)',
       description: 'Mặt thảm BWF tiêu chuẩn 4.5mm chống trượt, hệ thống đèn chiếu sáng chống chói Lux LED 1000+, trần cao 11m.',
       specs: ['MẶT THẢM BWF', 'CHỐNG CHÓI', 'CHUẨN 4.5MM'],
       pricePerHour: 120000,
       priceLabel: '120.000đ / GIỜ',
       image: '/images/badminton.jpg',
       icon: ShuttlecockIcon,
-      courts: [],
+      courts: ['Sân CL-01', 'Sân CL-02', 'Sân CL-03', 'Sân CL-04', 'Sân CL-05'],
     },
     football: {
       id: 'football',
       name: 'Bóng Đá',
       badge: 'BÓNG ĐÁ',
       tagline: 'SÂN CỎ NHÂN TẠO',
-      title: 'Sân Bóng Đá Tiêu Chuẩn',
-      description: 'Sân bóng đá cỏ nhân tạo đạt chuẩn, không gian rộng rãi. 8 sân cầu lông có thể gộp thành 1 sân bóng đá.',
-      specs: ['SÂN 7 NGƯỜI', 'ĐÈN LUX 1000', 'CỎ NHÂN TẠO'],
+      title: '5 Sân Bóng Đá Mini (BD-01 -> BD-05)',
+      description: 'Sân bóng đá cỏ nhân tạo đạt chuẩn thi đấu mini 5 - 7 người, hệ thống đèn LED chuyên nghiệp, bóng thi đấu đạt chuẩn.',
+      specs: ['SÂN 5 - 7 NGƯỜI', 'ĐÈN LUX 1000', 'CỎ NHÂN TẠO'],
       pricePerHour: 200000,
       priceLabel: '200.000đ / GIỜ',
       image: '/images/hero_arena.jpg',
       icon: FootballIcon,
-      courts: [],
+      courts: ['Sân BD-01', 'Sân BD-02', 'Sân BD-03', 'Sân BD-04', 'Sân BD-05'],
     },
     volleyball: {
       id: 'volleyball',
       name: 'Bóng Chuyền',
       badge: 'BÓNG CHUYỀN',
       tagline: 'TRONG NHÀ CAO CẤP',
-      title: 'Sân Bóng Chuyền Tiêu Chuẩn',
-      description: 'Sân bóng chuyền trong nhà mái che cao 12m, thảm thi đấu Taraflex xịn, quạt thông gió công nghiệp mát mẻ.',
+      title: '5 Sân Bóng Chuyền (BC-01 -> BC-05)',
+      description: 'Sân bóng chuyền trong nhà mái che cao 12m, thảm thi đấu Taraflex xịn, trụ và lưới căng chuẩn FIVB thi đấu.',
       specs: ['THẢM TARAFLEX', 'MÁI CHE 12M', 'ĐÈN LUX 1000'],
       pricePerHour: 150000,
       priceLabel: '150.000đ / GIỜ',
       image: '/images/volleyball.jpg',
       icon: VolleyballIcon,
-      courts: [],
+      courts: ['Sân BC-01', 'Sân BC-02', 'Sân BC-03', 'Sân BC-04', 'Sân BC-05'],
     },
   };
 
@@ -494,13 +505,25 @@ export default function TrangChu() {
 
   // Dates list
   const availableDates = [
-    { label: 'Hôm nay', date: '18/09' },
-    { label: 'Thứ 6', date: '19/09' },
-    { label: 'Thứ 7', date: '20/09' },
-    { label: 'Chủ Nhật', date: '21/09' },
-    { label: 'Thứ 2', date: '22/09' },
-    { label: 'Thứ 3', date: '23/09' },
+    { label: 'Hôm nay', date: '29/10' },
+    { label: 'Thứ 6', date: '30/10' },
+    { label: 'Thứ 7', date: '31/10' },
+    { label: 'Chủ Nhật', date: '01/11' },
+    { label: 'Thứ 2', date: '02/11' },
+    { label: 'Thứ 3', date: '03/11' },
   ];
+
+  const scheduleDateObj = useMemo(() => {
+    if (!selectedDate) return new Date();
+    const match = selectedDate.match(/(\d{1,2})\/(\d{1,2})/);
+    if (match) {
+      const day = parseInt(match[1], 10);
+      const month = parseInt(match[2], 10) - 1;
+      const now = new Date();
+      return new Date(now.getFullYear(), month, day);
+    }
+    return new Date();
+  }, [selectedDate]);
 
   const getAvailableDurations = (startTimeStr: string) => {
     const possibleDurations = [60, 90, 120, 150, 180, 210, 240];
@@ -512,94 +535,14 @@ export default function TrangChu() {
     return possibleDurations.filter(duration => startMinutes + duration <= closingTimeMinutes);
   };
 
-  const mockScheduleBookings = useMemo(() => [
-    { startH: 8, startM: 0, endH: 10, endM: 0, courtStart: 0, courtCount: 4, sport: 'volleyball' }, // Sân 01-04
-    { startH: 9, startM: 0, endH: 10, endM: 30, courtStart: 5, courtCount: 1, sport: 'badminton' }, // Sân 06
-    { startH: 14, startM: 0, endH: 16, endM: 0, courtStart: 0, courtCount: 4, sport: 'volleyball' }, // Sân 01-04
-    { startH: 14, startM: 30, endH: 15, endM: 30, courtStart: 4, courtCount: 1, sport: 'badminton' }, // Sân 05
-    { startH: 15, startM: 0, endH: 16, endM: 0, courtStart: 5, courtCount: 1, sport: 'badminton' }, // Sân 06
-    { startH: 17, startM: 0, endH: 19, endM: 0, courtStart: 0, courtCount: 8, sport: 'football' }, // Sân 01-08
-    { startH: 19, startM: 30, endH: 21, endM: 0, courtStart: 1, courtCount: 1, sport: 'badminton' }, // Sân 02
-    { startH: 20, startM: 0, endH: 21, endM: 30, courtStart: 3, courtCount: 1, sport: 'badminton' }, // Sân 04
-  ], []);
-
-  const availableCourts = useMemo(() => {
-    if (
-      !selectedDate ||
-      !selectedStartTime ||
-      !getAvailableDurations(selectedStartTime).includes(selectedDuration)
-    ) return [];
-    const [h, m] = selectedStartTime.split(':').map(Number);
-    const startMin = h * 60 + m;
-    const endMin = startMin + selectedDuration;
-
-    const isCourtOccupied = (courtIdx: number) => {
-      return mockScheduleBookings.some((b) => {
-        const bCourtEnd = b.courtStart + b.courtCount;
-        if (courtIdx < b.courtStart || courtIdx >= bCourtEnd) return false;
-        const bStart = b.startH * 60 + b.startM;
-        const bEnd = b.endH * 60 + b.endM;
-        return Math.max(startMin, bStart) < Math.min(endMin, bEnd);
-      });
-    };
-
-    const courts: string[] = [];
-    if (selectedSportId === 'football') {
-      let isAllFree = true;
-      for (let c = 0; c < 8; c++) {
-        if (isCourtOccupied(c)) {
-          isAllFree = false;
-          break;
-        }
-      }
-      if (isAllFree) courts.push('Sân Bóng Đá Mini');
-    } else if (selectedSportId === 'volleyball') {
-      let isC1Free = true;
-      for (let c = 0; c <= 3; c++) {
-        if (isCourtOccupied(c)) {
-          isC1Free = false;
-          break;
-        }
-      }
-      if (isC1Free) courts.push('Sân Bóng Chuyền 1');
-
-      let isC2Free = true;
-      for (let c = 4; c <= 7; c++) {
-        if (isCourtOccupied(c)) {
-          isC2Free = false;
-          break;
-        }
-      }
-      if (isC2Free) courts.push('Sân Bóng Chuyền 2');
-    } else {
-      for (let i = 1; i <= 8; i++) {
-        if (!isCourtOccupied(i - 1)) {
-          courts.push('Sân ' + i.toString().padStart(2, '0'));
-        }
-      }
-    }
-    return courts;
-  }, [selectedSportId, selectedDate, selectedStartTime, selectedDuration, mockScheduleBookings]);
-
   useEffect(() => {
-    if (availableCourts.length > 0) {
-      if (!availableCourts.includes(selectedCourt)) {
-        setSelectedCourt(availableCourts[0]);
-      }
-    } else {
+    if (selectedCourt && !currentSport.courts.includes(selectedCourt)) {
       setSelectedCourt('');
+      setSelectedStartTime('');
     }
-  }, [availableCourts, selectedCourt]);
+  }, [selectedSportId, currentSport, selectedCourt]);
 
   const availableDurations = getAvailableDurations(selectedStartTime);
-
-  const handleStartTimeSelect = (time: string) => {
-    setSelectedStartTime(time);
-    const validDurations = getAvailableDurations(time);
-    if (!validDurations.includes(selectedDuration)) {
-      setSelectedDuration(60); // default to 1 hour if current duration is invalid
-    }
-  };
 
   const getEndTime = (start: string, durationMins: number) => {
     if (!start) return '';
@@ -1138,7 +1081,9 @@ export default function TrangChu() {
                 <span className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500 text-xs font-black text-white">2</span>
                 <h3 className="text-sm font-black uppercase tracking-wider text-slate-900">CHỌN NGÀY THI ĐẤU</h3>
               </div>
-              <span className="text-[10px] font-bold text-emerald-600">Tháng 09/2026</span>
+              <span className="text-[10px] font-bold text-emerald-600">
+                Tháng {(scheduleDateObj.getMonth() + 1).toString().padStart(2, '0')}/{scheduleDateObj.getFullYear()}
+              </span>
             </div>
 
             <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
@@ -1175,219 +1120,237 @@ export default function TrangChu() {
             </div>
           </div>
 
-          {/* ⚡ BƯỚC 3: LỰA CHỌN THỜI GIAN & SÂN KHẢ DỤNG */}
-          <div className="rounded-2xl border border-slate-200 bg-white p-4 space-y-4 shadow-xs">
+          {/* ⚡ BƯỚC 3: LỊCH SÂN TRỰC QUAN REAL-TIME */}
+          <div id="booking-schedule-section" className="rounded-2xl border border-slate-200 bg-white p-4 space-y-3.5 shadow-xs scroll-mt-20">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500 text-xs font-black text-white">3</span>
-                <h3 className="text-sm font-black uppercase tracking-wider text-slate-900">CHỌN THỜI GIAN & SÂN</h3>
-              </div>
-            </div>
-
-            {/* 1. Time Selection (Always at top of Step 3) */}
-            <div className="space-y-3">
-              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="mb-1.5 block text-[10px] font-bold uppercase text-slate-500 tracking-wider">Giờ Bắt Đầu</label>
-                  <input
-                    type="time"
-                    min="05:00"
-                    max="22:00"
-                    step={60}
-                    value={selectedStartTime}
-                    onChange={(e) => handleStartTimeSelect(e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-bold text-slate-900 outline-none focus:border-emerald-500 focus:bg-white transition"
-                  />
-                </div>
-                <div>
-                  <label className="mb-1.5 block text-[10px] font-bold uppercase text-slate-500 tracking-wider">Thời Lượng</label>
-                  <select 
-                    value={selectedDuration}
-                    onChange={(e) => setSelectedDuration(Number(e.target.value))}
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-bold text-slate-900 outline-none focus:border-emerald-500 focus:bg-white transition"
-                  >
-                    {availableDurations.map(dur => (
-                      <option key={dur} value={dur}>
-                        {dur % 60 === 0 ? `${dur / 60} tiếng` : `${Math.floor(dur / 60)} tiếng 30 phút`}
-                      </option>
-                    ))}
-                  </select>
+                  <h3 className="text-sm font-black uppercase tracking-wider text-slate-900">LỊCH SÂN TRỰC QUAN REAL-TIME</h3>
+                  <p className="text-[10px] text-slate-500 font-medium">Chạm vào ô giờ trống (màu vàng) trên bảng lịch để chọn sân & thời gian</p>
                 </div>
               </div>
-              
-              {selectedStartTime && (
-                <div className="flex items-center justify-between rounded-xl bg-emerald-50/50 p-3 border border-emerald-100 animate-in fade-in duration-200">
-                  <span className="text-xs font-semibold text-emerald-800">Khung giờ đã chọn:</span>
-                  <span className="text-sm font-black text-emerald-600">{selectedSlot}</span>
-                </div>
-              )}
+              <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">
+                {currentSport.name} ({currentSport.pricePerHour / 1000}k/h)
+              </span>
             </div>
 
-            {/* 2. Available Courts (Shows ONLY AFTER date & time are selected) */}
-            {!selectedDate || !selectedStartTime ? (
-              <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50/80 p-3.5 text-center text-xs text-slate-500">
-                <p className="font-semibold text-slate-600">
-                  {!selectedDate 
-                    ? "Vui lòng chọn Ngày thi đấu để tiếp tục" 
-                    : "Vui lòng chọn Giờ bắt đầu để hiển thị các sân khả dụng"}
-                </p>
+            {/* Embedded Visual Interactive Schedule Grid */}
+            <div className="rounded-xl overflow-hidden border border-slate-200 bg-white shadow-xs">
+              <CustomerSchedule
+                initialSport={selectedSportId}
+                initialDate={scheduleDateObj}
+                selectedCourtName={selectedCourt}
+                selectedTimeStr={selectedStartTime}
+                selectedDurationMinutes={selectedDuration}
+                hideHeaderControls={true}
+                isInlineBookingMode={true}
+                onSelectSlot={(sportId, courtName, time, dateStr) => {
+                  handleSelectSlotFromSchedule(sportId, courtName, time, dateStr);
+                }}
+              />
+            </div>
+
+            {/* Slot Selection Feedback Card */}
+            {selectedCourt && selectedStartTime ? (
+              <div className="flex items-center justify-between rounded-xl bg-emerald-50 p-3.5 border border-emerald-200 animate-in fade-in slide-in-from-top-1 duration-200">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-emerald-500 text-white flex items-center justify-center font-black shrink-0">
+                    <CheckCircle2 className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="text-xs font-black text-emerald-950 uppercase">{selectedCourt}</span>
+                      <span className="text-[10px] font-extrabold text-emerald-800 bg-emerald-100 px-1.5 py-0.5 rounded">
+                        {selectedStartTime} - {getEndTime(selectedStartTime, selectedDuration)}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-emerald-700 font-semibold mt-0.5">
+                      {currentSport.name} • {durationHours} tiếng • {formattedPrice}
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    const el = document.getElementById('booking-summary-section');
+                    if (el) el.scrollIntoView({ behavior: 'smooth' });
+                  }}
+                  className="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black px-3.5 py-2 active:scale-95 transition cursor-pointer shadow-xs shrink-0 flex items-center gap-1"
+                >
+                  Đặt sân này <ArrowRight className="w-3.5 h-3.5" />
+                </button>
               </div>
             ) : (
-              <div className="pt-3 border-t border-slate-100 animate-in fade-in slide-in-from-top-2 duration-300">
-                <div className="flex items-center justify-between mb-2">
-                  <label className="block text-[10px] font-bold uppercase text-slate-500 tracking-wider">
-                    Sân khả dụng ({availableCourts.length} sân trống)
-                  </label>
-                  <span className="text-[10px] text-emerald-600 font-bold">
-                    {selectedSlot}
-                  </span>
-                </div>
-
-                {availableCourts.length > 0 ? (
-                  <div className="flex flex-wrap gap-2">
-                    {availableCourts.map((court) => {
-                      const isCourtSelected = selectedCourt === court;
-                      return (
-                        <button
-                          key={court}
-                          type="button"
-                          onClick={() => setSelectedCourt(court)}
-                          className={[
-                            'rounded-xl px-3.5 py-2 text-xs font-bold transition active:scale-95 flex items-center gap-1.5 cursor-pointer',
-                            isCourtSelected
-                              ? 'bg-emerald-50 border-2 border-emerald-500 text-emerald-800 font-black shadow-xs'
-                              : 'bg-white border border-slate-200 text-slate-700 hover:border-emerald-300 hover:bg-emerald-50/30',
-                          ].join(' ')}
-                        >
-                          <span className={`w-2 h-2 rounded-full ${isCourtSelected ? 'bg-emerald-500' : 'bg-slate-300'}`}></span>
-                          {court}
-                        </button>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <div className="rounded-xl border border-amber-200 bg-amber-50 p-3.5 text-center text-xs text-amber-800 space-y-2">
-                    <p className="font-bold">Khung giờ này hiện đã kín sân!</p>
-                    <p className="text-[11px] text-amber-700">Vui lòng chọn giờ khác hoặc bấm nút "Xem lịch sân" ở góc dưới để tìm giờ trống.</p>
-                    <button
-                      type="button"
-                      onClick={() => setShowScheduleModal(true)}
-                      className="inline-flex items-center gap-1 rounded-lg bg-amber-600 text-white font-bold px-3 py-1.5 text-[11px] hover:bg-amber-700 active:scale-95 transition cursor-pointer"
-                    >
-                      Mở lịch sân xem giờ trống
-                    </button>
-                  </div>
-                )}
+              <div className="rounded-xl border border-dashed border-amber-300 bg-amber-50/70 p-3 text-center text-xs text-amber-800 animate-pulse">
+                <p className="font-bold">👆 Quý khách vui lòng chạm vào một ô giờ còn trống (màu vàng) trên bảng lịch ở trên để bắt đầu đặt sân.</p>
               </div>
             )}
           </div>
 
           {/* ⚡ BƯỚC 4: TÓM TẮT ĐƠN ĐẶT SÂN */}
-          <div id="booking-summary-section" className="rounded-2xl border border-slate-200 bg-white p-4 space-y-3 shadow-xs scroll-mt-20">
+          <div id="booking-summary-section" className="rounded-2xl border border-slate-200 bg-white p-4 space-y-3.5 shadow-xs scroll-mt-20">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500 text-xs font-black text-white">4</span>
                 <h3 className="text-sm font-black uppercase tracking-wider text-slate-900">TÓM TẮT ĐƠN ĐẶT SÂN</h3>
               </div>
-              <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-[10px] font-extrabold uppercase text-emerald-700 border border-emerald-200">
-                Xác nhận
-              </span>
+              {selectedCourt && selectedStartTime ? (
+                <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-[10px] font-extrabold uppercase text-emerald-700 border border-emerald-200 flex items-center gap-1">
+                  <CheckCircle2 className="w-3 h-3" /> Đã chọn sân
+                </span>
+              ) : (
+                <span className="rounded-full bg-amber-50 px-2.5 py-0.5 text-[10px] font-extrabold uppercase text-amber-700 border border-amber-200">
+                  Chờ chọn lịch
+                </span>
+              )}
             </div>
 
-            <div className="space-y-2 rounded-xl bg-slate-50 p-3.5 border border-slate-200 text-xs">
-              <div className="flex items-center justify-between">
-                <span className="text-slate-500">Môn thi đấu</span>
-                <span className="font-bold text-slate-900">{currentSport.name}</span>
+            {!selectedCourt || !selectedStartTime ? (
+              <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4 text-center text-xs text-slate-500 space-y-2">
+                <p className="font-bold text-slate-700">Chưa có thông tin lịch sân</p>
+                <p className="text-[11px] text-slate-500">Vui lòng chạm vào một ô giờ trống trên bảng lịch ở Bước 3 phía trên để tiếp tục.</p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const el = document.getElementById('booking-schedule-section');
+                    if (el) el.scrollIntoView({ behavior: 'smooth' });
+                  }}
+                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 text-xs font-black border border-emerald-200 hover:bg-emerald-100 transition cursor-pointer"
+                >
+                  Xem bảng lịch Bước 3 👆
+                </button>
               </div>
-              <div className="flex items-center justify-between">
-                <span className="text-slate-500">Sân thi đấu</span>
-                <span className="font-bold text-emerald-600">{selectedCourt}</span>
+            ) : (
+              <div className="space-y-3">
+                <div className="space-y-2.5 rounded-xl bg-slate-50 p-3.5 border border-slate-200 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-500">Môn thi đấu</span>
+                    <span className="font-bold text-slate-900">{currentSport.name}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-500">Sân thi đấu</span>
+                    <span className="font-black text-emerald-700 text-sm">{selectedCourt}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-500">Ngày đặt</span>
+                    <span className="font-bold text-slate-900">{selectedDate}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-500">Giờ bắt đầu</span>
+                    <span className="font-bold text-slate-900">{selectedStartTime}</span>
+                  </div>
+
+                  {/* Duration Selector */}
+                  <div className="flex items-center justify-between border-t border-slate-200/80 pt-2">
+                    <span className="text-slate-600 font-bold">Thời lượng thuê:</span>
+                    <select
+                      value={selectedDuration}
+                      onChange={(e) => setSelectedDuration(Number(e.target.value))}
+                      className="rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs font-black text-slate-800 outline-none focus:border-emerald-500 cursor-pointer"
+                    >
+                      {availableDurations.map((dur) => (
+                        <option key={dur} value={dur}>
+                          {dur % 60 === 0 ? `${dur / 60} tiếng` : `${Math.floor(dur / 60)} tiếng 30 phút`}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-500">Khung giờ</span>
+                    <span className="font-bold text-emerald-800 bg-emerald-100/70 px-2 py-0.5 rounded">
+                      {selectedSlot} ({durationHours} tiếng)
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-500">Đơn giá niêm yết</span>
+                    <span className="font-bold text-slate-700">{currentSport.pricePerHour.toLocaleString('vi-VN')}đ / giờ</span>
+                  </div>
+
+                  <div className="flex items-center justify-between border-t border-slate-200 pt-2.5">
+                    <span className="text-slate-700 font-black text-sm">TỔNG THANH TOÁN</span>
+                    <span className="text-2xl font-black text-emerald-600">{formattedPrice}</span>
+                  </div>
+                </div>
               </div>
-              <div className="flex items-center justify-between">
-                <span className="text-slate-500">Ngày đặt</span>
-                <span className="font-bold text-slate-900">{selectedDate}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-slate-500">Khung giờ</span>
-                <span className="font-bold text-slate-900">{selectedSlot} ({durationHours} giờ)</span>
-              </div>
-              <div className="flex items-center justify-between border-t border-slate-200 pt-2.5">
-                <span className="text-slate-600 font-bold">Tổng thanh toán</span>
-                <span className="text-xl font-black text-emerald-600">{formattedPrice}</span>
-              </div>
-            </div>
+            )}
           </div>
 
           {/* ⚡ BƯỚC 5: THÔNG TIN KHÁCH HÀNG & THANH TOÁN FORM */}
-          <form onSubmit={handleBookingSubmit} className="space-y-4">
-            <div className="rounded-2xl border border-slate-200 bg-white p-4 space-y-3 shadow-xs">
-              <div className="flex items-center gap-2">
-                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500 text-xs font-black text-white">5</span>
-                <h3 className="text-sm font-black uppercase tracking-wider text-slate-900">THÔNG TIN NGUỜI ĐẶT</h3>
+          {selectedCourt && selectedStartTime && (
+            <form onSubmit={handleBookingSubmit} className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
+              <div className="rounded-2xl border border-slate-200 bg-white p-4 space-y-3 shadow-xs">
+                <div className="flex items-center gap-2">
+                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500 text-xs font-black text-white">5</span>
+                  <h3 className="text-sm font-black uppercase tracking-wider text-slate-900">THÔNG TIN NGUỜI ĐẶT</h3>
+                </div>
+
+                <div className="space-y-3 text-xs">
+                  <div>
+                    <label className="mb-1 block font-bold uppercase text-slate-500 text-[10px] tracking-wider">
+                      Họ và tên *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={customerName}
+                      onChange={(e) => setCustomerName(e.target.value)}
+                      placeholder="Nhập họ và tên..."
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3 text-sm text-slate-900 placeholder-slate-400 outline-none transition focus:border-emerald-500 focus:bg-white"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-1 block font-bold uppercase text-slate-500 text-[10px] tracking-wider">
+                      Số điện thoại *
+                    </label>
+                    <input
+                      type="tel"
+                      required
+                      value={customerPhone}
+                      onChange={(e) => setCustomerPhone(e.target.value)}
+                      placeholder="Nhập số điện thoại..."
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3 text-sm text-slate-900 placeholder-slate-400 outline-none transition focus:border-emerald-500 focus:bg-white"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-1 block font-bold uppercase text-slate-500 text-[10px] tracking-wider">
+                      Ghi chú thêm (Tùy chọn)
+                    </label>
+                    <input
+                      type="text"
+                      value={customerNote}
+                      onChange={(e) => setCustomerNote(e.target.value)}
+                      placeholder="VD: Cần mượn thêm vợt, bóng..."
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3 text-sm text-slate-900 placeholder-slate-400 outline-none transition focus:border-emerald-500 focus:bg-white"
+                    />
+                  </div>
+
+                  <label className="flex items-center gap-2 cursor-pointer pt-1">
+                    <input
+                      type="checkbox"
+                      checked={sendZalo}
+                      onChange={(e) => setSendZalo(e.target.checked)}
+                      className="h-4 w-4 rounded border-slate-300 text-emerald-500 focus:ring-emerald-500"
+                    />
+                    <span className="text-slate-700 text-xs font-semibold">Gửi vé điện tử & thông báo nhắc lịch qua Zalo/SMS</span>
+                  </label>
+                </div>
               </div>
 
-              <div className="space-y-3 text-xs">
-                <div>
-                  <label className="mb-1 block font-bold uppercase text-slate-500 text-[10px] tracking-wider">
-                    Họ và tên *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={customerName}
-                    onChange={(e) => setCustomerName(e.target.value)}
-                    placeholder="Nhập họ và tên..."
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3 text-sm text-slate-900 placeholder-slate-400 outline-none transition focus:border-emerald-500 focus:bg-white"
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-1 block font-bold uppercase text-slate-500 text-[10px] tracking-wider">
-                    Số điện thoại *
-                  </label>
-                  <input
-                    type="tel"
-                    required
-                    value={customerPhone}
-                    onChange={(e) => setCustomerPhone(e.target.value)}
-                    placeholder="Nhập số điện thoại..."
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3 text-sm text-slate-900 placeholder-slate-400 outline-none transition focus:border-emerald-500 focus:bg-white"
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-1 block font-bold uppercase text-slate-500 text-[10px] tracking-wider">
-                    Ghi chú thêm (Tùy chọn)
-                  </label>
-                  <input
-                    type="text"
-                    value={customerNote}
-                    onChange={(e) => setCustomerNote(e.target.value)}
-                    placeholder="VD: Cần mượn thêm vợt, bóng..."
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3 text-sm text-slate-900 placeholder-slate-400 outline-none transition focus:border-emerald-500 focus:bg-white"
-                  />
-                </div>
-
-                <label className="flex items-center gap-2 cursor-pointer pt-1">
-                  <input
-                    type="checkbox"
-                    checked={sendZalo}
-                    onChange={(e) => setSendZalo(e.target.checked)}
-                    className="h-4 w-4 rounded border-slate-300 text-emerald-500 focus:ring-emerald-500"
-                  />
-                  <span className="text-slate-700 text-xs font-semibold">Gửi vé điện tử & thông báo nhắc lịch qua Zalo/SMS</span>
-                </label>
-              </div>
-            </div>
-
-            {/* SUBMIT BUTTON */}
-            <button
-              type="submit"
-              className="mt-6 w-full flex items-center justify-center gap-2 rounded-2xl bg-emerald-500 py-4 text-sm font-black uppercase tracking-widest text-white shadow-lg shadow-emerald-500/25 transition hover:bg-emerald-600 active:scale-95"
-            >
-              TIẾN HÀNH THANH TOÁN
-            </button>
-          </form>
+              {/* SUBMIT BUTTON */}
+              <button
+                type="submit"
+                className="mt-6 w-full flex items-center justify-center gap-2 rounded-2xl bg-emerald-500 py-4 text-sm font-black uppercase tracking-widest text-white shadow-lg shadow-emerald-500/25 transition hover:bg-emerald-600 active:scale-95 cursor-pointer"
+              >
+                TIẾN HÀNH THANH TOÁN ({formattedPrice})
+              </button>
+            </form>
+          )}
         </section>
 
 
@@ -1548,7 +1511,14 @@ export default function TrangChu() {
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 w-full max-w-md pointer-events-none z-40 px-4 flex justify-end animate-in fade-in zoom-in-95 duration-300">
           <button
             type="button"
-            onClick={() => setShowScheduleModal(true)}
+            onClick={() => {
+              const el = document.getElementById('booking-schedule-section');
+              if (el) {
+                el.scrollIntoView({ behavior: 'smooth' });
+              } else {
+                setShowScheduleModal(true);
+              }
+            }}
             className="pointer-events-auto flex items-center gap-2 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2.5 shadow-xl shadow-emerald-950/25 border-2 border-emerald-400 active:scale-95 transition-all group cursor-pointer"
           >
             <span className="relative flex h-2.5 w-2.5">
