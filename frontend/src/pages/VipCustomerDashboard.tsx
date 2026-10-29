@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import QrCodeArtwork from '../components/QrCodeArtwork';
 import { 
   Clock, 
   QrCode, 
@@ -994,22 +995,10 @@ export default function VipCustomerDashboard({ onLogout }: VipCustomerDashboardP
               </div>
             </div>
 
-            {/* QR Mock */}
-            <div className="mx-auto h-36 w-36 bg-white rounded-xl p-2 border border-slate-200 shadow-sm relative flex items-center justify-center">
-              <div className="grid grid-cols-4 gap-1.5 w-full h-full p-2 bg-slate-100 rounded">
-                {Array.from({ length: 16 }).map((_, idx) => (
-                  <div key={idx} className={'rounded ' + (idx % 3 === 0 ? 'bg-emerald-500' : 'bg-slate-800')}></div>
-                ))}
-              </div>
-              <div className="absolute inset-0 flex items-center justify-center">
-                <span className="bg-white text-emerald-600 px-2 py-0.5 font-black text-[10px] rounded-full shadow-md uppercase border border-emerald-100">
-                  VIETQR
-                </span>
-              </div>
-            </div>
+            <QrCodeArtwork className="mx-auto h-36 w-36 rounded-xl p-2" />
 
             <p className="text-[10px] text-slate-500">
-              Mở ứng dụng ngân hàng bất kỳ để quét mã VietQR tự động khớp tiền và nội dung.
+              Mã QR hiện là hình minh họa, chưa thể quét để chuyển khoản.
             </p>
 
             <div className="grid grid-cols-2 gap-2 pt-1">

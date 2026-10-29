@@ -1,22 +1,18 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  Banknote,
   CalendarClock,
   Check,
   CheckCheck,
-  CheckCircle2,
   Copy,
-  CreditCard,
   Landmark,
-  QrCode,
   ShieldCheck,
   WalletCards,
   X,
 } from 'lucide-react';
-import type { LucideIcon } from 'lucide-react';
+import QrCodeArtwork from './QrCodeArtwork';
 
-export type PaymentPlan = 'full' | 'half' | 'installment';
-export type PaymentMethod = 'cash' | 'qr' | 'card';
+export type PaymentPlan = 'full' | 'installment';
+export type PaymentMethod = 'qr';
 
 type ScheduleItem = {
   label: string;
@@ -55,30 +51,16 @@ type PaymentCheckoutProps = {
   customerPhone: string;
   totalAmount: number;
   registrationMonths?: number;
+  bookingDetails?: {
+    sport: string;
+    court: string;
+    date: string;
+    time: string;
+  };
+  allowInstallments?: boolean;
   onClose: () => void;
   onComplete: (result: PaymentResult) => void;
 };
-
-const methodOptions: Array<{
-  id: PaymentMethod;
-  label: string;
-  shortLabel: string;
-  icon: LucideIcon;
-}> = [
-  { id: 'cash', label: 'Tiền mặt', shortLabel: 'Tiền mặt', icon: Banknote },
-  { id: 'qr', label: 'VietQR MB Bank', shortLabel: 'VietQR', icon: QrCode },
-  { id: 'card', label: 'Quẹt thẻ POS', shortLabel: 'Thẻ POS', icon: CreditCard },
-];
-
-const qrCells = Array.from({ length: 121 }, (_, index) => {
-  const row = Math.floor(index / 11);
-  const column = index % 11;
-  const finder =
-    (row < 4 && column < 4) ||
-    (row < 4 && column > 6) ||
-    (row > 6 && column < 4);
-  return finder || ((row * 3 + column * 5 + row * column) % 7 < 3);
-});
 
 const formatCurrency = (amount: number) => `${amount.toLocaleString('vi-VN')}đ`;
 
@@ -93,19 +75,18 @@ export default function PaymentCheckout({
   customerName,
   customerPhone,
   totalAmount,
-  registrationMonths = 6,
+  registrationMonths,
+  bookingDetails,
+  allowInstallments = false,
   onClose,
   onComplete,
 }: PaymentCheckoutProps) {
-  const effectiveRegistrationMonths = getEffectiveRegistrationMonths(registrationMonths);
+  const effectiveInstallmentCount = getEffectiveRegistrationMonths(registrationMonths ?? 6);
   const [selectedPlan, setSelectedPlan] = useState<PaymentPlan>('full');
-  const [selectedMethod, setSelectedMethod] = useState<PaymentMethod>('qr');
-  const [methodConfirmed, setMethodConfirmed] = useState(false);
   const [result, setResult] = useState<PaymentResult | null>(null);
-  const [installmentCount, setInstallmentCount] = useState(effectiveRegistrationMonths);
+  const [installmentCount, setInstallmentCount] = useState(effectiveInstallmentCount);
 
   const plans = useMemo<PlanDetails[]>(() => {
-    const halfAmount = Math.round(totalAmount / 2);
     const installmentAmount = Math.floor(totalAmount / installmentCount);
     const installmentSchedule = Array.from({ length: installmentCount }, (_, index) => ({
       label: index === 0 ? 'Kỳ 1 · Hôm nay' : `Kỳ ${index + 1} · sau ${index} tháng`,
@@ -116,7 +97,7 @@ export default function PaymentCheckout({
       isToday: index === 0,
     }));
 
-    return [
+    const availablePlans: PlanDetails[] = [
       {
         id: 'full',
         title: 'Trả toàn bộ một lần (100%)',
@@ -126,20 +107,10 @@ export default function PaymentCheckout({
         nextDue: null,
         schedule: [{ label: 'Hôm nay', amount: totalAmount, isToday: true }],
       },
-      {
-        id: 'half',
-        title: 'Cọc 50%, trả phần còn lại giữa kỳ',
-        description: `${formatCurrency(halfAmount)} hôm nay · phần còn lại giữa kỳ`,
-        badge: 'Từ 3 tháng',
-        todayAmount: halfAmount,
-        remainingAmount: totalAmount - halfAmount,
-        nextDue: 'Giữa kỳ · sau 3 tháng',
-        schedule: [
-          { label: 'Hôm nay', amount: halfAmount, isToday: true },
-          { label: 'Giữa kỳ · sau 3 tháng', amount: totalAmount - halfAmount, isToday: false },
-        ],
-      },
-      {
+    ];
+
+    if (allowInstallments) {
+      availablePlans.push({
         id: 'installment',
         title: 'Trả theo từng kỳ linh hoạt',
         description: `${installmentCount} kỳ trong ${installmentCount} tháng · kỳ đầu thanh toán hôm nay`,
@@ -148,29 +119,21 @@ export default function PaymentCheckout({
         remainingAmount: totalAmount - (installmentSchedule[0]?.amount ?? 0),
         nextDue: installmentSchedule[1]?.label ?? null,
         schedule: installmentSchedule,
-      },
-    ];
-  }, [installmentCount, totalAmount]);
+      });
+    }
+
+    return availablePlans;
+  }, [allowInstallments, installmentCount, totalAmount]);
 
   const activePlan = plans.find((plan) => plan.id === selectedPlan) ?? plans[0];
-  const activeMethod = methodOptions.find((method) => method.id === selectedMethod) ?? methodOptions[1];
-  const requiresMethodConfirmation = selectedMethod === 'cash' || selectedMethod === 'card';
-  const canSubmit = !requiresMethodConfirmation || methodConfirmed;
   const transferContent = `THANHTOAN ${orderCode.replace(/[^a-zA-Z0-9]/g, '')}`;
 
   const closeCheckout = useCallback(() => {
     setSelectedPlan('full');
-    setSelectedMethod('qr');
-    setMethodConfirmed(false);
     setResult(null);
-    setInstallmentCount(effectiveRegistrationMonths);
+    setInstallmentCount(effectiveInstallmentCount);
     onClose();
-  }, [effectiveRegistrationMonths, onClose]);
-
-  useEffect(() => {
-    setInstallmentCount(effectiveRegistrationMonths);
-    setMethodConfirmed(false);
-  }, [effectiveRegistrationMonths, open]);
+  }, [effectiveInstallmentCount, onClose]);
 
   useEffect(() => {
     if (!open) return;
@@ -191,28 +154,19 @@ export default function PaymentCheckout({
 
   const selectPlan = (plan: PaymentPlan) => {
     setSelectedPlan(plan);
-    setMethodConfirmed(false);
-  };
-
-  const selectMethod = (method: PaymentMethod) => {
-    setSelectedMethod(method);
-    setMethodConfirmed(false);
   };
 
   const selectInstallmentCount = (count: number) => {
     setInstallmentCount(count);
-    setMethodConfirmed(false);
   };
 
   const confirmPayment = () => {
-    if (!canSubmit) return;
-
     setResult({
       orderCode,
       plan: activePlan.id,
       planLabel: activePlan.title,
-      method: activeMethod.id,
-      methodLabel: activeMethod.label,
+      method: 'qr',
+      methodLabel: 'VietQR MB Bank',
       paidAmount: activePlan.todayAmount,
       remainingAmount: activePlan.remainingAmount,
       nextDue: activePlan.nextDue,
@@ -275,7 +229,7 @@ export default function PaymentCheckout({
           <div className="mt-2.5 pt-2 border-t border-slate-100 flex items-center justify-between text-[11px]">
             <div className="flex items-center gap-1.5 font-black text-slate-900">
               <WalletCards className="w-4 h-4 text-emerald-600" />
-              <span>{result ? 'Thanh toán thành công' : 'Thanh toán đặt sân'}</span>
+              <span>{result ? 'Ghi nhận thanh toán' : 'Thanh toán đặt sân'}</span>
             </div>
             <span className="text-slate-500 font-mono font-bold text-[10px] bg-slate-100 px-2 py-0.5 rounded-full">
               {orderCode}
@@ -287,7 +241,7 @@ export default function PaymentCheckout({
         {/* 📋 NỘI DUNG FORM (ẨN SCROLLBAR XẤU, CUỘN MƯỢT)           */}
         {/* ======================================================== */}
         {result ? (
-          <SuccessContent result={result} />
+          <PaymentRecordContent result={result} />
         ) : (
           <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar p-3.5 space-y-3.5 text-xs">
             {/* BƯỚC 1: THÔNG TIN ĐẶT SÂN */}
@@ -298,10 +252,17 @@ export default function PaymentCheckout({
                   <InfoItem label="Khách hàng" value={customerName} />
                   <InfoItem label="Số điện thoại" value={customerPhone} />
                   <InfoItem label="Mã đặt sân" value={orderCode} mono />
-                  <InfoItem label="Thời hạn đăng ký" value={`${effectiveRegistrationMonths} tháng`} />
+                  {bookingDetails && (
+                    <>
+                      <InfoItem label="Môn thể thao" value={bookingDetails.sport} />
+                      <InfoItem label="Sân / khu vực" value={bookingDetails.court} />
+                      <InfoItem label="Ngày đặt" value={bookingDetails.date} />
+                      <InfoItem label="Khung giờ" value={bookingDetails.time} />
+                    </>
+                  )}
                 </div>
                 <div className="mt-2.5 flex items-center justify-between border-t border-slate-200 pt-2.5">
-                  <span className="text-[11px] font-bold text-slate-600">Tổng tiền đăng ký:</span>
+                  <span className="text-xs font-bold text-slate-600">Tổng tiền đặt sân:</span>
                   <span className="text-base font-black text-slate-900 tabular-nums">
                     {formatCurrency(totalAmount)}
                   </span>
@@ -312,7 +273,11 @@ export default function PaymentCheckout({
             {/* BƯỚC 2: CHỌN CÁCH THANH TOÁN */}
             <section aria-labelledby="payment-plan-heading">
               <SectionHeading number="2" id="payment-plan-heading" title="Chọn hình thức thanh toán" />
-              <p className="mt-0.5 text-[10px] text-slate-500">Chọn cách chia khoản tiền theo thời gian.</p>
+              <p className="mt-0.5 text-[10px] text-slate-500">
+                {allowInstallments
+                  ? 'Thanh toán đủ ngay hoặc chia đợt theo thỏa thuận hợp đồng.'
+                  : 'Thanh toán đủ 100% ngay khi xác nhận đặt sân.'}
+              </p>
               
               <div className="mt-2 space-y-1.5" role="radiogroup" aria-label="Cách thanh toán">
                 {plans.map((plan) => {
@@ -422,62 +387,9 @@ export default function PaymentCheckout({
             {/* BƯỚC 3: PHƯƠNG THỨC THANH TOÁN */}
             <section aria-labelledby="payment-method-heading">
               <SectionHeading number="3" id="payment-method-heading" title="Phương thức thanh toán" />
-              <p className="mt-0.5 text-[10px] text-slate-500">Chọn kênh thực hiện khoản thanh toán hôm nay.</p>
-              
-              <div className="mt-2 grid grid-cols-3 gap-1.5" role="radiogroup" aria-label="Phương thức thanh toán">
-                {methodOptions.map((method) => {
-                  const Icon = method.icon;
-                  const selected = method.id === selectedMethod;
-                  return (
-                    <button
-                      key={method.id}
-                      type="button"
-                      role="radio"
-                      aria-checked={selected}
-                      onClick={() => selectMethod(method.id)}
-                      className={`flex flex-col items-center justify-center gap-1 rounded-2xl border p-2 text-center transition cursor-pointer ${
-                        selected
-                          ? 'border-emerald-500 bg-emerald-50/70 text-emerald-800 font-bold shadow-xs ring-1 ring-emerald-500/20'
-                          : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50/50'
-                      }`}
-                    >
-                      <Icon className={`h-4 w-4 ${selected ? 'text-emerald-600' : 'text-slate-500'}`} />
-                      <span className="text-[10px] font-black">{method.label}</span>
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* NỘI DUNG THEO PHƯƠNG THỨC ĐÃ CHỌN */}
+              <p className="mt-0.5 text-[10px] text-slate-500">Chỉ nhận chuyển khoản qua mã QR của sân.</p>
               <div className="mt-2">
-                {selectedMethod === 'qr' && (
-                  <QrPaymentContent
-                    amount={activePlan.todayAmount}
-                    transferContent={transferContent}
-                  />
-                )}
-                {selectedMethod === 'cash' && (
-                  <ManualConfirmation
-                    icon={Banknote}
-                    title="Tiền mặt cần thu"
-                    amount={activePlan.todayAmount}
-                    instruction="Nhân viên kiểm đếm đủ tiền mặt từ khách trước khi bấm xác nhận."
-                    buttonLabel="Xác nhận đã thu đủ tiền mặt"
-                    confirmed={methodConfirmed}
-                    onToggle={() => setMethodConfirmed((value) => !value)}
-                  />
-                )}
-                {selectedMethod === 'card' && (
-                  <ManualConfirmation
-                    icon={CreditCard}
-                    title="Số tiền quẹt POS"
-                    amount={activePlan.todayAmount}
-                    instruction="Quẹt/chạm thẻ trên máy POS và đối chiếu biên lai thành công."
-                    buttonLabel="Xác nhận đã thanh toán POS thành công"
-                    confirmed={methodConfirmed}
-                    onToggle={() => setMethodConfirmed((value) => !value)}
-                  />
-                )}
+                <QrPaymentContent amount={activePlan.todayAmount} transferContent={transferContent} />
               </div>
             </section>
           </div>
@@ -493,27 +405,25 @@ export default function PaymentCheckout({
               onClick={() => {
                 onComplete(result);
                 setSelectedPlan('full');
-                setSelectedMethod('qr');
-                setMethodConfirmed(false);
                 setResult(null);
-                setInstallmentCount(effectiveRegistrationMonths);
+                setInstallmentCount(effectiveInstallmentCount);
               }}
               className="w-full flex items-center justify-center gap-1.5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 py-2.5 px-4 text-xs font-black uppercase tracking-wide text-white shadow-xs transition active:scale-95 cursor-pointer"
             >
-              <Check className="h-4 w-4" strokeWidth={3} /> Hoàn tất đơn đặt sân
+              <Check className="h-4 w-4" strokeWidth={3} /> Hoàn tất ghi nhận
             </button>
           ) : (
             <>
               <div className="flex items-center gap-2.5 text-xs">
                 <div>
-                  <span className="block text-[9px] font-bold text-slate-500">Thu hôm nay:</span>
+                  <span className="block text-[11px] font-bold text-slate-500">Ghi nhận hôm nay:</span>
                   <span className="text-sm font-black text-emerald-700 tabular-nums">
                     {formatCurrency(activePlan.todayAmount)}
                   </span>
                 </div>
                 <div className="h-5 w-px bg-slate-200" />
                 <div>
-                  <span className="block text-[9px] font-bold text-slate-500">Còn lại:</span>
+                  <span className="block text-[11px] font-bold text-slate-500">Còn phải thu:</span>
                   <span className={`text-xs font-black tabular-nums ${activePlan.remainingAmount > 0 ? 'text-amber-600' : 'text-slate-700'}`}>
                     {formatCurrency(activePlan.remainingAmount)}
                   </span>
@@ -531,10 +441,9 @@ export default function PaymentCheckout({
                 <button
                   type="button"
                   onClick={confirmPayment}
-                  disabled={!canSubmit}
-                  className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs uppercase tracking-wide flex items-center justify-center gap-1 shadow-xs transition active:scale-95 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400 cursor-pointer"
+                  className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs uppercase tracking-wide flex items-center justify-center gap-1 shadow-xs transition active:scale-95 cursor-pointer"
                 >
-                  <ShieldCheck className="h-3.5 w-3.5" /> Xác nhận
+                  <ShieldCheck className="h-3.5 w-3.5" /> Tôi đã đối soát
                 </button>
               </div>
             </>
@@ -561,8 +470,8 @@ function SectionHeading({ number, id, title }: { number: string; id: string; tit
 function InfoItem({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) {
   return (
     <div className="min-w-0">
-      <p className="text-[10px] font-bold text-slate-500">{label}</p>
-      <p className={`mt-0.5 truncate text-[11px] font-black text-slate-900 ${mono ? 'font-mono' : ''}`}>{value}</p>
+      <p className="text-[11px] font-bold text-slate-600">{label}</p>
+      <p className={`mt-0.5 truncate text-xs font-black text-slate-900 ${mono ? 'font-mono' : ''}`}>{value}</p>
     </div>
   );
 }
@@ -586,18 +495,7 @@ function QrPaymentContent({ amount, transferContent }: { amount: number; transfe
     <div className="rounded-2xl border border-emerald-300 bg-emerald-50/50 p-3">
       <div className="flex items-center gap-3">
         {/* QR Scan box */}
-        <div className="relative h-28 w-28 shrink-0 overflow-hidden rounded-xl border border-slate-200 bg-white p-1.5 shadow-xs text-center flex items-center justify-center">
-          <div className="grid h-full w-full grid-cols-11 gap-[2px] rounded bg-white p-1">
-            {qrCells.map((filled, index) => (
-              <span key={index} className={filled ? 'bg-slate-900' : 'bg-white'} />
-            ))}
-          </div>
-          <div className="absolute inset-0 flex items-center justify-center">
-            <span className="bg-white text-emerald-700 px-1.5 py-0.5 font-black text-[8px] rounded-full shadow border border-emerald-100 uppercase">
-              COURTX
-            </span>
-          </div>
-        </div>
+        <QrCodeArtwork className="h-28 w-28 shrink-0 rounded-xl p-1.5" />
 
         {/* Thông tin chuyển khoản */}
         <div className="min-w-0 flex-1 space-y-1.5 text-xs">
@@ -605,18 +503,18 @@ function QrPaymentContent({ amount, transferContent }: { amount: number; transfe
             <div className="flex items-center gap-1 font-black text-slate-900 text-[11px]">
               <Landmark className="h-3.5 w-3.5 text-emerald-700" /> MB Bank
             </div>
-            <span className="rounded bg-emerald-100 px-1.5 py-0.2 text-[8px] font-black text-emerald-700">VIETQR</span>
+            <span className="rounded bg-emerald-100 px-1.5 py-0.2 text-[10px] font-black text-emerald-700">VIETQR</span>
           </div>
 
           <div className="flex items-center justify-between rounded-lg bg-white px-2 py-1 border border-slate-200/80">
             <div>
-              <p className="text-[9px] font-bold text-slate-500">STK MB Bank</p>
+              <p className="text-[11px] font-bold text-slate-600">STK MB Bank</p>
               <p className="font-mono text-[11px] font-black text-slate-900">12427519920188</p>
             </div>
             <button
               type="button"
               onClick={() => copyToClipboard('12427519920188', 'acc')}
-              className="flex items-center gap-1 text-[9px] font-bold text-emerald-700 hover:text-emerald-800 bg-emerald-50 px-1.5 py-0.5 rounded cursor-pointer"
+              className="flex items-center gap-1 text-[10px] font-bold text-emerald-700 hover:text-emerald-800 bg-emerald-50 px-1.5 py-0.5 rounded cursor-pointer"
             >
               {copiedAccount ? <CheckCheck className="w-2.5 h-2.5" /> : <Copy className="w-2.5 h-2.5" />}
               <span>{copiedAccount ? 'Đã chép' : 'Chép'}</span>
@@ -625,24 +523,24 @@ function QrPaymentContent({ amount, transferContent }: { amount: number; transfe
 
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-[9px] font-bold text-slate-500">Số tiền cần quét</p>
+              <p className="text-[11px] font-bold text-slate-600">Số tiền cần quét</p>
               <p className="text-xs font-black tabular-nums text-emerald-700">{formatCurrency(amount)}</p>
             </div>
             <div className="text-right">
-              <p className="text-[9px] font-bold text-slate-500">Chủ tài khoản</p>
-              <p className="text-[10px] font-black text-slate-800 uppercase">COURTX ARENA</p>
+              <p className="text-[11px] font-bold text-slate-600">Chủ tài khoản</p>
+              <p className="text-[11px] font-black text-slate-800 uppercase">COURTX ARENA</p>
             </div>
           </div>
 
           <div className="flex items-center justify-between rounded-lg bg-white px-2 py-1 border border-slate-200/80">
             <div className="min-w-0 flex-1">
-              <p className="text-[9px] font-bold text-slate-500">Nội dung CK</p>
-              <p className="font-mono text-[10px] font-black text-slate-900 truncate">{transferContent}</p>
+              <p className="text-[11px] font-bold text-slate-600">Nội dung chuyển khoản</p>
+              <p className="font-mono text-[11px] font-black text-slate-900 truncate">{transferContent}</p>
             </div>
             <button
               type="button"
               onClick={() => copyToClipboard(transferContent, 'content')}
-              className="flex items-center gap-1 text-[9px] font-bold text-emerald-700 hover:text-emerald-800 bg-emerald-50 px-1.5 py-0.5 rounded cursor-pointer shrink-0 ml-1.5"
+              className="flex items-center gap-1 text-[10px] font-bold text-emerald-700 hover:text-emerald-800 bg-emerald-50 px-1.5 py-0.5 rounded cursor-pointer shrink-0 ml-1.5"
             >
               {copiedContent ? <CheckCheck className="w-2.5 h-2.5" /> : <Copy className="w-2.5 h-2.5" />}
               <span>{copiedContent ? 'Đã chép' : 'Chép'}</span>
@@ -650,88 +548,47 @@ function QrPaymentContent({ amount, transferContent }: { amount: number; transfe
           </div>
         </div>
       </div>
-      <p className="mt-2 rounded-lg bg-white/90 px-2 py-1 text-[9px] leading-relaxed text-slate-600 border border-emerald-100">
-        💡 Quét mã bằng app ngân hàng bất kỳ để tự động điền đúng số tiền và nội dung.
+      <p className="mt-2 rounded-lg bg-white/90 px-2 py-1 text-[12px] leading-relaxed text-slate-700 border border-emerald-100">
+        Mã QR minh họa, không dùng để chuyển tiền. Hệ thống không xác minh giao dịch ngân hàng; chỉ ghi nhận sau khi nhân viên tự đối soát khoản tiền thực nhận.
       </p>
     </div>
   );
 }
 
-function ManualConfirmation({
-  icon: Icon,
-  title,
-  amount,
-  instruction,
-  buttonLabel,
-  confirmed,
-  onToggle,
-}: {
-  icon: LucideIcon;
-  title: string;
-  amount: number;
-  instruction: string;
-  buttonLabel: string;
-  confirmed: boolean;
-  onToggle: () => void;
-}) {
-  return (
-    <div className={`rounded-2xl border p-3 transition ${confirmed ? 'border-emerald-300 bg-emerald-50/70' : 'border-slate-200 bg-slate-50/70'}`}>
-      <div className="flex items-center gap-2.5">
-        <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${confirmed ? 'bg-emerald-600 text-white' : 'bg-white text-slate-600 border border-slate-200 shadow-2xs'}`}>
-          {confirmed ? <Check className="h-4 w-4" strokeWidth={3} /> : <Icon className="h-4 w-4" />}
-        </span>
-        <div className="min-w-0 flex-1">
-          <p className="text-[10px] font-bold text-slate-500">{title}</p>
-          <p className="text-sm font-black tabular-nums text-slate-900">{formatCurrency(amount)}</p>
-        </div>
-      </div>
-      <p className="mt-1.5 text-[10px] leading-relaxed text-slate-600">{instruction}</p>
-      <button
-        type="button"
-        aria-pressed={confirmed}
-        onClick={onToggle}
-        className={`mt-2 flex w-full items-center justify-center gap-1.5 rounded-xl border py-2 text-[11px] font-black transition cursor-pointer ${
-          confirmed
-            ? 'border-emerald-600 bg-emerald-600 text-white shadow-xs'
-            : 'border-slate-300 bg-white text-slate-700 hover:border-emerald-400 hover:text-emerald-700'
-        }`}
-      >
-        <Check className="h-3.5 w-3.5" /> {confirmed ? 'Đã xác nhận thành công' : buttonLabel}
-      </button>
-    </div>
-  );
-}
-
-function SuccessContent({ result }: { result: PaymentResult }) {
+function PaymentRecordContent({ result }: { result: PaymentResult }) {
   return (
     <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar p-4 text-xs space-y-3.5">
       <div className="text-center py-1">
-        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-600 text-white shadow-lg shadow-emerald-600/20">
+        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-100 text-amber-800">
           <Check className="h-6 w-6" strokeWidth={3} />
         </div>
-        <p className="mt-2.5 text-[9px] font-black uppercase tracking-wider text-emerald-700">Giao dịch đã xác nhận</p>
+        <p className="mt-2.5 text-[11px] font-black uppercase tracking-wider text-amber-800">Ghi nhận nội bộ từ nhân viên</p>
         <h3 className="mt-0.5 text-base font-black text-slate-900">
-          Đã thu {formatCurrency(result.paidAmount)}
+          Ghi nhận {formatCurrency(result.paidAmount)}
         </h3>
         <p className="mt-0.5 text-[10px] text-slate-500">
           Mã đơn: <strong className="font-mono text-slate-800">{result.orderCode}</strong>
         </p>
       </div>
 
+      <div role="alert" className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-[12px] leading-relaxed text-amber-950">
+        Mã QR chỉ minh họa và không dùng để chuyển tiền. Đây không phải xác nhận từ ngân hàng; hệ thống không kiểm tra giao dịch tự động. Chỉ hoàn tất sau khi nhân viên đã tự đối soát khoản tiền thực nhận.
+      </div>
+
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50/80 p-3 space-y-2">
         <ResultRow label="Hình thức thanh toán" value={result.planLabel} />
         {result.installmentCount && (
-          <ResultRow label="Số kỳ đăng ký" value={`${result.installmentCount} kỳ (${result.installmentCount} tháng)`} />
+          <ResultRow label="Số kỳ thanh toán" value={`${result.installmentCount} kỳ (${result.installmentCount} tháng)`} />
         )}
         <ResultRow label="Kênh thu tiền" value={result.methodLabel} />
         
         <div className="grid grid-cols-2 gap-2 border-t border-slate-200 pt-2">
           <div>
-            <p className="text-[9px] font-bold text-slate-500">Đã thu</p>
-            <p className="mt-0.5 text-xs font-black tabular-nums text-emerald-700">{formatCurrency(result.paidAmount)}</p>
+            <p className="text-[11px] font-bold text-slate-600">Đã ghi nhận</p>
+            <p className="mt-0.5 text-xs font-black tabular-nums text-slate-900">{formatCurrency(result.paidAmount)}</p>
           </div>
           <div className="text-right">
-            <p className="text-[9px] font-bold text-slate-500">Còn lại</p>
+            <p className="text-[11px] font-bold text-slate-600">Còn phải thu</p>
             <p className={`mt-0.5 text-xs font-black tabular-nums ${result.remainingAmount > 0 ? 'text-amber-600' : 'text-slate-800'}`}>
               {formatCurrency(result.remainingAmount)}
             </p>
@@ -760,9 +617,9 @@ function SuccessContent({ result }: { result: PaymentResult }) {
           </div>
         </div>
       ) : (
-        <div className="flex items-center gap-2 rounded-2xl bg-emerald-50 p-2.5 text-[10px] text-emerald-800 border border-emerald-100 font-medium">
-          <ShieldCheck className="h-4 w-4 shrink-0 text-emerald-600" />
-          <span>Đã thanh toán đủ 100%. Không còn công nợ.</span>
+        <div className="flex items-center gap-2 rounded-2xl bg-slate-50 p-2.5 text-[12px] text-slate-800 border border-slate-200 font-medium">
+          <ShieldCheck className="h-4 w-4 shrink-0 text-slate-600" />
+          <span>Đã ghi nhận đủ 100% tại quầy sau đối soát thủ công; không có xác minh tự động từ ngân hàng.</span>
         </div>
       )}
     </div>

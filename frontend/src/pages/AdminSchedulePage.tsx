@@ -10,7 +10,7 @@ type BookingDetail = {
   time: string;
   paymentStatus: string;
   total: string;
-  deposit: string;
+  paidAmount: string;
   remaining: string;
   status: string;
 };
@@ -22,10 +22,10 @@ const baseBooking: BookingDetail = {
   court: 'Sân 01',
   sport: 'Cầu lông',
   time: '06:00 - 07:30',
-  paymentStatus: 'Đã đặt cọc 50%',
+  paymentStatus: 'Đã thanh toán đủ qua VietQR',
   total: '180.000 đ',
-  deposit: '90.000 đ',
-  remaining: '90.000 đ',
+  paidAmount: '180.000 đ',
+  remaining: '0 đ',
   status: 'Đã đặt',
 };
 
@@ -153,10 +153,10 @@ export default function AdminSchedulePage({ onCheckoutModeChange, onBookingCheck
       court: 'Sân 02',
       sport: 'Cầu lông',
       time: '11:30 - 13:00',
-      paymentStatus: 'Đã đặt cọc 50%',
+      paymentStatus: 'Đã thanh toán đủ qua VietQR',
       total: '180.000 đ',
-      deposit: '90.000 đ',
-      remaining: '90.000 đ',
+      paidAmount: '180.000 đ',
+      remaining: '0 đ',
       status: 'Chờ duyệt hủy',
     },
     {
@@ -166,10 +166,10 @@ export default function AdminSchedulePage({ onCheckoutModeChange, onBookingCheck
       court: 'Sân 06',
       sport: 'Cầu lông',
       time: '14:00 - 15:30',
-      paymentStatus: 'Đã đặt cọc 50%',
+      paymentStatus: 'Đã thanh toán đủ qua VietQR',
       total: '210.000 đ',
-      deposit: '105.000 đ',
-      remaining: '105.000 đ',
+      paidAmount: '210.000 đ',
+      remaining: '0 đ',
       status: 'Chờ duyệt hủy',
     },
     {
@@ -179,10 +179,10 @@ export default function AdminSchedulePage({ onCheckoutModeChange, onBookingCheck
       court: 'Sân 05',
       sport: 'Cầu lông',
       time: '07:00 - 08:30',
-      paymentStatus: 'Đã đặt cọc 50%',
+      paymentStatus: 'Đã thanh toán đủ qua VietQR',
       total: '210.000 đ',
-      deposit: '105.000 đ',
-      remaining: '105.000 đ',
+      paidAmount: '210.000 đ',
+      remaining: '0 đ',
       status: 'Chờ duyệt hủy',
     },
   ];
@@ -290,9 +290,9 @@ export default function AdminSchedulePage({ onCheckoutModeChange, onBookingCheck
           <div className="mb-4 flex items-center justify-between gap-2">
             <h3 className="flex items-center gap-1.5 text-[11px] font-black uppercase tracking-wide text-slate-600">
               <CreditCard className="h-4 w-4" />
-              Tài chính & Đặt cọc
+              Tài chính & Thanh toán
             </h3>
-            <span className="rounded-full bg-indigo-100 px-2.5 py-1 text-[9px] font-black uppercase tracking-wide text-slate-700">Tiền mặt / Chuyển khoản</span>
+            <span className="rounded-full bg-indigo-100 px-2.5 py-1 text-[9px] font-black uppercase tracking-wide text-slate-700">VietQR • 100%</span>
           </div>
           <div className="space-y-3">
             <div className="flex items-start justify-between gap-3">
@@ -302,9 +302,9 @@ export default function AdminSchedulePage({ onCheckoutModeChange, onBookingCheck
             <div className="flex items-center justify-between gap-3">
               <span className="flex items-center gap-1.5 text-[13px] font-medium text-slate-700">
                 <span className="h-3 w-3 rounded-full bg-emerald-700" />
-                Đã đặt cọc trước (50%)
+                Đã thanh toán 100% qua VietQR
               </span>
-              <span className="text-[15px] font-black text-emerald-700">-{checkinBooking.deposit}</span>
+              <span className="text-[15px] font-black text-emerald-700">-{checkinBooking.paidAmount}</span>
             </div>
             <div className="flex items-center justify-between gap-3 border-t border-indigo-100 pt-3">
               <span className="text-[14px] font-black text-slate-950">Khoản cần thu tại quầy:</span>
@@ -459,7 +459,7 @@ export default function AdminSchedulePage({ onCheckoutModeChange, onBookingCheck
         <section className="mb-3 rounded-xl bg-indigo-100 p-4 text-[12px] font-medium leading-relaxed text-slate-600">
           <div className="flex items-start gap-2">
             <Info className="mt-0.5 h-5 w-5 shrink-0 text-slate-600" />
-            <p>Nghiệp vụ hoàn tiền cọc hoặc thanh toán chênh lệch được thực hiện riêng biệt tại sổ quỹ quầy giao dịch, không xử lý hay hiển thị số dư tại giao diện điều phối sân này.</p>
+            <p>Nghiệp vụ hoàn tiền khoản đã chuyển khoản hoặc thanh toán chênh lệch được thực hiện riêng biệt tại sổ quỹ quầy giao dịch, không xử lý hay hiển thị số dư tại giao diện điều phối sân này.</p>
           </div>
         </section>
 
@@ -1163,7 +1163,10 @@ export default function AdminSchedulePage({ onCheckoutModeChange, onBookingCheck
   }
 
   if (checkoutBooking) {
-    const amountDue = checkoutBooking.remaining;
+    const additionalCharges = 45_000;
+    const bookingBalance = Number(checkoutBooking.remaining.replace(/\D/g, ''));
+    const amountDue = `${(bookingBalance + additionalCharges).toLocaleString('vi-VN')} đ`;
+    const actualTotal = Number(checkoutBooking.total.replace(/\D/g, '')) + additionalCharges;
 
     return (
       <div className="flex-1 min-h-0 overflow-y-auto bg-slate-50 px-3 py-3">
@@ -1259,8 +1262,8 @@ export default function AdminSchedulePage({ onCheckoutModeChange, onBookingCheck
               <span className="text-[15px] font-black text-slate-950">{checkoutBooking.total}</span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-[13px] font-semibold text-slate-600">Đã thanh toán trước / Tiền cọc</span>
-              <span className="text-[15px] font-black text-emerald-700">-{checkoutBooking.deposit}</span>
+              <span className="text-[13px] font-semibold text-slate-600">Đã thanh toán đủ qua VietQR</span>
+              <span className="text-[15px] font-black text-emerald-700">-{checkoutBooking.paidAmount}</span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-[13px] font-semibold text-slate-600">Phụ phí thêm giờ</span>
@@ -1268,12 +1271,12 @@ export default function AdminSchedulePage({ onCheckoutModeChange, onBookingCheck
             </div>
             <div className="flex items-center justify-between">
               <span className="text-[13px] font-semibold text-slate-600">Khoản phát sinh đã ghi nhận</span>
-              <span className="text-[15px] font-black text-slate-950">+45.000đ</span>
+              <span className="text-[15px] font-black text-slate-950">+{additionalCharges.toLocaleString('vi-VN')}đ</span>
             </div>
             <div className="border-t border-slate-100 pt-3">
               <div className="flex items-center justify-between">
                 <span className="text-[13px] font-semibold text-slate-500">Tổng giá trị thực tế tiêu dùng</span>
-                <span className="text-[15px] font-black text-slate-950">285.000đ</span>
+                <span className="text-[15px] font-black text-slate-950">{actualTotal.toLocaleString('vi-VN')}đ</span>
               </div>
               <div className="mt-3 flex items-center justify-between gap-3 rounded-xl bg-indigo-100 px-4 py-3">
                 <div className="min-w-0">
@@ -1306,18 +1309,10 @@ export default function AdminSchedulePage({ onCheckoutModeChange, onBookingCheck
 
         <section className="mb-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
           <h3 className="mb-3 text-[14px] font-black text-slate-900">Hình thức thu tiền</h3>
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-1 gap-2">
             <button type="button" className="rounded-xl bg-indigo-100 px-2 py-4 text-[12px] font-black text-emerald-700">
               <QrCode className="mx-auto mb-1 h-5 w-5" />
-              QR Chuyển khoản
-            </button>
-            <button type="button" className="rounded-xl bg-slate-100 px-2 py-4 text-[12px] font-black text-slate-600">
-              <CreditCard className="mx-auto mb-1 h-5 w-5" />
-              Tiền mặt
-            </button>
-            <button type="button" className="rounded-xl bg-slate-100 px-2 py-4 text-[12px] font-black text-slate-600">
-              <CreditCard className="mx-auto mb-1 h-5 w-5" />
-              Thẻ / POS
+              Chuyển khoản 100% qua VietQR của sân
             </button>
           </div>
           <div className="mt-3 flex items-center gap-3 rounded-xl bg-slate-100 p-3">
@@ -1483,8 +1478,8 @@ export default function AdminSchedulePage({ onCheckoutModeChange, onBookingCheck
                   court: 'Sân 05',
                   time: '07:00 - 08:30',
                   total: '210.000 đ',
-                  deposit: '105.000 đ',
-                  remaining: '105.000 đ',
+                  paidAmount: '210.000 đ',
+                  remaining: '0 đ',
                   status: 'Đang sử dụng',
                 })}
                 className="absolute z-20 rounded-lg bg-emerald-600 text-white px-2 flex flex-col justify-center text-left shadow-sm ring-1 ring-emerald-500/20 active:scale-[0.99] transition-transform overflow-hidden"
@@ -1507,8 +1502,8 @@ export default function AdminSchedulePage({ onCheckoutModeChange, onBookingCheck
                   court: 'Sân 02',
                   time: '11:30 - 13:00',
                   total: '180.000 đ',
-                  deposit: '90.000 đ',
-                  remaining: '90.000 đ',
+                  paidAmount: '180.000 đ',
+                  remaining: '0 đ',
                 })}
                 className="absolute z-20 rounded-lg bg-blue-50 border border-blue-300 px-2 flex flex-col justify-center text-left shadow-sm active:scale-[0.99] transition-transform overflow-hidden"
                 style={getFilteredBookingStyle(11, 30, 13, 0, 1)}
@@ -1528,8 +1523,8 @@ export default function AdminSchedulePage({ onCheckoutModeChange, onBookingCheck
                   sport: 'Bóng chuyền',
                   time: '09:30 - 11:00',
                   total: '450.000 đ',
-                  deposit: '225.000 đ',
-                  remaining: '225.000 đ',
+                  paidAmount: '450.000 đ',
+                  remaining: '0 đ',
                 })}
                 className="absolute z-30 rounded-lg bg-blue-50 border border-blue-400 px-3 py-2 text-left shadow-[0_3px_14px_rgba(37,99,235,0.12)] overflow-hidden active:scale-[0.99] transition-transform"
                 style={getFilteredBookingStyle(9, 30, 11, 0, 0, 4, 'volleyball')}
@@ -1553,8 +1548,8 @@ export default function AdminSchedulePage({ onCheckoutModeChange, onBookingCheck
                   court: 'Sân 06',
                   time: '14:00 - 15:30',
                   total: '150.000 đ',
-                  deposit: '75.000 đ',
-                  remaining: '75.000 đ',
+                  paidAmount: '150.000 đ',
+                  remaining: '0 đ',
                   status: 'Chờ duyệt hủy',
                 })}
                 className="absolute z-20 rounded-lg bg-orange-50 border border-orange-300 px-2 text-left shadow-sm overflow-hidden active:scale-[0.99] transition-transform"
@@ -1577,8 +1572,8 @@ export default function AdminSchedulePage({ onCheckoutModeChange, onBookingCheck
                   court: 'Sân 08',
                   time: '15:30 - 16:30',
                   total: '120.000 đ',
-                  deposit: '60.000 đ',
-                  remaining: '60.000 đ',
+                  paidAmount: '120.000 đ',
+                  remaining: '0 đ',
                 })}
                 className="absolute z-20 rounded-lg bg-blue-50 border border-blue-300 px-2 flex flex-col justify-center text-left shadow-sm active:scale-[0.99] transition-transform overflow-hidden"
                 style={getFilteredBookingStyle(15, 30, 16, 30, 7)}
@@ -1597,8 +1592,8 @@ export default function AdminSchedulePage({ onCheckoutModeChange, onBookingCheck
                   court: 'Sân 03',
                   time: '17:30 - 19:00',
                   total: '240.000 đ',
-                  deposit: '120.000 đ',
-                  remaining: '120.000 đ',
+                  paidAmount: '240.000 đ',
+                  remaining: '0 đ',
                 })}
                 className="absolute z-20 rounded-lg bg-blue-50 border border-blue-300 px-2 flex flex-col justify-center text-left shadow-sm active:scale-[0.99] transition-transform overflow-hidden"
                 style={getFilteredBookingStyle(17, 30, 19, 0, 2)}
@@ -1617,8 +1612,8 @@ export default function AdminSchedulePage({ onCheckoutModeChange, onBookingCheck
                   court: 'Sân 07',
                   time: '19:00 - 20:30',
                   total: '240.000 đ',
-                  deposit: '120.000 đ',
-                  remaining: '120.000 đ',
+                  paidAmount: '240.000 đ',
+                  remaining: '0 đ',
                 })}
                 className="absolute z-20 rounded-lg bg-blue-50 border border-blue-300 px-2 flex flex-col justify-center text-left shadow-sm active:scale-[0.99] transition-transform overflow-hidden"
                 style={getFilteredBookingStyle(19, 0, 20, 30, 6)}
@@ -1638,8 +1633,8 @@ export default function AdminSchedulePage({ onCheckoutModeChange, onBookingCheck
                   sport: 'Bóng đá mini',
                   time: '21:00 - 22:30',
                   total: '800.000 đ',
-                  deposit: '400.000 đ',
-                  remaining: '400.000 đ',
+                  paidAmount: '800.000 đ',
+                  remaining: '0 đ',
                 })}
                 className="absolute z-30 rounded-lg bg-blue-50 border border-blue-400 px-3 py-2 text-left shadow-lg overflow-hidden active:scale-[0.99] transition-transform"
                 style={getFilteredBookingStyle(21, 0, 22, 30, 0, 8, 'futsal')}
@@ -1649,7 +1644,7 @@ export default function AdminSchedulePage({ onCheckoutModeChange, onBookingCheck
                   <span className="rounded bg-blue-100 px-1.5 py-0.5 text-[8px] font-black text-blue-700">BĐ</span>
                 </div>
                 <div className="mt-8 text-sm font-black text-blue-950 leading-tight">BÓNG ĐÁ MINI BĐ1</div>
-                <div className="mt-1 text-[11px] font-bold text-blue-700 truncate">FC Đại Nam • Đã cọc 50%</div>
+                <div className="mt-1 text-[11px] font-bold text-blue-700 truncate">FC Đại Nam • Đã thanh toán đủ</div>
                 <div className="mt-0.5 text-[9px] font-medium text-blue-600 truncate">21:00 - 22:30 • Đã đặt</div>
               </button>
             </div>
@@ -1752,7 +1747,7 @@ export default function AdminSchedulePage({ onCheckoutModeChange, onBookingCheck
                   </div>
                   <div>
                     <p className="text-[10px] font-semibold text-slate-500">Trạng thái thanh toán</p>
-                    <p className="mt-0.5 text-[12px] font-black text-orange-600">{selectedBooking.paymentStatus}</p>
+                    <p className="mt-0.5 text-[12px] font-black text-emerald-700">{selectedBooking.paymentStatus}</p>
                   </div>
                   <div>
                     <p className="text-[10px] font-semibold text-slate-500">Tổng số tiền</p>
@@ -1763,8 +1758,8 @@ export default function AdminSchedulePage({ onCheckoutModeChange, onBookingCheck
 
               <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
                 <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                  <span className="text-[11px] font-bold text-slate-500">Đã đặt cọc trước (50%)</span>
-                  <span className="text-[13px] font-black text-emerald-700">{selectedBooking.deposit}</span>
+                  <span className="text-[11px] font-bold text-slate-500">Đã thanh toán qua VietQR</span>
+                  <span className="text-[13px] font-black text-emerald-700">{selectedBooking.paidAmount}</span>
                 </div>
                 <div className="flex items-center justify-between pt-2">
                   <span className="text-[11px] font-bold text-red-500">Còn lại cần thu khi nhận sân</span>

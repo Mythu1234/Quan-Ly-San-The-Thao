@@ -3,7 +3,7 @@
 CRITICAL DIRECTIVE FOR ALL AI ASSISTANTS & DEVELOPERS:
 BẮT BUỘC PHẢI ĐỌC TÀI LIỆU NÀY TRƯỚC KHI BẮT ĐẦU BẤT KỲ TÁC VỤ NÀO!
 Tất cả các logic về giá sân (Cầu lông 120k, Bóng chuyền 150k, Bóng đá 200k),
-chuyển đổi 8 ô mặt sân linh hoạt, gói VIP tháng (giảm 10% và 15%), theo dõi thanh toán,
+chuyển đổi 8 ô mặt sân linh hoạt, theo dõi thanh toán,
 quản lý thiết bị từng chiếc (Asset Serial), phân ca và nhiệm vụ ca trực
 PHẢI TUÂN THỦ 100% CÁC QUY TẮC TRONG TÀI LIỆU NÀY. KHÔNG ĐƯỢC TỰ Ý THAY ĐỔI.
 ================================================================================
@@ -59,39 +59,33 @@ Các thông tin này là cơ sở cốt lõi để lập trình logic xử lý, 
 
 ---
 
-## 4. CHÍNH SÁCH KHÁCH HÀNG VIP THÁNG & ĐẶT SÂN CỐ ĐỊNH DÀI HẠN (MONTHLY SUBSCRIPTION)
+## 4. PHẠM VI KHÁCH HÀNG & YÊU CẦU ĐẶT SÂN
 
-Nghiệp vụ dành cho các Khách hàng Doanh nghiệp, Câu lạc bộ hoặc Cá nhân đăng ký lịch chơi cố định định kỳ theo tuần/tháng:
-
-1. **Quyền hạn tạo lịch:** Khách hàng **không tự tạo lịch VIP tháng** trên cổng web công cộng. Lịch cố định dài hạn **bắt buộc do Chủ sân (Admin) hoặc Nhân viên (Staff)** tiếp nhận thỏa thuận và tạo trên phần mềm quản lý tại quầy.
-2. **Chính sách Nâng hạng VIP & Chiết khấu (Discount Rules):**
-   * **Đăng ký từ 3 đến 6 tháng:** Khách hàng được nâng lên hạng **Khách hàng VIP** $\rightarrow$ **Giảm 10%** trên mỗi giờ đăng ký.
-   * **Đăng ký trên 6 tháng:** Khách hàng được nâng lên hạng **Khách hàng VIP Thượng hạng** $\rightarrow$ **Giảm 15%** trên mỗi giờ đăng ký.
-3. **Cơ chế Thanh toán Linh hoạt nhiều đợt:**
-   * Không ép buộc thanh toán 100% hay chỉ cọc cố định. Nhân viên/Chủ sân và khách hàng tự do thỏa thuận chia tổng số tiền thành **N đợt thanh toán** (chia làm 2, 3, 4... đợt tùy hợp đồng).
-   * Hệ thống tự động theo dõi **Số tiền còn lại cần thanh toán** của khách sau mỗi lần thanh toán.
+* Sân không kinh doanh gói khách hàng VIP/thành viên theo tháng; không tạo, tiếp nhận hoặc hiển thị yêu cầu đặt sân thuộc nhóm VIP.
+* Form tiếp nhận đặt sân tại quầy dùng một luồng đặt sân thông thường, không phân loại khách thành “trải nghiệm” hoặc “sự kiện”. Nhân viên ghi nhận khách, môn/sân, ngày đặt, giờ bắt đầu và thời lượng.
+* Yêu cầu sự kiện/chuỗi ngày trên website (nếu có) được xử lý ở luồng riêng, không phải loại đặt sân tại quầy.
+* Dữ liệu yêu cầu VIP cũ (nếu có) không hiển thị trong danh sách yêu cầu đặt sân.
 
 ---
 
 ## 5. QUY ĐỊNH THANH TOÁN, THEO DÕI THANH TOÁN & HÓA ĐƠN ĐIỆN TỬ
 
-1. **Ba (03) Hình thức thanh toán của hệ thống:**
-   * **Hình thức 1: Thanh toán tất (100%):** Khách hàng thanh toán toàn bộ tiền sân ngay lúc đặt chỗ $\rightarrow$ Số tiền còn lại = 0đ (Trạng thái: *Đã thanh toán đủ*).
-   * **Hình thức 2: Đặt cọc 50%:** Áp dụng cho khách vãng lai đặt trước $\rightarrow$ Khách trả trước 50%, 50% còn lại sẽ thu nốt lúc khách Check-out ra về.
-   * **Hình thức 3: Chia nhiều đợt thanh toán (Linh hoạt):** Áp dụng chủ yếu cho Khách VIP tháng hoặc Hợp đồng thuê dài hạn giá trị lớn $\rightarrow$ Nhân viên và khách tự thỏa thuận số đợt (Đợt 1, Đợt 2, Đợt 3...) và hạn thanh toán của từng đợt.
+1. **Hình thức thanh toán:**
+   * Khách đặt sân thông thường thanh toán đủ 100% ngay lúc đặt chỗ qua mã QR VietQR của sân. Không áp dụng đặt cọc, tiền mặt hoặc quẹt thẻ POS.
+   * Đặt sân tại quầy cũng phải thanh toán đủ 100%; không nhận đặt cọc hoặc chia đợt.
 
 2. **Theo dõi Số tiền đã trả & Số tiền còn lại:**
    * Tại mọi thời điểm, hệ thống tự động xác định số tiền khách còn phải nộp:
      $$\text{Số tiền còn lại} = \text{Tổng tiền phải trả} - \text{Tổng số tiền đã thanh toán qua các đợt}$$
    * **Trạng thái thanh toán của đơn đặt sân:**
      * `CHUA_THANH_TOAN`: Khách chưa thanh toán đợt nào.
-     * `DA_COC_HOAC_MOT_PHAN`: Khách đã cọc hoặc đã thanh toán một phần (Số tiền còn lại > 0).
+     * `DA_COC_HOAC_MOT_PHAN`: Đơn đặt sân cũ hoặc ngoại lệ đã thanh toán một phần (Số tiền còn lại > 0).
      * `DA_THANH_TOAN_DU`: Khách đã thanh toán đủ 100% (Số tiền còn lại = 0).
    * Khi khách hoàn tất đóng đợt tiền cuối cùng, hệ thống cập nhật số tiền còn lại về 0đ và chuyển trạng thái sang `DA_THANH_TOAN_DU`.
-2. **Quy định Hóa đơn điện tử:**
+3. **Quy định Hóa đơn điện tử:**
    * Không thiết kế bảng Hóa đơn riêng biệt gây dư thừa. Thông tin xuất hóa đơn điện tử được tích hợp trực tiếp vào mỗi lần thanh toán (`thanh_toan`).
    * Khi khách hàng doanh nghiệp yêu cầu hóa đơn cho đợt thanh toán, nhân viên ghi nhận `so_hoa_don` điện tử (từ hệ thống xuất HĐĐT liên kết) và `ngay_xuat_hoa_don`. Khách lẻ không lấy hóa đơn thì giá trị này để trống (`NULL`).
-3. **Vé đặt sân:**
+4. **Vé đặt sân:**
    * Không sử dụng bảng Vé điện tử riêng. Mã đặt sân (`ma_dat_san`) kiêm luôn vai trò của Mã vé điện tử để khách quét QR đối soát và làm thủ tục Check-in/Check-out.
 
 ---
@@ -99,7 +93,7 @@ Nghiệp vụ dành cho các Khách hàng Doanh nghiệp, Câu lạc bộ hoặc
 ## 6. CHÍNH SÁCH HỦY ĐẶT SÂN & HOÀN TIỀN (CANCELLATION & REFUND)
 
 1. **Khách hàng tự hủy trên hệ thống:**
-   * **Hủy trước $\ge$ 24 giờ:** Khách hàng được phép tự thao tác bấm "Hủy vé" trực tuyến trên hệ thống. Đơn chuyển sang trạng thái "Đã hủy - Chờ duyệt hoàn tiền", hoàn trả 100% số tiền đã cọc/thanh toán. Chủ sân xử lý đối soát và chuyển khoản hoàn tiền trong vòng 24 giờ.
+   * **Hủy trước $\ge$ 24 giờ:** Khách hàng được phép tự thao tác bấm "Hủy vé" trực tuyến trên hệ thống. Đơn chuyển sang trạng thái "Đã hủy - Chờ duyệt hoàn tiền", hoàn trả 100% số tiền đã thanh toán. Chủ sân xử lý đối soát và chuyển khoản hoàn tiền trong vòng 24 giờ.
    * **Hủy trong vòng < 24 giờ trước giờ chơi:** Hệ thống khóa chức năng tự hủy trực tuyến. Khách hàng bắt buộc phải liên hệ trực tiếp với Chủ sân để xử lý ngoại lệ thủ công.
 2. **Quyền hạn Nhân viên / Chủ sân chủ động hủy sân:**
    * Nhân viên hoặc Chủ sân có toàn quyền **chủ động hủy lịch đặt sân của khách** trong các trường hợp bất khả kháng: Sự cố hỏng hóc khẩn cấp (cháy đèn chiếu sáng, hỏng mặt sân, dột nước, mất điện lưới...) hoặc phục vụ bảo trì đột xuất.
@@ -114,7 +108,7 @@ Nghiệp vụ dành cho các Khách hàng Doanh nghiệp, Câu lạc bộ hoặc
   * Nếu khách chơi quá 10 phút, hệ thống bắt đầu tính phụ phí lố giờ, **tính cộng dồn toàn bộ thời gian trễ** (bao gồm cả 10 phút ân hạn ban đầu).
   * Tiền phụ phí làm tròn theo block 15 phút hoặc 30 phút dựa theo đơn giá theo giờ của bộ môn đang chơi.
 * **Tổng kết thu tiền lúc Checkout:**
-  $$\text{Tổng tiền thu lúc Checkout} = \text{Tiền cọc còn thiếu (nếu cọc 50%)} + \text{Phụ phí chơi thêm giờ} + \text{Phí bồi thường sự cố (nếu có)}$$
+  $$\text{Tổng tiền thu lúc Checkout} = \text{Khoản thanh toán còn thiếu (nếu có)} + \text{Phụ phí chơi thêm giờ} + \text{Phí bồi thường sự cố (nếu có)}$$
 
 ---
 
@@ -165,20 +159,17 @@ Nghiệp vụ dành cho các Khách hàng Doanh nghiệp, Câu lạc bộ hoặc
 
 ## 10. MÔ HÌNH TÁC NHÂN (ACTORS) & PHÂN QUYỀN VAI TRÒ (ROLES)
 
-Hệ thống thiết lập bảng vai trò (`vai_tro`) chuẩn hóa với 4 nhóm tác nhân chính:
+Hệ thống thiết lập bảng vai trò (`vai_tro`) chuẩn hóa với 3 nhóm tác nhân chính:
 
 1. **Chủ sân (Admin / Owner - `ADMIN`):**
    * Quản trị toàn bộ hệ thống: Cấu hình giá, mở/khóa ca trực, quản lý nhân viên, phê duyệt hoàn tiền, xem báo cáo doanh thu tài chính tổng hợp.
 2. **Nhân viên (Staff / Employee - `STAFF`):**
    * Đăng ký ca làm việc, xem lịch phân ca.
    * Check-in / Check-out cho khách, tính phụ phí thêm giờ lúc thanh toán.
-   * Tạo lịch đặt sân tại quầy cho khách và tạo lịch cố định dài hạn cho Khách VIP tháng.
+   * Tiếp nhận đặt sân thông thường tại quầy theo ngày, giờ và thời lượng khách chọn.
    * Chủ động hủy sân khi phát sinh sự cố cơ sở vật chất đột xuất.
    * Báo cáo sự cố hỏng hóc trang thiết bị, cập nhật nhật ký bảo trì.
-3. **Khách hàng VIP (VIP Customer - `VIP`):**
-   * Khách hàng đăng ký gói thuê cố định từ 3 tháng trở lên, hưởng ưu đãi chiết khấu 10% - 15% trên đơn giá thuê.
-   * Được hỗ trợ chia đợt thanh toán linh hoạt.
-4. **Khách hàng thường (Customer - `CUSTOMER`):**
+3. **Khách hàng (Customer - `CUSTOMER`):**
    * Đăng ký tài khoản, tra cứu tình trạng sân trống theo thời gian thực.
-   * Đặt sân trực tuyến, thanh toán cọc 50% hoặc 100% qua QR ngân hàng/ quẹt thẻ hoặc trả theo nhiều kỳ.
+   * Đặt sân trực tuyến, thanh toán đủ 100% qua mã QR VietQR của sân; không đặt cọc.
    * Xem lịch sử đặt chỗ, chủ động hủy vé trước 24 giờ.

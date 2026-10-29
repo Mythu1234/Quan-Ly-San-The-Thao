@@ -9,23 +9,26 @@ import {
   X,
   DollarSign,
   QrCode,
-  ChevronDown
 } from 'lucide-react';
 import type { 
-  BookingRequest, 
-  CustomerType 
+  BookingRequest
 } from '../../types/bookingRequest';
 import {
   getStoredBookingRequests, 
   saveBookingRequests 
 } from '../../types/bookingRequest';
 import PaymentCheckout, { type PaymentResult } from '../PaymentCheckout';
+import QrCodeArtwork from '../QrCodeArtwork';
+
+const getTodayInputDate = () => {
+  const today = new Date();
+  return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+};
 
 export default function AdminBookingRequestsView() {
   const [requests, setRequests] = useState<BookingRequest[]>([]);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'in_consultation' | 'confirmed' | 'cancelled'>('all');
-  const [typeFilter, setTypeFilter] = useState<'all' | CustomerType>('all');
 
   // Load from localStorage on mount & listen to changes
   useEffect(() => {
@@ -43,6 +46,7 @@ export default function AdminBookingRequestsView() {
   const [showPaymentModal, setShowPaymentModal] = useState<boolean>(false);
   const [selectedReq, setSelectedReq] = useState<BookingRequest | null>(null);
   const [checkoutReq, setCheckoutReq] = useState<BookingRequest | null>(null);
+  const [counterCheckoutReq, setCounterCheckoutReq] = useState<BookingRequest | null>(null);
 
   // Detail Modal State (Mobile-first)
   const [detailReq, setDetailReq] = useState<BookingRequest | null>(null);
@@ -57,100 +61,20 @@ export default function AdminBookingRequestsView() {
 
   // Payment Modal State
   const [payAmountInput, setPayAmountInput] = useState<number>(0);
-  const [payMethodInput, setPayMethodInput] = useState<'cash' | 'vietqr'>('cash');
-  const [showQrBox, setShowQrBox] = useState<boolean>(false);
 
   // New Request Form State
-  const [newCustomerType, setNewCustomerType] = useState<CustomerType>('trai_nghiem');
   const [newName, setNewName] = useState<string>('');
   const [newPhone, setNewPhone] = useState<string>('');
   const [newSource, setNewSource] = useState<BookingRequest['source']>('direct_counter');
   const [newSport, setNewSport] = useState<BookingRequest['sport']>('badminton');
   const [newCourtDetails, setNewCourtDetails] = useState<string>('Sân 01');
-  const [newTime, setNewTime] = useState<string>('18:00 – 20:00 (2h/buổi)');
-  const [newDurationMonths, setNewDurationMonths] = useState<number>(1);
-  const [newEventDays, setNewEventDays] = useState<number>(7);
+  const [newBookingDate, setNewBookingDate] = useState<string>(getTodayInputDate);
+  const [newStartTime, setNewStartTime] = useState<string>('18:00');
+  const [newDurationHours, setNewDurationHours] = useState<number>(2);
   const [newNotes, setNewNotes] = useState<string>('');
 
-  // Schedule Days Multi-select State
-  const DAYS_LIST = ['Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7', 'Chủ Nhật'];
-  const [selectedDays, setSelectedDays] = useState<string[]>(['Thứ 2', 'Thứ 4', 'Thứ 6']);
-  const [isDaysDropdownOpen, setIsDaysDropdownOpen] = useState<boolean>(false);
-
-  const toggleDay = (day: string) => {
-    if (selectedDays.includes(day)) {
-      setSelectedDays(selectedDays.filter(d => d !== day));
-    } else {
-      const updated = [...selectedDays, day].sort((a, b) => DAYS_LIST.indexOf(a) - DAYS_LIST.indexOf(b));
-      setSelectedDays(updated);
-    }
-  };
-
-  const applyPresetDays = (preset: '246' | '357' | 'weekend' | 'all') => {
-    if (preset === '246') setSelectedDays(['Thứ 2', 'Thứ 4', 'Thứ 6']);
-    else if (preset === '357') setSelectedDays(['Thứ 3', 'Thứ 5', 'Thứ 7']);
-    else if (preset === 'weekend') setSelectedDays(['Thứ 7', 'Chủ Nhật']);
-    else if (preset === 'all') setSelectedDays([...DAYS_LIST]);
-  };
-
-  // Payment inside New Request Form
-  const [newBasePrice, setNewBasePrice] = useState<number>(120000);
-  const [newPaymentMode, setNewPaymentMode] = useState<BookingRequest['paymentMode']>('deposit_50');
-  const [newPaidNow, setNewPaidNow] = useState<number>(60000);
-  const [newPayMethod, setNewPayMethod] = useState<'cash' | 'vietqr'>('cash');
-  const [newInstallmentCount, setNewInstallmentCount] = useState<number>(3);
-
-  // Automatically adjust max installments when switching customer type
-  useEffect(() => {
-    if (newCustomerType === 'event_series' && newInstallmentCount > 3) {
-      setNewInstallmentCount(3);
-    } else if (newCustomerType === 'trai_nghiem' && newInstallmentCount > 2) {
-      setNewInstallmentCount(2);
-    }
-  }, [newCustomerType, newInstallmentCount]);
-
-  // Automatically recalculate estimate based on Customer Type & Sport in Add Form
-  useEffect(() => {
-    let rate = newSport === 'badminton' ? 120000 : newSport === 'volleyball' ? 150000 : 200000;
-    
-    if (newCustomerType === 'trai_nghiem') {
-      const estimatedTotal = rate * 2 * (newDurationMonths > 0 ? newDurationMonths * 4 * 2 : 1);
-      setNewBasePrice(estimatedTotal);
-      if (newPaymentMode === 'full_100') setNewPaidNow(estimatedTotal);
-      else if (newPaymentMode === 'deposit_50') setNewPaidNow(Math.round(estimatedTotal / 2));
-      else {
-        const count = Math.min(2, newInstallmentCount);
-        setNewPaidNow(Math.round(estimatedTotal / count));
-      }
-    } else if (newCustomerType === 'vip_monthly') {
-      const months = Math.max(3, newDurationMonths);
-      const totalHours = months * 4 * 3 * 2; // 3 buổi/tuần, 2h/buổi
-      const gross = totalHours * rate;
-      const discount = months <= 6 ? 10 : 15;
-      const net = Math.round(gross * (1 - discount / 100));
-      setNewBasePrice(net);
-      if (newPaymentMode === 'full_100') setNewPaidNow(net);
-      else if (newPaymentMode === 'deposit_50') setNewPaidNow(Math.round(net / 2));
-      else {
-        // VIP allows up to 4 installments (2, 3, or 4)
-        const count = Math.min(4, Math.max(2, newInstallmentCount));
-        setNewPaidNow(Math.round(net / count)); // Kỳ 1
-      }
-    } else if (newCustomerType === 'event_series') {
-      const days = Math.max(7, newEventDays);
-      const totalHours = days * 3; // 3h/ngày
-      const gross = totalHours * rate;
-      const net = Math.round(gross * 0.95); // -5%
-      setNewBasePrice(net);
-      if (newPaymentMode === 'full_100') setNewPaidNow(net);
-      else if (newPaymentMode === 'deposit_50') setNewPaidNow(Math.round(net / 2));
-      else {
-        // Event allows up to 3 installments (2 or 3)
-        const count = Math.min(3, Math.max(2, newInstallmentCount));
-        setNewPaidNow(Math.round(net / count)); // Kỳ 1
-      }
-    }
-  }, [newCustomerType, newSport, newDurationMonths, newEventDays, newPaymentMode, newInstallmentCount]);
+  const hourlyRate = newSport === 'badminton' ? 120000 : newSport === 'volleyball' ? 150000 : 200000;
+  const newBasePrice = hourlyRate * newDurationHours;
 
   // Counters
   const pendingCount = useMemo(() => requests.filter(r => r.status === 'pending').length, [requests]);
@@ -167,11 +91,9 @@ export default function AdminBookingRequestsView() {
         (r.notes && r.notes.toLowerCase().includes(searchQuery.toLowerCase()));
 
       const matchStatus = statusFilter === 'all' || r.status === statusFilter;
-      const matchType = typeFilter === 'all' || r.customerType === typeFilter;
-
-      return matchSearch && matchStatus && matchType;
+      return matchSearch && matchStatus;
     });
-  }, [requests, searchQuery, statusFilter, typeFilter]);
+  }, [requests, searchQuery, statusFilter]);
 
   // Open Contact Modal
   const handleOpenContactModal = (req: BookingRequest) => {
@@ -185,8 +107,6 @@ export default function AdminBookingRequestsView() {
   const handleOpenPaymentModal = (req: BookingRequest) => {
     setSelectedReq(req);
     setPayAmountInput(req.remainingDue);
-    setPayMethodInput('cash');
-    setShowQrBox(false);
     setShowPaymentModal(true);
   };
 
@@ -242,7 +162,7 @@ export default function AdminBookingRequestsView() {
           ...r,
           paidAmount: newPaid,
           remainingDue: newRemaining,
-          paymentMethod: payMethodInput,
+          paymentMethod: 'vietqr' as const,
           paymentStatus: newRemaining === 0 ? ('paid_in_full' as const) : ('partial' as const),
           paymentStatusLabel: newRemaining === 0 ? 'Đã thanh toán đủ' : `Đã nộp ${newPaid.toLocaleString('vi-VN')}đ`,
           status: newRemaining === 0 && r.status === 'pending' ? ('confirmed' as const) : r.status,
@@ -250,8 +170,8 @@ export default function AdminBookingRequestsView() {
           contactLogs: [
             {
               date: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' }),
-              staffName: 'Quản lý (Admin)',
-              note: `Thu thêm ${payAmountInput.toLocaleString('vi-VN')}đ qua ${payMethodInput === 'cash' ? 'Tiền mặt tại quầy' : 'VietQR'}. Còn nợ: ${newRemaining.toLocaleString('vi-VN')}đ.`
+              staffName: 'Nhân viên/Quản lý tại quầy',
+              note: `Thu thêm ${payAmountInput.toLocaleString('vi-VN')}đ qua VietQR. Còn nợ: ${newRemaining.toLocaleString('vi-VN')}đ.`
             },
             ...(r.contactLogs || [])
           ]
@@ -269,7 +189,7 @@ export default function AdminBookingRequestsView() {
 
     const totalPaid = Math.min(checkoutReq.finalPrice, checkoutReq.paidAmount + result.paidAmount);
     const remainingDue = Math.max(0, checkoutReq.finalPrice - totalPaid);
-    const paymentMode = result.plan === 'full' ? 'full_100' : result.plan === 'half' ? 'deposit_50' : 'installments';
+    const paymentMode = result.plan === 'full' ? 'full_100' : 'installments';
 
     updateRequestsList(requests.map(request => {
       if (request.id !== checkoutReq.id) return request;
@@ -281,7 +201,7 @@ export default function AdminBookingRequestsView() {
         installmentCount: result.installmentCount ?? undefined,
         paidAmount: totalPaid,
         remainingDue,
-        paymentMethod: result.method === 'qr' ? 'vietqr' : 'cash',
+        paymentMethod: 'vietqr',
         paymentStatus: remainingDue === 0 ? ('paid_in_full' as const) : ('partial' as const),
         paymentStatusLabel: remainingDue === 0 ? 'Đã thanh toán đủ' : `Đã thanh toán ${totalPaid.toLocaleString('vi-VN')}đ`,
         status: 'confirmed' as const,
@@ -290,13 +210,48 @@ export default function AdminBookingRequestsView() {
           {
             date: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' }),
             staffName: 'Quản lý (Admin)',
-            note: `Đã chốt đặt sân và ghi nhận ${result.paidAmount.toLocaleString('vi-VN')}đ qua ${result.methodLabel}.`
+            note: `Đã đối soát thủ công và ghi nhận ${result.paidAmount.toLocaleString('vi-VN')}đ qua VietQR; hệ thống không xác minh giao dịch ngân hàng tự động.`
           },
           ...(request.contactLogs || [])
         ]
       };
     }));
     setCheckoutReq(null);
+  };
+
+  const handleCompleteCounterCheckout = (result: PaymentResult) => {
+    if (!counterCheckoutReq || result.plan !== 'full' || result.paidAmount !== counterCheckoutReq.finalPrice) return;
+
+    const confirmedRequest: BookingRequest = {
+      ...counterCheckoutReq,
+      paymentMode: 'full_100',
+      paymentModeLabel: 'Thanh toán đủ 100%',
+      paidAmount: counterCheckoutReq.finalPrice,
+      remainingDue: 0,
+      paymentMethod: 'vietqr',
+      paymentStatus: 'paid_in_full',
+      paymentStatusLabel: 'Đã thanh toán đủ',
+      status: 'confirmed',
+      statusLabel: 'Đã chốt đặt sân',
+      contactLogs: [
+        {
+          date: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' }),
+          staffName: 'Nhân viên/Quản lý tại quầy',
+          note: `Đã đối soát thủ công và ghi nhận đủ ${result.paidAmount.toLocaleString('vi-VN')}đ qua VietQR; hệ thống không xác minh giao dịch ngân hàng tự động.`
+        }
+      ]
+    };
+
+    updateRequestsList([confirmedRequest, ...requests]);
+    setCounterCheckoutReq(null);
+    setShowAddModal(false);
+
+    setNewName('');
+    setNewPhone('');
+    setNewBookingDate(getTodayInputDate());
+    setNewStartTime('18:00');
+    setNewDurationHours(2);
+    setNewNotes('');
   };
 
   // Submit New Request Created by Admin
@@ -307,11 +262,27 @@ export default function AdminBookingRequestsView() {
       return;
     }
 
-    const typeLabels: Record<CustomerType, string> = {
-      trai_nghiem: newDurationMonths > 0 ? `Trải nghiệm (${newDurationMonths} Tháng)` : 'Trải nghiệm (Giờ lẻ)',
-      vip_monthly: `Hội viên VIP (${newDurationMonths} Tháng)`,
-      event_series: `Sự kiện (${newEventDays} Ngày)`
-    };
+    const [year, month, day] = newBookingDate.split('-').map(Number);
+    const [startHour, startMinute] = newStartTime.split(':').map(Number);
+    const startMinutes = startHour * 60 + startMinute;
+    const endMinutes = startMinutes + newDurationHours * 60;
+    const now = new Date();
+    const currentMinutes = now.getHours() * 60 + now.getMinutes();
+    const today = getTodayInputDate();
+    if (
+      !newBookingDate ||
+      newBookingDate < today ||
+      (newBookingDate === today && startMinutes < currentMinutes) ||
+      Number.isNaN(startMinutes) ||
+      endMinutes > 23 * 60 ||
+      startMinutes < 5 * 60
+    ) {
+      alert('Vui lòng chọn ngày và khung giờ trong giờ hoạt động 05:00–23:00.');
+      return;
+    }
+
+    const formatTime = (minutes: number) =>
+      `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
 
     const sportLabels: Record<BookingRequest['sport'], string> = {
       badminton: 'Cầu Lông',
@@ -326,68 +297,44 @@ export default function AdminBookingRequestsView() {
       zalo: 'Nhắn qua Zalo'
     };
 
-    const modeLabels: Record<BookingRequest['paymentMode'], string> = {
-      full_100: 'Thanh toán 100%',
-      deposit_50: 'Cọc 50%',
-      installments: `Chia ${newInstallmentCount} kỳ`
-    };
-
-    const remaining = Math.max(0, newBasePrice - newPaidNow);
-    const now = new Date();
     const dateStr = `${now.getDate().toString().padStart(2, '0')}/${(now.getMonth() + 1).toString().padStart(2, '0')} ${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
     const randomCode = `YC-${now.getFullYear()}${(now.getMonth() + 1).toString().padStart(2, '0')}${now.getDate().toString().padStart(2, '0')}-${Math.floor(10 + Math.random() * 90)}`;
+    const bookingDate = new Date(year, month - 1, day).toLocaleDateString('vi-VN');
+    const timeRange = `${newStartTime} – ${formatTime(endMinutes)} (${newDurationHours} giờ)`;
 
     const newReqItem: BookingRequest = {
       id: `REQ-${Date.now()}`,
       code: randomCode,
       customerName: newName.trim(),
       phone: newPhone.trim(),
-      customerType: newCustomerType,
-      customerTypeLabel: typeLabels[newCustomerType],
+      customerType: 'trai_nghiem',
+      customerTypeLabel: 'Đặt sân',
       sport: newSport,
       sportLabel: sportLabels[newSport],
       courtDetails: newCourtDetails.trim() || 'Sân 01',
-      preferredSchedule: selectedDays.length > 0 ? `${selectedDays.join(', ')} hàng tuần` : 'Lịch linh hoạt',
-      preferredTime: newTime.trim() || '18:00 – 20:00 (2h/buổi)',
-      durationMonths: newCustomerType !== 'event_series' ? newDurationMonths : undefined,
-      eventDays: newCustomerType === 'event_series' ? newEventDays : undefined,
+      preferredSchedule: bookingDate,
+      preferredTime: timeRange,
       source: newSource,
       sourceLabel: sourceLabels[newSource],
       notes: newNotes.trim() || 'Tiếp nhận trực tiếp tại quầy.',
       totalPrice: newBasePrice,
-      discountPercent: newCustomerType === 'vip_monthly' ? (newDurationMonths <= 6 ? 10 : 15) : newCustomerType === 'event_series' ? 5 : 0,
+      discountPercent: 0,
       discountAmount: 0,
       finalPrice: newBasePrice,
-      paymentMode: newPaymentMode,
-      paymentModeLabel: newPaymentMode === 'installments' ? `Chia ${newInstallmentCount} kỳ` : modeLabels[newPaymentMode],
-      installmentCount: newPaymentMode === 'installments' ? newInstallmentCount : undefined,
-      paidAmount: newPaidNow,
-      remainingDue: remaining,
-      paymentMethod: newPayMethod,
-      paymentStatus: remaining === 0 ? 'paid_in_full' : newPaidNow > 0 ? 'partial' : 'unpaid',
-      paymentStatusLabel: remaining === 0 ? 'Đã thanh toán đủ' : newPaidNow > 0 ? (newPaymentMode === 'installments' ? `Đã nộp Kỳ 1 (${newPaidNow.toLocaleString('vi-VN')}đ)` : `Đã nộp ${newPaidNow.toLocaleString('vi-VN')}đ`) : 'Chưa đóng',
+      paymentMode: 'full_100',
+      paymentModeLabel: 'Thanh toán đủ 100%',
+      paidAmount: 0,
+      remainingDue: newBasePrice,
+      paymentStatus: 'unpaid',
+      paymentStatusLabel: 'Chưa thanh toán',
       status: 'pending',
-      statusLabel: 'Chờ liên hệ',
+      statusLabel: 'Chờ thanh toán',
       createdAt: dateStr,
-      contactLogs: newPaidNow > 0 ? [
-        {
-          date: dateStr,
-          staffName: 'Quản lý (Admin)',
-          note: `Đã thu ${newPaidNow.toLocaleString('vi-VN')}đ (${newPayMethod === 'cash' ? 'Tiền mặt' : 'VietQR'}) - ${newPaymentMode === 'installments' ? `Đợt 1/${newInstallmentCount}` : 'Đặt cọc'}. Còn nợ: ${remaining.toLocaleString('vi-VN')}đ.`
-        }
-      ] : []
+      contactLogs: []
     };
 
-    updateRequestsList([newReqItem, ...requests]);
+    setCounterCheckoutReq(newReqItem);
     setShowAddModal(false);
-
-    // Reset Form
-    setNewName('');
-    setNewPhone('');
-    setSelectedDays(['Thứ 2', 'Thứ 4', 'Thứ 6']);
-    setIsDaysDropdownOpen(false);
-    setNewInstallmentCount(3);
-    setNewNotes('');
   };
 
   return (
@@ -410,7 +357,7 @@ export default function AdminBookingRequestsView() {
           className="flex items-center justify-center gap-1 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-700 active:scale-95 transition cursor-pointer shadow-xs shrink-0"
         >
           <Plus className="w-3.5 h-3.5" />
-          <span>Tạo yêu cầu mới</span>
+          <span>Đặt sân tại quầy</span>
         </button>
       </div>
 
@@ -429,17 +376,6 @@ export default function AdminBookingRequestsView() {
             />
           </div>
 
-          {/* Customer Group Filter */}
-          <select
-            value={typeFilter}
-            onChange={(e) => setTypeFilter(e.target.value as any)}
-            className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5 text-xs font-bold text-slate-700 outline-none focus:border-emerald-500 cursor-pointer max-w-[140px] truncate"
-          >
-            <option value="all">Tất cả khách</option>
-            <option value="trai_nghiem">Trải nghiệm (1-2T)</option>
-            <option value="vip_monthly">VIP (3-12T)</option>
-            <option value="event_series">Sự kiện (7-14N)</option>
-          </select>
         </div>
 
         {/* Status Filter Tabs (Horizontal scroll on mobile) */}
@@ -487,13 +423,6 @@ export default function AdminBookingRequestsView() {
             const isPending = req.status === 'pending';
             const isConfirmed = req.status === 'confirmed';
 
-            const typeBadgeColor = 
-              req.customerType === 'vip_monthly' 
-                ? 'bg-amber-50 text-amber-800 border-amber-200' 
-                : req.customerType === 'event_series' 
-                ? 'bg-emerald-50 text-emerald-800 border-emerald-200' 
-                : 'bg-slate-100 text-slate-700 border-slate-200';
-
             const statusBadgeColor =
               isPending ? 'bg-amber-100 text-amber-800' :
               req.status === 'in_consultation' ? 'bg-sky-100 text-sky-800' :
@@ -518,15 +447,13 @@ export default function AdminBookingRequestsView() {
                   </span>
                 </div>
 
-                {/* Dòng 2: Môn, Sân & Gói khách */}
+                {/* Dòng 2: Môn, Sân & Lịch đặt */}
                 <div className="flex items-center gap-1.5 text-[11px] text-slate-600 flex-wrap">
                   <span className="font-bold text-slate-800">{req.sportLabel}</span>
                   <span className="text-slate-300">•</span>
                   <span className="text-emerald-700 font-semibold">{req.courtDetails}</span>
                   <span className="text-slate-300">•</span>
-                  <span className={`px-1.5 py-0.2 rounded text-[10px] font-medium border ${typeBadgeColor}`}>
-                    {req.customerTypeLabel}
-                  </span>
+                  <span className="font-medium">{req.preferredSchedule} · {req.preferredTime}</span>
                 </div>
 
                 {/* Dòng 3: Tài chính & Ngày tiếp nhận + Nút xem chi tiết */}
@@ -634,9 +561,6 @@ export default function AdminBookingRequestsView() {
             <div className="bg-slate-50 p-3 rounded-xl border border-slate-200/80 space-y-2">
               <div className="font-bold text-slate-800 text-[11px] uppercase tracking-wide flex items-center justify-between">
                 <span>Thông tin đặt sân</span>
-                <span className="px-2 py-0.5 rounded text-[10px] font-bold border bg-white text-slate-800">
-                  {currentDetailReq.customerTypeLabel}
-                </span>
               </div>
               <div className="grid grid-cols-2 gap-2 text-[11px]">
                 <div>
@@ -648,7 +572,7 @@ export default function AdminBookingRequestsView() {
                   <span className="font-bold text-slate-800">{currentDetailReq.preferredTime}</span>
                 </div>
                 <div className="col-span-2">
-                  <span className="text-slate-400 block text-[10px]">Lịch trong tuần:</span>
+                  <span className="text-slate-400 block text-[10px]">Ngày đặt sân:</span>
                   <span className="font-bold text-slate-800">{currentDetailReq.preferredSchedule}</span>
                 </div>
               </div>
@@ -752,21 +676,36 @@ export default function AdminBookingRequestsView() {
         </div>
       )}
 
-      {checkoutReq && (
+      {(checkoutReq || counterCheckoutReq) && (
         <PaymentCheckout
+          key={(counterCheckoutReq || checkoutReq)!.id}
           open
-          orderCode={checkoutReq.code}
-          customerName={checkoutReq.customerName}
-          customerPhone={checkoutReq.phone}
-          totalAmount={checkoutReq.finalPrice}
-          registrationMonths={checkoutReq.durationMonths}
-          onClose={() => setCheckoutReq(null)}
-          onComplete={handleCompleteCheckout}
+          orderCode={(counterCheckoutReq || checkoutReq)!.code}
+          customerName={(counterCheckoutReq || checkoutReq)!.customerName}
+          customerPhone={(counterCheckoutReq || checkoutReq)!.phone}
+          totalAmount={(counterCheckoutReq || checkoutReq)!.finalPrice}
+          bookingDetails={{
+            sport: (counterCheckoutReq || checkoutReq)!.sportLabel,
+            court: (counterCheckoutReq || checkoutReq)!.courtDetails,
+            date: (counterCheckoutReq || checkoutReq)!.preferredSchedule,
+            time: (counterCheckoutReq || checkoutReq)!.preferredTime,
+          }}
+          registrationMonths={(counterCheckoutReq || checkoutReq)!.durationMonths}
+          allowInstallments={!counterCheckoutReq && checkoutReq!.customerType !== 'trai_nghiem'}
+          onClose={() => {
+            if (counterCheckoutReq) {
+              setCounterCheckoutReq(null);
+              setShowAddModal(true);
+            } else {
+              setCheckoutReq(null);
+            }
+          }}
+          onComplete={counterCheckoutReq ? handleCompleteCounterCheckout : handleCompleteCheckout}
         />
       )}
 
       {/* ======================================================== */}
-      {/* 🟢 MODAL: TIẾP NHẬN YÊU CẦU MỚI TẠI QUẦY (ĐẦY ĐỦ 3 NHÓM) */}
+      {/* 🟢 MODAL: TIẾP NHẬN ĐẶT SÂN TẠI QUẦY */}
       {/* ======================================================== */}
       {showAddModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-3 backdrop-blur-xs">
@@ -775,10 +714,10 @@ export default function AdminBookingRequestsView() {
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div>
                 <h3 className="text-sm font-black text-slate-900 uppercase">
-                  Tiếp nhận khách & Đặt sân mới
+                  Tiếp nhận đặt sân tại quầy
                 </h3>
                 <p className="text-[11px] text-slate-500">
-                  Hỗ trợ Khách trải nghiệm, VIP tháng và Sự kiện chuỗi ngày
+                  Chọn khách, môn chơi, ngày giờ và thời lượng thuê sân
                 </p>
               </div>
               <button
@@ -791,52 +730,7 @@ export default function AdminBookingRequestsView() {
             </div>
 
             <form onSubmit={handleCreateNewRequest} className="mt-3.5 space-y-3">
-              {/* STEP 1: CHỌN NHÓM KHÁCH HÀNG (3 TABS) */}
-              <div>
-                <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                  1. Nhóm khách hàng & Nhu cầu:
-                </label>
-                <div className="grid grid-cols-3 gap-1.5 p-1 bg-slate-100 rounded-xl">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setNewCustomerType('trai_nghiem');
-                      setNewDurationMonths(1);
-                    }}
-                    className={`py-1.5 px-2 rounded-lg text-[11px] font-bold transition text-center cursor-pointer ${
-                      newCustomerType === 'trai_nghiem' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
-                    }`}
-                  >
-                    Trải nghiệm (1-2T)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setNewCustomerType('vip_monthly');
-                      setNewDurationMonths(6);
-                    }}
-                    className={`py-1.5 px-2 rounded-lg text-[11px] font-bold transition text-center cursor-pointer ${
-                      newCustomerType === 'vip_monthly' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
-                    }`}
-                  >
-                    VIP Tháng (3-12T)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setNewCustomerType('event_series');
-                      setNewEventDays(14);
-                    }}
-                    className={`py-1.5 px-2 rounded-lg text-[11px] font-bold transition text-center cursor-pointer ${
-                      newCustomerType === 'event_series' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
-                    }`}
-                  >
-                    Sự kiện (7-14N)
-                  </button>
-                </div>
-              </div>
-
-              {/* STEP 2: THÔNG TIN KHÁCH */}
+              {/* THÔNG TIN KHÁCH */}
               <div className="grid grid-cols-3 gap-2">
                 <div>
                   <label className="block text-[11px] font-bold text-slate-700 mb-1">
@@ -872,7 +766,7 @@ export default function AdminBookingRequestsView() {
                   </label>
                   <select
                     value={newSource}
-                    onChange={(e) => setNewSource(e.target.value as any)}
+                    onChange={(e) => setNewSource(e.target.value as BookingRequest['source'])}
                     className="w-full rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5 font-bold text-slate-800 outline-none focus:border-emerald-500"
                   >
                     <option value="direct_counter">Tại quầy lễ tân</option>
@@ -883,15 +777,15 @@ export default function AdminBookingRequestsView() {
                 </div>
               </div>
 
-              {/* STEP 3: MÔN, SÂN & THỜI LƯỢNG */}
-              <div className="grid grid-cols-3 gap-2">
+              {/* MÔN CHƠI & SÂN */}
+              <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="block text-[11px] font-bold text-slate-700 mb-1">
                     Môn chơi
                   </label>
                   <select
                     value={newSport}
-                    onChange={(e) => setNewSport(e.target.value as any)}
+                    onChange={(e) => setNewSport(e.target.value as BookingRequest['sport'])}
                     className="w-full rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5 font-bold text-slate-800 outline-none focus:border-emerald-500"
                   >
                     <option value="badminton">Cầu Lông (120k)</option>
@@ -913,300 +807,76 @@ export default function AdminBookingRequestsView() {
                   />
                 </div>
 
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                    {newCustomerType === 'event_series' ? 'Số ngày' : 'Thời hạn'}
-                  </label>
-                  {newCustomerType === 'event_series' ? (
-                    <select
-                      value={newEventDays}
-                      onChange={(e) => setNewEventDays(Number(e.target.value))}
-                      className="w-full rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5 font-bold text-slate-800 outline-none focus:border-emerald-500"
-                    >
-                      <option value={7}>7 ngày</option>
-                      <option value={10}>10 ngày</option>
-                      <option value={14}>14 ngày</option>
-                      <option value={21}>21 ngày</option>
-                      <option value={30}>30 ngày</option>
-                    </select>
-                  ) : (
-                    <select
-                      value={newDurationMonths}
-                      onChange={(e) => setNewDurationMonths(Number(e.target.value))}
-                      className="w-full rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5 font-bold text-slate-800 outline-none focus:border-emerald-500"
-                    >
-                      {newCustomerType === 'trai_nghiem' ? (
-                        <>
-                          <option value={0}>Thuê giờ lẻ</option>
-                          <option value={1}>1 Tháng (Giá chuẩn)</option>
-                          <option value={2}>2 Tháng (Giá chuẩn)</option>
-                        </>
-                      ) : (
-                        <>
-                          <option value={3}>3 Tháng (-10%)</option>
-                          <option value={6}>6 Tháng (-10%)</option>
-                          <option value={12}>12 Tháng (-15%)</option>
-                        </>
-                      )}
-                    </select>
-                  )}
-                </div>
               </div>
 
-              {/* STEP 3.5: LỊCH TRONG TUẦN (DROPDOWN MULTI-SELECT) & KHUNG GIỜ */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                {/* Lịch thi đấu các thứ trong tuần */}
-                <div className="relative">
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="text-[11px] font-bold text-slate-700">
-                      Lịch thi đấu trong tuần:
-                    </label>
-                    <span className="text-[10px] text-emerald-700 font-bold">
-                      {selectedDays.length} buổi/tuần
-                    </span>
-                  </div>
-
-                  {/* Trigger Dropdown Button */}
-                  <button
-                    type="button"
-                    onClick={() => setIsDaysDropdownOpen(!isDaysDropdownOpen)}
-                    className="w-full rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-2 font-bold text-slate-800 text-left flex items-center justify-between outline-none focus:border-emerald-500 focus:bg-white cursor-pointer"
-                  >
-                    <span className="truncate text-xs">
-                      {selectedDays.length === 0 ? (
-                        <span className="text-slate-400 font-normal">Chưa chọn (bấm để chọn thứ)...</span>
-                      ) : (
-                        <span>{selectedDays.join(', ')} hàng tuần</span>
-                      )}
-                    </span>
-                    <ChevronDown className={`w-3.5 h-3.5 text-slate-500 transition-transform ${isDaysDropdownOpen ? 'rotate-180' : ''}`} />
-                  </button>
-
-                  {/* Dropdown Popover */}
-                  {isDaysDropdownOpen && (
-                    <div className="absolute top-full left-0 right-0 mt-1 p-2.5 bg-white border border-slate-200 rounded-xl shadow-xl space-y-2 z-30">
-                      {/* Presets */}
-                      <div className="flex items-center gap-1 text-[10px] pb-1.5 border-b border-slate-100 overflow-x-auto">
-                        <span className="text-slate-400 font-semibold shrink-0">Chọn nhanh:</span>
-                        <button
-                          type="button"
-                          onClick={() => applyPresetDays('246')}
-                          className="px-2 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold shrink-0 cursor-pointer"
-                        >
-                          T2-4-6
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => applyPresetDays('357')}
-                          className="px-2 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold shrink-0 cursor-pointer"
-                        >
-                          T3-5-7
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => applyPresetDays('weekend')}
-                          className="px-2 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold shrink-0 cursor-pointer"
-                        >
-                          T7-CN
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => applyPresetDays('all')}
-                          className="px-2 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold shrink-0 cursor-pointer"
-                        >
-                          Cả tuần
-                        </button>
-                      </div>
-
-                      {/* Day pills */}
-                      <div className="grid grid-cols-4 sm:grid-cols-7 gap-1">
-                        {DAYS_LIST.map((day) => {
-                          const isSelected = selectedDays.includes(day);
-                          return (
-                            <button
-                              key={day}
-                              type="button"
-                              onClick={() => toggleDay(day)}
-                              className={`py-1.5 rounded-lg text-[10px] font-bold text-center transition cursor-pointer ${
-                                isSelected
-                                  ? 'bg-emerald-700 text-white shadow-xs'
-                                  : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                              }`}
-                            >
-                              {day.replace('Thứ ', 'T')}
-                            </button>
-                          );
-                        })}
-                      </div>
-
-                      <div className="flex items-center justify-between pt-1 border-t border-slate-100">
-                        <span className="text-[10px] text-slate-500">
-                          Đã chọn: <strong className="text-emerald-700">{selectedDays.length}</strong> ngày
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => setIsDaysDropdownOpen(false)}
-                          className="px-3 py-1 rounded bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] cursor-pointer"
-                        >
-                          Xác nhận
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Khung giờ */}
+              {/* NGÀY, GIỜ & THỜI LƯỢNG */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                    Khung giờ thi đấu:
-                  </label>
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">Ngày đặt sân</label>
+                  <input
+                    type="date"
+                    required
+                    min={getTodayInputDate()}
+                    value={newBookingDate}
+                    onChange={(e) => setNewBookingDate(e.target.value)}
+                    className="w-full rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5 font-bold text-slate-800 outline-none focus:border-emerald-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">Giờ bắt đầu</label>
+                  <input
+                    type="time"
+                    required
+                    min="05:00"
+                    max={`${String(Math.floor((23 * 60 - newDurationHours * 60) / 60)).padStart(2, '0')}:${String((23 * 60 - newDurationHours * 60) % 60).padStart(2, '0')}`}
+                    step={60}
+                    value={newStartTime}
+                    onChange={(e) => setNewStartTime(e.target.value)}
+                    className="w-full rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5 font-bold text-slate-800 outline-none focus:border-emerald-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">Thời lượng</label>
                   <select
-                    value={newTime}
-                    onChange={(e) => setNewTime(e.target.value)}
-                    className="w-full rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-2 text-xs font-bold text-slate-800 outline-none focus:border-emerald-500 focus:bg-white"
+                    value={newDurationHours}
+                    onChange={(e) => setNewDurationHours(Number(e.target.value))}
+                    className="w-full rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5 font-bold text-slate-800 outline-none focus:border-emerald-500"
                   >
-                    <option value="18:00 – 20:00 (2h/buổi)">18:00 – 20:00 (Tối vàng - 2h)</option>
-                    <option value="17:00 – 19:00 (2h/buổi)">17:00 – 19:00 (Chiều tối - 2h)</option>
-                    <option value="19:00 – 21:00 (2h/buổi)">19:00 – 21:00 (Tối muộn - 2h)</option>
-                    <option value="20:00 – 22:00 (2h/buổi)">20:00 – 22:00 (Đêm - 2h)</option>
-                    <option value="06:00 – 08:00 (2h/buổi)">06:00 – 08:00 (Sáng sớm - 2h)</option>
-                    <option value="08:00 – 10:00 (2h/buổi)">08:00 – 10:00 (Sáng - 2h)</option>
-                    <option value="15:00 – 17:00 (2h/buổi)">15:00 – 17:00 (Chiều - 2h)</option>
+                    <option value={1}>1 giờ</option>
+                    <option value={1.5}>1,5 giờ</option>
+                    <option value={2}>2 giờ</option>
+                    <option value={2.5}>2,5 giờ</option>
+                    <option value={3}>3 giờ</option>
+                    <option value={3.5}>3,5 giờ</option>
+                    <option value={4}>4 giờ</option>
                   </select>
                 </div>
               </div>
 
-              {/* STEP 4: KHU VỰC THANH TOÁN (PAYMENT SECTION) */}
+              {/* THANH TOÁN */}
               <div className="rounded-xl bg-slate-50 p-3 border border-slate-200 space-y-2.5">
                 <div className="flex items-center justify-between border-b border-slate-200/80 pb-1.5">
-                  <span className="font-bold text-slate-800 uppercase text-[10px]">Thanh toán & Thu tiền tại quầy</span>
+                  <span className="font-bold text-slate-800 uppercase text-[10px]">Thanh toán tại quầy</span>
                   <span className="font-bold text-emerald-700 text-xs">
                     Tổng dự toán: {newBasePrice.toLocaleString('vi-VN')}đ
                   </span>
                 </div>
 
                 <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-600 mb-0.5">
-                      Hình thức thanh toán:
-                    </label>
-                    <select
-                      value={newPaymentMode}
-                      onChange={(e) => setNewPaymentMode(e.target.value as any)}
-                      className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-bold text-slate-800 outline-none"
-                    >
-                      <option value="deposit_50">Đặt cọc 50%</option>
-                      <option value="full_100">Thanh toán đủ 100%</option>
-                      {newCustomerType !== 'trai_nghiem' && (
-                        <option value="installments">Chia nhiều đợt (VIP/Sự kiện)</option>
-                      )}
-                    </select>
+                  <div className="rounded-lg border border-slate-200 bg-white px-2 py-1">
+                    <span className="block text-[10px] text-slate-500">Hình thức thanh toán</span>
+                    <span className="text-xs font-bold text-slate-800">Thanh toán đủ 100%</span>
                   </div>
-
                   <div>
-                    <label className="block text-[10px] font-bold text-slate-600 mb-0.5">
-                      Phương thức thu:
-                    </label>
-                    <select
-                      value={newPayMethod}
-                      onChange={(e) => setNewPayMethod(e.target.value as any)}
-                      className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-bold text-slate-800 outline-none"
-                    >
-                      <option value="cash">Tiền mặt tại quầy</option>
-                      <option value="vietqr">Chuyển khoản VietQR</option>
-                    </select>
+                    <span className="block text-[10px] text-slate-500 mb-0.5">Phương thức thu</span>
+                    <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-1 text-xs font-bold text-emerald-800">
+                      Chuyển khoản qua mã QR VietQR của sân
+                    </p>
                   </div>
                 </div>
 
-                {/* LỰA CHỌN SỐ KỲ THANH TOÁN (KHI CHỌN CHIA NHIỀU ĐỢT) */}
-                {newPaymentMode === 'installments' && (
-                  <div className="p-2.5 bg-emerald-50/70 rounded-xl border border-emerald-200 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <label className="text-[11px] font-bold text-emerald-950">
-                        Chọn số kỳ thanh toán:
-                      </label>
-                      <span className="text-[10px] font-medium text-emerald-700">
-                        {newCustomerType === 'vip_monthly' 
-                          ? '👑 VIP: Tối đa 4 kỳ' 
-                          : '🎪 Sự kiện: Tối đa 3 kỳ'}
-                      </span>
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-1.5">
-                      {/* 2 Kỳ */}
-                      <button
-                        type="button"
-                        onClick={() => setNewInstallmentCount(2)}
-                        className={`py-1.5 px-2 rounded-lg text-xs font-bold transition text-center cursor-pointer border ${
-                          newInstallmentCount === 2
-                            ? 'bg-emerald-700 text-white border-emerald-700 shadow-xs'
-                            : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
-                        }`}
-                      >
-                        Chia 2 kỳ
-                      </button>
-
-                      {/* 3 Kỳ */}
-                      <button
-                        type="button"
-                        onClick={() => setNewInstallmentCount(3)}
-                        className={`py-1.5 px-2 rounded-lg text-xs font-bold transition text-center cursor-pointer border ${
-                          newInstallmentCount === 3
-                            ? 'bg-emerald-700 text-white border-emerald-700 shadow-xs'
-                            : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
-                        }`}
-                      >
-                        Chia 3 kỳ
-                      </button>
-
-                      {/* 4 Kỳ: Chỉ dành cho VIP */}
-                      {newCustomerType === 'vip_monthly' ? (
-                        <button
-                          type="button"
-                          onClick={() => setNewInstallmentCount(4)}
-                          className={`py-1.5 px-2 rounded-lg text-xs font-bold transition text-center cursor-pointer border ${
-                            newInstallmentCount === 4
-                              ? 'bg-emerald-700 text-white border-emerald-700 shadow-xs'
-                              : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
-                          }`}
-                        >
-                          Chia 4 kỳ
-                        </button>
-                      ) : (
-                        <div className="py-1.5 px-2 rounded-lg text-[10px] text-slate-400 border border-dashed border-slate-200 flex items-center justify-center text-center bg-slate-50/50">
-                          4 kỳ (chỉ VIP)
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="text-[10px] text-emerald-800 flex items-center justify-between pt-1 border-t border-emerald-200/50">
-                      <span>Mỗi kỳ: <strong>{Math.round(newBasePrice / newInstallmentCount).toLocaleString('vi-VN')}đ</strong></span>
-                      <span>Thu Kỳ 1 hôm nay: <strong>{newPaidNow.toLocaleString('vi-VN')}đ</strong></span>
-                    </div>
-                  </div>
-                )}
-
-                <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-200/60">
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-600 mb-0.5">
-                      Số tiền thu ngay lúc này:
-                    </label>
-                    <input
-                      type="number"
-                      value={newPaidNow}
-                      onChange={(e) => setNewPaidNow(Number(e.target.value))}
-                      className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-black text-emerald-700 outline-none"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-600 mb-0.5">
-                      Số tiền còn nợ lại:
-                    </label>
-                    <div className="py-1 px-2.5 rounded-lg bg-slate-100 text-xs font-black text-amber-800 border border-slate-200">
-                      {Math.max(0, newBasePrice - newPaidNow).toLocaleString('vi-VN')}đ
-                    </div>
-                  </div>
+                <div className="pt-1 border-t border-slate-200/60 text-xs font-bold text-emerald-800">
+                  Thu đủ 100%: {newBasePrice.toLocaleString('vi-VN')}đ
                 </div>
               </div>
 
@@ -1237,7 +907,7 @@ export default function AdminBookingRequestsView() {
                   type="submit"
                   className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold cursor-pointer shadow-xs"
                 >
-                  Lưu & Tiếp nhận
+                  Xác nhận đặt sân
                 </button>
               </div>
             </form>
@@ -1297,6 +967,7 @@ export default function AdminBookingRequestsView() {
                   max={selectedReq.remainingDue}
                   value={payAmountInput}
                   onChange={(e) => setPayAmountInput(Number(e.target.value))}
+                  readOnly={selectedReq.customerType === 'trai_nghiem'}
                   className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-black text-emerald-700 outline-none focus:border-emerald-500 focus:bg-white"
                 />
               </div>
@@ -1305,57 +976,22 @@ export default function AdminBookingRequestsView() {
                 <label className="block text-[11px] font-bold text-slate-700 mb-1">
                   Phương thức thanh toán:
                 </label>
-                <div className="grid grid-cols-2 gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setPayMethodInput('cash');
-                      setShowQrBox(false);
-                    }}
-                    className={`py-2 px-2 rounded-lg border font-bold text-center cursor-pointer transition ${
-                      payMethodInput === 'cash' ? 'bg-slate-900 text-white border-slate-900' : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-                    }`}
-                  >
-                    Tiền mặt tại quầy
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setPayMethodInput('vietqr');
-                      setShowQrBox(true);
-                    }}
-                    className={`py-2 px-2 rounded-lg border font-bold text-center cursor-pointer transition flex items-center justify-center gap-1 ${
-                      payMethodInput === 'vietqr' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-                    }`}
-                  >
-                    <QrCode className="w-3.5 h-3.5" />
-                    <span>VietQR MB Bank</span>
-                  </button>
-                </div>
+                <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-2 font-bold text-emerald-800">
+                  <QrCode className="mr-1 inline h-3.5 w-3.5" />
+                  Chuyển khoản qua mã QR VietQR của sân
+                </p>
               </div>
 
               {/* VietQR Quick Scan Box */}
-              {showQrBox && (
-                <div className="rounded-xl border border-emerald-300 bg-emerald-50/50 p-3 text-center space-y-2">
-                  <div className="mx-auto w-32 h-32 bg-white rounded-lg p-2 border border-slate-200 flex items-center justify-center relative shadow-xs">
-                    <div className="grid grid-cols-4 gap-1 w-full h-full p-1 bg-slate-100 rounded">
-                      {Array.from({ length: 16 }).map((_, idx) => (
-                        <div key={idx} className={'rounded ' + (idx % 3 === 0 ? 'bg-emerald-600' : 'bg-slate-800')}></div>
-                      ))}
-                    </div>
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <span className="bg-white text-emerald-700 px-2 py-0.5 font-black text-[9px] rounded-full shadow border border-emerald-100">COURTX</span>
-                    </div>
-                  </div>
-                  <p className="font-bold text-emerald-800 text-[11px]">
-                    Quét mã MB Bank: {payAmountInput.toLocaleString('vi-VN')}đ
-                  </p>
-                  <p className="text-[10px] text-slate-500 font-mono">
-                    Nội dung: {selectedReq.code} {selectedReq.phone}
-                  </p>
-                </div>
-              )}
+              <div className="rounded-xl border border-emerald-300 bg-emerald-50/50 p-3 text-center space-y-2">
+                <QrCodeArtwork className="mx-auto h-32 w-32 rounded-lg p-2" />
+                <p className="font-bold text-emerald-800 text-[11px]">
+                  Mã QR minh họa • {payAmountInput.toLocaleString('vi-VN')}đ
+                </p>
+                <p className="text-[10px] text-slate-500 font-mono">
+                  Nội dung: {selectedReq.code} {selectedReq.phone}
+                </p>
+              </div>
 
               <div className="pt-2 border-t border-slate-100 flex items-center justify-end gap-2">
                 <button
@@ -1408,7 +1044,7 @@ export default function AdminBookingRequestsView() {
                 </label>
                 <select
                   value={newStatusInput}
-                  onChange={(e) => setNewStatusInput(e.target.value as any)}
+                  onChange={(e) => setNewStatusInput(e.target.value as BookingRequest['status'])}
                   className="w-full rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 font-bold text-slate-800 outline-none"
                 >
                   <option value="pending">Chờ liên hệ</option>

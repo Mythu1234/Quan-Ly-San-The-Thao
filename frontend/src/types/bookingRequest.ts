@@ -1,4 +1,4 @@
-export type CustomerType = 'trai_nghiem' | 'vip_monthly' | 'event_series';
+export type CustomerType = 'trai_nghiem' | 'event_series';
 
 export interface BookingRequest {
   id: string;
@@ -45,44 +45,12 @@ export interface BookingRequest {
 
 export const INITIAL_BOOKING_REQUESTS: BookingRequest[] = [
   {
-    id: 'REQ-01',
-    code: 'YC-20261016-01',
-    customerName: 'Anh Trần Quang Huy (CLB Cầu Lông Ba Đình)',
-    phone: '0918.334.556',
-    customerType: 'vip_monthly',
-    customerTypeLabel: 'Hội viên VIP (6 Tháng)',
-    sport: 'badminton',
-    sportLabel: 'Cầu Lông (2 Sân)',
-    courtDetails: 'Sân 01 & Sân 02',
-    preferredSchedule: 'Thứ 2 - 4 - 6 hàng tuần',
-    preferredTime: '18:00 – 20:00 (2h/buổi)',
-    durationMonths: 6,
-    source: 'website',
-    sourceLabel: 'Từ Website',
-    notes: 'Muốn chia làm 3 đợt thanh toán, yêu cầu xuất hóa đơn điện tử cho công ty.',
-    totalPrice: 19200000,
-    discountPercent: 10,
-    discountAmount: 1920000,
-    finalPrice: 17280000,
-    paymentMode: 'installments',
-    paymentModeLabel: 'Chia 3 đợt',
-    paidAmount: 8640000,
-    remainingDue: 8640000,
-    paymentMethod: 'vietqr',
-    paymentStatus: 'partial',
-    paymentStatusLabel: 'Đã cọc Đợt 1',
-    status: 'pending',
-    statusLabel: 'Chờ liên hệ',
-    createdAt: '16/10/2026 10:15',
-    contactLogs: []
-  },
-  {
     id: 'REQ-02',
     code: 'YC-20261016-02',
     customerName: 'Chị Lê Thu Hà (Công ty CP FPT Software)',
     phone: '0977.889.900',
     customerType: 'event_series',
-    customerTypeLabel: 'Sự kiện (Chuỗi 14 Ngày)',
+    customerTypeLabel: 'Đặt sân',
     sport: 'volleyball',
     sportLabel: 'Bóng Chuyền',
     courtDetails: 'Cụm BC1 (Ô 1-4)',
@@ -96,13 +64,13 @@ export const INITIAL_BOOKING_REQUESTS: BookingRequest[] = [
     discountPercent: 5,
     discountAmount: 315000,
     finalPrice: 5985000,
-    paymentMode: 'deposit_50',
-    paymentModeLabel: 'Cọc 50%',
-    paidAmount: 3000000,
-    remainingDue: 2985000,
-    paymentMethod: 'cash',
-    paymentStatus: 'partial',
-    paymentStatusLabel: 'Đã cọc 50%',
+    paymentMode: 'full_100',
+    paymentModeLabel: 'Thanh toán đủ 100%',
+    paidAmount: 5985000,
+    remainingDue: 0,
+    paymentMethod: 'vietqr',
+    paymentStatus: 'paid_in_full',
+    paymentStatusLabel: 'Đã thanh toán đủ',
     status: 'in_consultation',
     statusLabel: 'Đang tư vấn',
     createdAt: '16/10/2026 09:30',
@@ -121,7 +89,7 @@ export const INITIAL_BOOKING_REQUESTS: BookingRequest[] = [
     customerName: 'Anh Tuấn (Nhóm FC Tuổi Trẻ)',
     phone: '0904.556.778',
     customerType: 'trai_nghiem',
-    customerTypeLabel: 'Trải nghiệm (2 Tháng)',
+    customerTypeLabel: 'Đặt sân',
     sport: 'football',
     sportLabel: 'Bóng Đá Mini',
     courtDetails: 'Toàn bộ 8 ô sàn',
@@ -135,13 +103,13 @@ export const INITIAL_BOOKING_REQUESTS: BookingRequest[] = [
     discountPercent: 0,
     discountAmount: 0,
     finalPrice: 3200000,
-    paymentMode: 'deposit_50',
-    paymentModeLabel: 'Cọc 50%',
-    paidAmount: 1600000,
-    remainingDue: 1600000,
+    paymentMode: 'full_100',
+    paymentModeLabel: 'Thanh toán đủ 100%',
+    paidAmount: 3200000,
+    remainingDue: 0,
     paymentMethod: 'vietqr',
-    paymentStatus: 'partial',
-    paymentStatusLabel: 'Đã cọc 50%',
+    paymentStatus: 'paid_in_full',
+    paymentStatusLabel: 'Đã thanh toán đủ',
     status: 'pending',
     statusLabel: 'Chờ liên hệ',
     createdAt: '16/10/2026 08:30',
@@ -153,7 +121,7 @@ export const INITIAL_BOOKING_REQUESTS: BookingRequest[] = [
     customerName: 'Bạn Hoàng Nam',
     phone: '0988.123.456',
     customerType: 'trai_nghiem',
-    customerTypeLabel: 'Trải nghiệm (Giờ lẻ)',
+    customerTypeLabel: 'Đặt sân',
     sport: 'badminton',
     sportLabel: 'Cầu Lông (1 Sân)',
     courtDetails: 'Sân 05',
@@ -170,7 +138,7 @@ export const INITIAL_BOOKING_REQUESTS: BookingRequest[] = [
     paymentModeLabel: 'Thanh toán 100%',
     paidAmount: 180000,
     remainingDue: 0,
-    paymentMethod: 'cash',
+    paymentMethod: 'vietqr',
     paymentStatus: 'paid_in_full',
     paymentStatusLabel: 'Đã thanh toán đủ',
     status: 'confirmed',
@@ -181,7 +149,7 @@ export const INITIAL_BOOKING_REQUESTS: BookingRequest[] = [
       {
         date: '15/10/2026 17:25',
         staffName: 'Lễ tân',
-        note: 'Đã nhận đủ 180.000đ tiền mặt tại quầy và xuất vé QR.'
+        note: 'Đã nhận đủ 180.000đ qua VietQR và xuất vé QR.'
       }
     ]
   }
@@ -196,7 +164,10 @@ export function getStoredBookingRequests(): BookingRequest[] {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(INITIAL_BOOKING_REQUESTS));
       return INITIAL_BOOKING_REQUESTS;
     }
-    return JSON.parse(raw);
+    const storedRequests: Array<BookingRequest | { customerType: 'vip_monthly' }> = JSON.parse(raw);
+    return storedRequests.filter(
+      (request): request is BookingRequest => request.customerType !== 'vip_monthly'
+    );
   } catch {
     return INITIAL_BOOKING_REQUESTS;
   }

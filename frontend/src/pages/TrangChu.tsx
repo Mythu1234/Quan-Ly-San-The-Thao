@@ -1,10 +1,11 @@
 import AdminDashboard from './AdminDashboard';
 import CustomerSchedule from '../components/CustomerSchedule';
+import QrCodeArtwork from '../components/QrCodeArtwork';
 import EmployeeDashboard from './employee/EmployeeDashboard';
 import VipCustomerDashboard from './VipCustomerDashboard';
 import { addBookingRequest } from '../types/bookingRequest';
 import { useState, useRef, useEffect, useMemo } from 'react';
-import { Search, MapPin, Phone, Clock, Play, Home, Calendar as CalendarIcon, X, Zap , User, Lock, Eye, Bell, Key, ArrowLeft, Award, Trophy, LayoutGrid } from 'lucide-react';
+import { Search, MapPin, Phone, Clock, Play, Home, Calendar as CalendarIcon, X, Zap , User, Lock, Eye, Bell, Key, ArrowLeft, Trophy, LayoutGrid } from 'lucide-react';
 
 // Custom SVG Icons matching Figma design
 const ShuttlecockIcon = () => (
@@ -62,7 +63,6 @@ export default function TrangChu() {
 
   // Order Submission State
   const [showPayment, setShowPayment] = useState<boolean>(false);
-  const [paymentPercent, setPaymentPercent] = useState<50 | 100>(100);
   const [isSubmitted, setIsSubmitted] = useState<boolean>(false);
   const [showOTP, setShowOTP] = useState<boolean>(false);
   const [showLogin, setShowLogin] = useState<boolean>(false);
@@ -172,119 +172,6 @@ export default function TrangChu() {
 
   const currentSport = sportsData[selectedSportId];
 
-  // --- VIP / LONG-TERM BOOKING STATE & CALCULATOR ---
-  const [vipSport, setVipSport] = useState<'badminton' | 'volleyball' | 'football'>('badminton');
-  const [vipSessionsPerWeek, setVipSessionsPerWeek] = useState<number>(3);
-  const [vipHoursPerSession, setVipHoursPerSession] = useState<number>(2);
-  const [vipMonths, setVipMonths] = useState<number>(6); // Range: 3 to 12 months (max 1 year)
-  const [showVipModal, setShowVipModal] = useState<boolean>(false);
-  const [vipCustomerName, setVipCustomerName] = useState<string>('');
-  const [vipCustomerPhone, setVipCustomerPhone] = useState<string>('');
-  const [vipPreferredSchedule, setVipPreferredSchedule] = useState<string>('');
-  const [vipCustomerNote, setVipCustomerNote] = useState<string>('');
-
-  // VIP Calculator formulas
-  const vipHourlyRate = useMemo(() => {
-    return sportsData[vipSport].pricePerHour;
-  }, [vipSport]);
-
-  const vipDiscountPercent = useMemo(() => {
-    // 1 - 2 months: 0% (Gói Trải Nghiệm - Giữ cố định giờ chơi)
-    // 3 - 6 months: 10% / hour (Hạng VIP)
-    // > 6 months (7 - 12 months): 15% / hour (Hạng VIP Thượng Hạng)
-    if (vipMonths < 3) return 0;
-    return vipMonths <= 6 ? 10 : 15;
-  }, [vipMonths]);
-
-  const vipTotalWeeks = useMemo(() => {
-    return vipMonths * 4;
-  }, [vipMonths]);
-
-  const vipTotalSessions = useMemo(() => {
-    return vipSessionsPerWeek * vipTotalWeeks;
-  }, [vipSessionsPerWeek, vipTotalWeeks]);
-
-  const vipTotalHours = useMemo(() => {
-    return vipTotalSessions * vipHoursPerSession;
-  }, [vipTotalSessions, vipHoursPerSession]);
-
-  const vipBasePrice = useMemo(() => {
-    return vipTotalHours * vipHourlyRate;
-  }, [vipTotalHours, vipHourlyRate]);
-
-  const vipDiscountAmount = useMemo(() => {
-    return Math.round((vipBasePrice * vipDiscountPercent) / 100);
-  }, [vipBasePrice, vipDiscountPercent]);
-
-  const vipFinalPrice = useMemo(() => {
-    return vipBasePrice - vipDiscountAmount;
-  }, [vipBasePrice, vipDiscountAmount]);
-
-  const vipMonthlyAverage = useMemo(() => {
-    return Math.round(vipFinalPrice / vipMonths);
-  }, [vipFinalPrice, vipMonths]);
-
-  const handleVipSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!vipCustomerName.trim()) {
-      showAlert('Thiếu thông tin', 'Vui lòng nhập Họ tên hoặc Tên CLB / Doanh nghiệp đại diện!');
-      return;
-    }
-    if (!vipCustomerPhone.trim() || !/^[0-9]{9,11}$/.test(vipCustomerPhone.trim())) {
-      showAlert('Số điện thoại không hợp lệ', 'Vui lòng nhập số điện thoại hợp lệ (9 - 11 chữ số) để nhân viên liên hệ xác nhận.');
-      return;
-    }
-
-    // Save to shared booking requests for Admin
-    const now = new Date();
-    const dateStr = `${now.getDate().toString().padStart(2, '0')}/${(now.getMonth() + 1).toString().padStart(2, '0')} ${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
-    const randomCode = `YC-VIP-${Date.now().toString().slice(-4)}`;
-
-    addBookingRequest({
-      id: `REQ-${Date.now()}`,
-      code: randomCode,
-      customerName: vipCustomerName.trim(),
-      phone: vipCustomerPhone.trim(),
-      customerType: 'vip_monthly',
-      customerTypeLabel: `Hội viên VIP (${vipMonths} Tháng)`,
-      sport: vipSport,
-      sportLabel: sportsData[vipSport].name,
-      courtDetails: 'Sân 01 & Sân 02',
-      preferredSchedule: vipPreferredSchedule.trim() || `${vipSessionsPerWeek} buổi/tuần`,
-      preferredTime: `${vipHoursPerSession}h/buổi`,
-      durationMonths: vipMonths,
-      source: 'website',
-      sourceLabel: 'Từ Website',
-      notes: vipCustomerNote.trim() || `Khách gửi yêu cầu gói VIP ${vipMonths} tháng từ Trang chủ.`,
-      totalPrice: vipBasePrice,
-      discountPercent: vipDiscountPercent,
-      discountAmount: vipDiscountAmount,
-      finalPrice: vipFinalPrice,
-      paymentMode: 'installments',
-      paymentModeLabel: 'Chia nhiều đợt',
-      paidAmount: 0,
-      remainingDue: vipFinalPrice,
-      paymentStatus: 'unpaid',
-      paymentStatusLabel: 'Chưa đóng',
-      status: 'pending',
-      statusLabel: 'Chờ liên hệ',
-      createdAt: dateStr,
-      contactLogs: []
-    });
-
-    setShowVipModal(false);
-    showAlert(
-      'Gửi yêu cầu VIP thành công! 🎉',
-      `Cảm ơn Quý khách ${vipCustomerName}!\n\nYêu cầu thuê sân cố định ${vipMonths} tháng (${sportsData[vipSport].name}) đã được hệ thống tiếp nhận.\n\nBộ phận quản lý sẽ liên hệ SĐT ${vipCustomerPhone} trong vòng 15 phút để hoàn tất ký hợp đồng và xếp lịch giữ sân cố định tại quầy.`
-    );
-
-    // Reset inputs
-    setVipCustomerName('');
-    setVipCustomerPhone('');
-    setVipPreferredSchedule('');
-    setVipCustomerNote('');
-  };
-
   // Tab switch between: 'vip_subscription' (Hội viên 3-12 tháng) and 'event_series' (Sự kiện & Chuỗi ngày 7-14 ngày)
   const [contractMode, setContractMode] = useState<'vip_subscription' | 'event_series'>('vip_subscription');
 
@@ -380,8 +267,8 @@ export default function TrangChu() {
       discountPercent: eventDiscountPercent,
       discountAmount: eventDiscountAmount,
       finalPrice: eventFinalPrice,
-      paymentMode: 'deposit_50',
-      paymentModeLabel: 'Cọc 50%',
+      paymentMode: 'full_100',
+      paymentModeLabel: 'Thanh toán đủ 100% qua VietQR',
       paidAmount: 0,
       remainingDue: eventFinalPrice,
       paymentStatus: 'unpaid',
@@ -414,28 +301,14 @@ export default function TrangChu() {
     { label: 'Thứ 3', date: '23/09' },
   ];
 
-  // Logic for Time Generation (05:00 - 23:00)
-  const generateStartTimes = () => {
-    const times = [];
-    for (let h = 5; h <= 22; h++) {
-      for (let m of ['00', '30']) {
-        times.push(`${h.toString().padStart(2, '0')}:${m}`);
-      }
-    }
-    return times;
-  };
-
   const getAvailableDurations = (startTimeStr: string) => {
-    if (!startTimeStr) return [60];
+    const possibleDurations = [60, 90, 120, 150, 180, 210, 240];
+    if (!startTimeStr) return possibleDurations;
+
     const [h, m] = startTimeStr.split(':').map(Number);
-    const startVal = h + m / 60;
-    const maxEndVal = 23; // close at 23:00
-    const maxDurationHours = Math.max(1, maxEndVal - startVal);
-    const durations = [];
-    for (let d = 1; d <= maxDurationHours && d <= 5; d += 0.5) {
-      durations.push(d * 60); // minutes
-    }
-    return durations.length > 0 ? durations : [60];
+    const startMinutes = h * 60 + m;
+    const closingTimeMinutes = 23 * 60;
+    return possibleDurations.filter(duration => startMinutes + duration <= closingTimeMinutes);
   };
 
   const mockScheduleBookings = useMemo(() => [
@@ -450,7 +323,11 @@ export default function TrangChu() {
   ], []);
 
   const availableCourts = useMemo(() => {
-    if (!selectedDate || !selectedStartTime) return [];
+    if (
+      !selectedDate ||
+      !selectedStartTime ||
+      !getAvailableDurations(selectedStartTime).includes(selectedDuration)
+    ) return [];
     const [h, m] = selectedStartTime.split(':').map(Number);
     const startMin = h * 60 + m;
     const endMin = startMin + selectedDuration;
@@ -513,7 +390,6 @@ export default function TrangChu() {
     }
   }, [availableCourts, selectedCourt]);
 
-  const allStartTimes = generateStartTimes();
   const availableDurations = getAvailableDurations(selectedStartTime);
 
   const handleStartTimeSelect = (time: string) => {
@@ -547,6 +423,10 @@ export default function TrangChu() {
     }
     if (!selectedStartTime) {
       showAlert('Chưa chọn giờ', 'Vui lòng chọn giờ bắt đầu ở Bước 3!');
+      return;
+    }
+    if (!getAvailableDurations(selectedStartTime).includes(selectedDuration)) {
+      showAlert('Thời lượng không hợp lệ', 'Vui lòng chọn thời lượng kết thúc trước 23:00!');
       return;
     }
     if (!selectedCourt) {
@@ -853,7 +733,7 @@ export default function TrangChu() {
                 Hợp đồng & Đặt sân theo gói
               </h2>
               <p className="mt-0.5 text-xs text-slate-500">
-                Chính sách ưu đãi và hỗ trợ vận hành riêng cho Hội viên gắn bó định kỳ hoặc Sự kiện / Giải đấu ngắn ngày.
+                Lịch VIP cố định được nhân viên tiếp nhận tại quầy; sự kiện và chuỗi ngày có thể gửi yêu cầu trực tuyến.
               </p>
             </div>
 
@@ -922,7 +802,7 @@ export default function TrangChu() {
                   </div>
                   <div className="flex items-start gap-2">
                     <span className="text-emerald-600 font-black">•</span>
-                    <span><strong>Thanh toán linh hoạt:</strong> Tự do thỏa thuận chia tổng số tiền thành nhiều đợt thanh toán trực tiếp tại quầy.</span>
+                    <span><strong>Thanh toán linh hoạt:</strong> Có thể thỏa thuận chia nhiều đợt tại quầy; thanh toán từng đợt qua mã QR VietQR của sân.</span>
                   </div>
                   <div className="flex items-start gap-2">
                     <span className="text-emerald-600 font-black">•</span>
@@ -931,19 +811,12 @@ export default function TrangChu() {
                 </div>
 
                 {/* Actions */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
-                  <button
-                    type="button"
-                    onClick={() => setShowVipModal(true)}
-                    className="w-full rounded-xl bg-emerald-600 py-3 px-4 text-xs font-black uppercase tracking-wider text-white hover:bg-emerald-700 active:scale-95 transition text-center cursor-pointer shadow-sm"
-                  >
-                    Đăng ký giữ lịch cố định
-                  </button>
+                <div className="grid grid-cols-1 gap-2 pt-1">
                   <a
                     href="tel:0901234567"
-                    className="w-full rounded-xl border border-slate-300 bg-white py-3 px-4 text-xs font-bold text-slate-700 hover:bg-slate-50 active:scale-95 transition text-center"
+                    className="w-full rounded-xl bg-emerald-600 py-3 px-4 text-xs font-black uppercase tracking-wider text-white hover:bg-emerald-700 active:scale-95 transition text-center"
                   >
-                    Hotline tư vấn: 0901.234.567
+                    Liên hệ đăng ký lịch VIP tại quầy · 0901.234.567
                   </a>
                 </div>
               </div>
@@ -1115,16 +988,15 @@ export default function TrangChu() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="mb-1.5 block text-[10px] font-bold uppercase text-slate-500 tracking-wider">Giờ Bắt Đầu</label>
-                  <select 
+                  <input
+                    type="time"
+                    min="05:00"
+                    max="22:00"
+                    step={60}
                     value={selectedStartTime}
                     onChange={(e) => handleStartTimeSelect(e.target.value)}
                     className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-bold text-slate-900 outline-none focus:border-emerald-500 focus:bg-white transition"
-                  >
-                    <option value="">-- Chọn giờ bắt đầu --</option>
-                    {allStartTimes.map(time => (
-                      <option key={time} value={time}>{time}</option>
-                    ))}
-                  </select>
+                  />
                 </div>
                 <div>
                   <label className="mb-1.5 block text-[10px] font-bold uppercase text-slate-500 tracking-wider">Thời Lượng</label>
@@ -1134,7 +1006,9 @@ export default function TrangChu() {
                     className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-bold text-slate-900 outline-none focus:border-emerald-500 focus:bg-white transition"
                   >
                     {availableDurations.map(dur => (
-                      <option key={dur} value={dur}>{dur / 60} giờ ({dur} phút)</option>
+                      <option key={dur} value={dur}>
+                        {dur % 60 === 0 ? `${dur / 60} tiếng` : `${Math.floor(dur / 60)} tiếng 30 phút`}
+                      </option>
                     ))}
                   </select>
                 </div>
@@ -1521,206 +1395,6 @@ export default function TrangChu() {
           </div>
         </div>
       )}
-
-      {/* 👑 MODAL ĐĂNG KÝ THUÊ SÂN VIP CỐ ĐỊNH */}
-      {showVipModal && (
-        <div className="fixed top-0 bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md z-50 flex items-end sm:items-center justify-center bg-slate-900/60 p-0 sm:p-4 backdrop-blur-sm animate-in fade-in duration-300">
-          <div className="w-full max-w-md rounded-t-3xl sm:rounded-3xl bg-white p-6 shadow-2xl animate-in slide-in-from-bottom-8 duration-300 max-h-[92vh] overflow-y-auto flex flex-col border border-slate-100">
-            <div className="w-12 h-1.5 bg-slate-200 rounded-full mb-3 mx-auto sm:hidden"></div>
-
-            {/* Header */}
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <div className="flex items-center gap-2.5">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-100 text-amber-700">
-                  <Award className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="text-base font-black text-slate-900 uppercase">Đăng ký giữ lịch VIP</h3>
-                  <p className="text-[10px] text-slate-500">Giữ sân cố định • Hợp đồng tối đa 1 năm</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowVipModal(false)}
-                className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 transition"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* Package Summary Card */}
-            <div className="mt-4 rounded-2xl bg-gradient-to-br from-amber-50 to-emerald-50 border border-amber-200 p-3.5 space-y-1.5 text-xs">
-              <div className="flex justify-between items-center">
-                <span className="text-slate-500">Môn & Thời hạn:</span>
-                <span className="font-extrabold text-slate-900">
-                  {sportsData[vipSport].name} • {vipMonths} Tháng (Giảm {vipDiscountPercent}%)
-                </span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-slate-500">Tần suất dự kiến:</span>
-                <span className="font-bold text-slate-800">
-                  {vipSessionsPerWeek} buổi/tuần ({vipHoursPerSession}h/buổi)
-                </span>
-              </div>
-              <div className="flex justify-between items-center border-t border-amber-200/60 pt-1.5">
-                <span className="text-slate-500">Dự toán sau giảm:</span>
-                <span className="font-black text-emerald-700 text-sm">
-                  {vipFinalPrice.toLocaleString('vi-VN')}đ
-                </span>
-              </div>
-              <p className="text-[10px] text-amber-700 font-medium">
-                ✨ Tiết kiệm {vipDiscountAmount.toLocaleString('vi-VN')}đ (~ {vipMonthlyAverage.toLocaleString('vi-VN')}đ/tháng, hỗ trợ chia nhiều đợt thanh toán tại quầy).
-              </p>
-            </div>
-
-            {/* Registration Form */}
-            <form onSubmit={handleVipSubmit} className="mt-4 space-y-3.5">
-              {/* Select Sport & Duration in VIP Modal */}
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block text-[11px] font-black uppercase text-slate-700 mb-1">
-                    Bộ môn thi đấu
-                  </label>
-                  <select
-                    value={vipSport}
-                    onChange={(e) => setVipSport(e.target.value as any)}
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-900 outline-none focus:border-amber-500 focus:bg-white transition"
-                  >
-                    <option value="badminton">Cầu Lông (120k/h)</option>
-                    <option value="volleyball">Bóng Chuyền (150k/h)</option>
-                    <option value="football">Bóng Đá Mini (200k/h)</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-[11px] font-black uppercase text-slate-700 mb-1">
-                    Gói thời hạn thuê
-                  </label>
-                  <select
-                    value={vipMonths}
-                    onChange={(e) => setVipMonths(Number(e.target.value))}
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-900 outline-none focus:border-amber-500 focus:bg-white transition"
-                  >
-                    <option value={1}>1 Tháng (Giá chuẩn)</option>
-                    <option value={2}>2 Tháng (Giá chuẩn)</option>
-                    <option value={3}>3 Tháng (Giảm 10% VIP)</option>
-                    <option value={6}>6 Tháng (Giảm 10% VIP)</option>
-                    <option value={12}>12 Tháng (Giảm 15% VIP)</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block text-[11px] font-black uppercase text-slate-700 mb-1">
-                    Tần suất buổi / tuần
-                  </label>
-                  <select
-                    value={vipSessionsPerWeek}
-                    onChange={(e) => setVipSessionsPerWeek(Number(e.target.value))}
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-900 outline-none focus:border-amber-500 focus:bg-white transition"
-                  >
-                    <option value={2}>2 buổi / tuần</option>
-                    <option value={3}>3 buổi / tuần</option>
-                    <option value={4}>4 buổi / tuần</option>
-                    <option value={5}>5 buổi / tuần</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-[11px] font-black uppercase text-slate-700 mb-1">
-                    Thời lượng mỗi buổi
-                  </label>
-                  <select
-                    value={vipHoursPerSession}
-                    onChange={(e) => setVipHoursPerSession(Number(e.target.value))}
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-900 outline-none focus:border-amber-500 focus:bg-white transition"
-                  >
-                    <option value={1.5}>1.5 giờ / buổi</option>
-                    <option value={2}>2.0 giờ / buổi</option>
-                    <option value={3}>3.0 giờ / buổi</option>
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-black uppercase text-slate-700 mb-1">
-                  Họ tên người đại diện / Tên CLB / Doanh nghiệp <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="Ví dụ: CLB Cầu Lông Đam Mê / Nguyễn Văn A"
-                  value={vipCustomerName}
-                  onChange={(e) => setVipCustomerName(e.target.value)}
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-xs font-bold text-slate-900 placeholder-slate-400 outline-none focus:border-amber-500 focus:bg-white transition"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-black uppercase text-slate-700 mb-1">
-                  Số điện thoại liên hệ <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="tel"
-                  required
-                  placeholder="Ví dụ: 0901234567"
-                  value={vipCustomerPhone}
-                  onChange={(e) => setVipCustomerPhone(e.target.value)}
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-xs font-bold text-slate-900 placeholder-slate-400 outline-none focus:border-amber-500 focus:bg-white transition"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-black uppercase text-slate-700 mb-1">
-                  Khung giờ & Các thứ trong tuần mong muốn
-                </label>
-                <input
-                  type="text"
-                  placeholder="Ví dụ: Tối Thứ 2 - 4 - 6 từ 18:00 đến 20:00"
-                  value={vipPreferredSchedule}
-                  onChange={(e) => setVipPreferredSchedule(e.target.value)}
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-xs font-bold text-slate-900 placeholder-slate-400 outline-none focus:border-amber-500 focus:bg-white transition"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-black uppercase text-slate-700 mb-1">
-                  Ghi chú hoặc yêu cầu thanh toán nhiều đợt
-                </label>
-                <textarea
-                  rows={2}
-                  placeholder="Ví dụ: Mong muốn thanh toán làm 3 đợt, cần xuất hóa đơn VAT cho công ty..."
-                  value={vipCustomerNote}
-                  onChange={(e) => setVipCustomerNote(e.target.value)}
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-xs font-medium text-slate-900 placeholder-slate-400 outline-none focus:border-amber-500 focus:bg-white transition resize-none"
-                />
-              </div>
-
-              <div className="rounded-xl bg-slate-50 p-3 text-[10px] text-slate-500 border border-slate-200 leading-relaxed">
-                ℹ️ <strong>Quy trình xử lý VIP:</strong> Để đảm bảo mặt sân được giữ độc quyền và khóa va chạm không gian xuyên suốt chu kỳ hợp đồng, nhân viên quản lý sân sẽ kiểm tra lịch sàn và gọi điện thoại xác nhận trong vòng 15 phút, sau đó hướng dẫn ký hợp đồng trực tiếp tại quầy.
-              </div>
-
-              <div className="pt-2 grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => setShowVipModal(false)}
-                  className="rounded-xl border border-slate-200 py-3 text-xs font-bold text-slate-600 hover:bg-slate-100 active:scale-95 transition"
-                >
-                  Hủy bỏ
-                </button>
-                <button
-                  type="submit"
-                  className="rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 py-3 text-xs font-black uppercase tracking-wider text-slate-950 shadow-md shadow-amber-500/20 hover:from-amber-300 hover:to-amber-400 active:scale-95 transition"
-                >
-                  GỬI YÊU CẦU VIP
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
       {/* 🎪 MODAL ĐĂNG KÝ SỰ KIỆN & CHUỖI NGÀY */}
       {showEventModal && (
         <div className="fixed top-0 bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md z-50 flex items-end sm:items-center justify-center bg-slate-900/60 p-0 sm:p-4 backdrop-blur-sm animate-in fade-in duration-300">
@@ -1906,7 +1580,7 @@ export default function TrangChu() {
               </div>
 
               <div className="rounded-xl bg-slate-50 p-3 text-[10px] text-slate-500 border border-slate-200 leading-relaxed">
-                ℹ️ <strong>Quy trình xử lý sự kiện:</strong> Vì thuê dồn dập {eventDays} ngày liên tiếp có thể trùng một vài ô sân lẻ đã có khách đặt trước, điều phối viên sẽ kiểm tra sơ đồ sàn trên hệ thống và gọi lại cho quý khách trong vòng 15 phút để chốt cụm sân và thủ tục đặt cọc 50%.
+                ℹ️ <strong>Quy trình xử lý sự kiện:</strong> Vì thuê dồn dập {eventDays} ngày liên tiếp có thể trùng một vài ô sân lẻ đã có khách đặt trước, điều phối viên sẽ kiểm tra sơ đồ sàn trên hệ thống và gọi lại cho quý khách trong vòng 15 phút để chốt cụm sân và hướng dẫn thanh toán đủ 100% qua VietQR.
               </div>
 
               <div className="pt-2 grid grid-cols-2 gap-2">
@@ -2199,43 +1873,20 @@ export default function TrangChu() {
             <h3 className="text-lg font-black text-slate-900 uppercase tracking-wide">Thanh toán đơn hàng</h3>
               <p className="text-xs text-slate-500 mt-1 mb-4 text-center">Quét mã VietQR bằng ứng dụng ngân hàng</p>
 
-              <div className="flex bg-slate-100 p-1 rounded-xl mb-4 text-xs font-bold w-full">
-                <button 
-                  onClick={() => setPaymentPercent(100)} 
-                  className={`flex-1 py-2 rounded-lg transition-all ${paymentPercent === 100 ? 'bg-white shadow-sm text-emerald-600' : 'text-slate-500 hover:text-slate-700'}`}
-                >
-                  Thanh toán 100%
-                </button>
-                <button 
-                  onClick={() => setPaymentPercent(50)} 
-                  className={`flex-1 py-2 rounded-lg transition-all ${paymentPercent === 50 ? 'bg-white shadow-sm text-emerald-600' : 'text-slate-500 hover:text-slate-700'}`}
-                >
-                  Cọc 50%
-                </button>
-              </div>
-
             <div className="w-full rounded-2xl border-2 border-emerald-500 bg-emerald-50/50 p-5 relative overflow-hidden text-center">
               <div className="flex justify-between items-center mb-3">
                  <p className="font-extrabold text-slate-900 text-sm">MB BANK</p>
                  <span className="rounded bg-emerald-100 px-2 py-1 text-[10px] font-black text-emerald-700">VIETQR</span>
               </div>
               
-              <div className="mx-auto h-40 w-40 bg-white rounded-xl p-2 border border-slate-200 shadow-sm relative flex items-center justify-center">
-                <div className="grid grid-cols-4 gap-1.5 w-full h-full p-2 bg-slate-100 rounded">
-                  {Array.from({ length: 16 }).map((_, idx) => (
-                    <div key={idx} className={'rounded ' + (idx % 3 === 0 ? 'bg-emerald-500' : 'bg-slate-800')}></div>
-                  ))}
-                </div>
-                <div className="absolute inset-0 flex items-center justify-center">
-                   <span className="bg-white text-emerald-600 px-3 py-1 font-black text-xs rounded-full shadow-md uppercase border border-emerald-100">COURTX</span>
-                </div>
-              </div>
+              <QrCodeArtwork className="mx-auto h-40 w-40" />
 
               <div className="mt-4 space-y-1 text-xs">
                 <p className="text-slate-500">Số tiền thanh toán:</p>
-                  <p className="text-2xl font-black text-emerald-600">{(paymentPercent === 100 ? totalPrice : totalPrice / 2).toLocaleString('vi-VN') + 'đ'}</p>
+                  <p className="text-2xl font-black text-emerald-600">{totalPrice.toLocaleString('vi-VN')}đ</p>
                 <p className="text-slate-500 mt-2">Nội dung chuyển khoản:</p>
                 <p className="font-mono font-bold text-slate-900 bg-white py-1 rounded border border-slate-200 uppercase">CX {selectedCourt.replace(/ /g, '')} {customerPhone}</p>
+                <p className="mt-2 text-[10px] text-slate-500">Mã QR minh họa, chưa dùng để chuyển khoản thật.</p>
               </div>
             </div>
 
@@ -2278,8 +1929,11 @@ export default function TrangChu() {
             <div className="rounded-2xl bg-slate-50 p-4 text-left text-xs space-y-2 border border-slate-200">
               <div className="flex justify-between"><span className="text-slate-500">Môn:</span> <span className="font-bold text-slate-900">{currentSport.name}</span></div>
               <div className="flex justify-between"><span className="text-slate-500">Sân:</span> <span className="font-bold text-emerald-600">{selectedCourt}</span></div>
-              <div className="flex justify-between"><span className="text-slate-500">Khung giờ:</span> <span className="font-bold text-slate-900">{selectedDate} ({selectedSlot})</span></div>
-              <div className="flex justify-between border-t border-slate-200 pt-2"><span className="text-slate-500">Đã thanh toán {paymentPercent === 50 ? '(Cọc 50%)' : ''}:</span> <span className="font-black text-emerald-600">{(paymentPercent === 100 ? totalPrice : totalPrice / 2).toLocaleString('vi-VN')}đ</span></div>
+              <div className="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-3">
+                <span className="text-slate-500">Ngày & giờ:</span>
+                <span className="text-right font-bold text-slate-900">{selectedDate} · {selectedSlot}</span>
+              </div>
+              <div className="flex justify-between border-t border-slate-200 pt-2"><span className="text-slate-500">Đã thanh toán đủ 100% qua VietQR:</span> <span className="font-black text-emerald-600">{totalPrice.toLocaleString('vi-VN')}đ</span></div>
             </div>
 
             <p className="text-[11px] text-slate-500">
