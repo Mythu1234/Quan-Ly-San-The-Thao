@@ -464,7 +464,6 @@ export default function CustomerSchedule({
                       if (bFirst && !bSecond) {
                         const tSecond = `${t.slice(0, 2)}:30`;
                         const isSelectedSecond = selectedCourtName === court.name && selStartMin >= 0 && (cellStart + 30) >= selStartMin && (cellStart + 30) < selEndMin;
-                        const halfPrice = Math.round(court.pricePerHour / 2 / 1000);
 
                         return (
                           <div key={cIdx} style={{ width: `${slotWidth}px` }} className="shrink-0 flex border-r border-slate-200/60">
@@ -485,17 +484,15 @@ export default function CustomerSchedule({
                                 className="h-full bg-emerald-500 text-white flex flex-col items-center justify-center text-center p-0.5 shadow-inner cursor-pointer"
                               >
                                 <span className="text-[8px] font-black uppercase">CHỌN</span>
-                                <span className="text-[7px] font-extrabold">{halfPrice}k</span>
                               </div>
                             ) : (
                               <div
                                 style={{ width: `${slotWidth / 2}px` }}
                                 onClick={() => handleSlotClick(court.sportId, court.name, tSecond, `${(court.pricePerHour / 2).toLocaleString('vi-VN')}đ`)}
                                 className="h-full bg-amber-50/80 hover:bg-amber-100 flex flex-col items-center justify-center text-center cursor-pointer transition active:scale-95 group p-0.5"
-                                title={`Bấm để chọn ${court.name} lúc ${tSecond} (nửa tiếng - ${(court.pricePerHour / 2).toLocaleString('vi-VN')}đ)`}
+                                title={`Bấm để chọn ${court.name} lúc ${tSecond} (nửa tiếng)`}
                               >
                                 <span className="text-[8px] font-black text-amber-800 uppercase group-hover:scale-105 transition">Trống</span>
-                                <span className="text-[7px] font-bold text-amber-700">{halfPrice}k</span>
                               </div>
                             )}
                           </div>
@@ -505,7 +502,6 @@ export default function CustomerSchedule({
                       // Case 3: First half FREE, second half occupied
                       if (!bFirst && bSecond) {
                         const isSelectedFirst = selectedCourtName === court.name && selStartMin >= 0 && cellStart >= selStartMin && cellStart < selEndMin;
-                        const halfPrice = Math.round(court.pricePerHour / 2 / 1000);
 
                         return (
                           <div key={cIdx} style={{ width: `${slotWidth}px` }} className="shrink-0 flex border-r border-slate-200/60">
@@ -517,17 +513,15 @@ export default function CustomerSchedule({
                                 className="h-full bg-emerald-500 text-white flex flex-col items-center justify-center text-center p-0.5 shadow-inner cursor-pointer border-r border-emerald-600"
                               >
                                 <span className="text-[8px] font-black uppercase">CHỌN</span>
-                                <span className="text-[7px] font-extrabold">{halfPrice}k</span>
                               </div>
                             ) : (
                               <div
                                 style={{ width: `${slotWidth / 2}px` }}
                                 onClick={() => handleSlotClick(court.sportId, court.name, t, `${(court.pricePerHour / 2).toLocaleString('vi-VN')}đ`)}
                                 className="h-full bg-amber-50/80 hover:bg-amber-100 flex flex-col items-center justify-center text-center cursor-pointer transition active:scale-95 group p-0.5 border-r border-amber-200/60"
-                                title={`Bấm để chọn ${court.name} lúc ${t} (nửa tiếng - ${(court.pricePerHour / 2).toLocaleString('vi-VN')}đ)`}
+                                title={`Bấm để chọn ${court.name} lúc ${t} (nửa tiếng)`}
                               >
                                 <span className="text-[8px] font-black text-amber-800 uppercase group-hover:scale-105 transition">Trống</span>
-                                <span className="text-[7px] font-bold text-amber-700">{halfPrice}k</span>
                               </div>
                             )}
 
@@ -556,7 +550,6 @@ export default function CustomerSchedule({
                             <span className="text-[10px] font-black uppercase flex items-center gap-0.5">
                               <CheckCircle2 className="w-3.5 h-3.5" /> CHỌN
                             </span>
-                            <span className="text-[8px] font-extrabold opacity-90">{court.pricePerHour / 1000}k</span>
                           </div>
                         );
                       }
@@ -567,13 +560,10 @@ export default function CustomerSchedule({
                           style={{ width: `${slotWidth}px` }} 
                           onClick={() => handleSlotClick(court.sportId, court.name, t, `${court.pricePerHour.toLocaleString('vi-VN')}đ`)}
                           className="shrink-0 border-r border-amber-200/70 bg-amber-50/70 hover:bg-amber-100 hover:border-amber-400 flex flex-col items-center justify-center text-center cursor-pointer transition active:scale-95 group p-1"
-                          title={`Bấm để chọn ${court.name} lúc ${t} (${court.pricePerHour.toLocaleString('vi-VN')}đ/h)`}
+                          title={`Bấm để chọn ${court.name} lúc ${t}`}
                         >
-                          <span className="text-[9px] font-black text-amber-800 uppercase group-hover:scale-105 transition">
+                          <span className="text-[10px] font-black text-amber-800 uppercase group-hover:scale-105 transition">
                             Trống
-                          </span>
-                          <span className="text-[8px] font-bold text-amber-700">
-                            {court.pricePerHour / 1000}k
                           </span>
                         </div>
                       );
@@ -582,7 +572,6 @@ export default function CustomerSchedule({
                       const cellEnd = cellStart + 30;
                       const occupyingBooking = getBookingAt(court.code, cellStart, cellEnd);
                       const isSelected = selectedCourtName === court.name && selStartMin >= 0 && cellStart >= selStartMin && cellStart < selEndMin;
-                      const halfPrice = Math.round(court.pricePerHour / 2 / 1000);
 
                       if (occupyingBooking) {
                         return (
@@ -608,7 +597,6 @@ export default function CustomerSchedule({
                             <span className="text-[10px] font-black uppercase flex items-center gap-0.5">
                               <CheckCircle2 className="w-3.5 h-3.5" /> CHỌN
                             </span>
-                            <span className="text-[8px] font-extrabold opacity-90">{halfPrice}k</span>
                           </div>
                         );
                       }
@@ -619,13 +607,10 @@ export default function CustomerSchedule({
                           style={{ width: `${slotWidth}px` }} 
                           onClick={() => handleSlotClick(court.sportId, court.name, t, `${(court.pricePerHour / 2).toLocaleString('vi-VN')}đ`)}
                           className="shrink-0 border-r border-amber-200/70 bg-amber-50/70 hover:bg-amber-100 hover:border-amber-400 flex flex-col items-center justify-center text-center cursor-pointer transition active:scale-95 group p-1"
-                          title={`Bấm để chọn ${court.name} lúc ${t} (30 phút: ${(court.pricePerHour / 2).toLocaleString('vi-VN')}đ)`}
+                          title={`Bấm để chọn ${court.name} lúc ${t}`}
                         >
-                          <span className="text-[9px] font-black text-amber-800 uppercase group-hover:scale-105 transition">
+                          <span className="text-[10px] font-black text-amber-800 uppercase group-hover:scale-105 transition">
                             Trống
-                          </span>
-                          <span className="text-[8px] font-bold text-amber-700">
-                            {halfPrice}k
                           </span>
                         </div>
                       );
