@@ -5,7 +5,7 @@ import EmployeeDashboard from './employee/EmployeeDashboard';
 import VipCustomerDashboard from './VipCustomerDashboard';
 import { addBookingRequest } from '../types/bookingRequest';
 import { useState, useRef, useEffect, useMemo } from 'react';
-import { Search, MapPin, Phone, Clock, Play, Home, Calendar as CalendarIcon, X, Zap , User, Lock, Eye, EyeOff, Bell, Key, ArrowLeft, ArrowRight, ChevronLeft, ChevronRight, ChevronDown, Trophy, LayoutGrid, CheckCircle2, RefreshCw, MessageSquare, Copy, Check, AlertTriangle } from 'lucide-react';
+import { Search, MapPin, Phone, Clock, Play, Home, Calendar as CalendarIcon, X, Zap , User, Lock, Eye, EyeOff, Bell, Key, ArrowLeft, ArrowRight, ChevronLeft, ChevronRight, ChevronDown, Trophy, CheckCircle2, RefreshCw, MessageSquare, Copy, Check, AlertTriangle } from 'lucide-react';
 
 const parseTimeToMinutes = (t: string): number => {
   if (!t) return 0;
@@ -56,10 +56,11 @@ const VolleyballIcon = () => (
 
 export default function TrangChu() {
   // Navigation tab state
-  const [activeTab, setActiveTab] = useState<'booking' | 'lookup' | 'schedule'>('booking');
+  const [activeTab, setActiveTab] = useState<'booking' | 'lookup'>('booking');
 
   // Booking Form State
-  const [selectedSportId, setSelectedSportId] = useState<'badminton' | 'football' | 'volleyball'>('badminton');
+  const [selectedSportId, setSelectedSportId] = useState<'badminton' | 'football' | 'volleyball' | null>(null);
+  const [sportError, setSportError] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<string>('');
   const [dateError, setDateError] = useState<string | null>(null);
   const [selectedCourt, setSelectedCourt] = useState<string>('');
@@ -303,12 +304,39 @@ export default function TrangChu() {
 
   // Section Refs for smooth scrolling
   const introRef = useRef<HTMLDivElement>(null);
+  const facilityRef = useRef<HTMLDivElement>(null);
   const bookingRef = useRef<HTMLDivElement>(null);
   const lookupRef = useRef<HTMLDivElement>(null);
 
-  const handleTabChange = (tab: 'booking' | 'lookup' | 'schedule') => {
+  const handleTabChange = (tab: 'booking' | 'lookup') => {
     setActiveTab(tab);
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const scrollToBooking = (sportId?: 'badminton' | 'volleyball' | 'football') => {
+    if (sportId) {
+      setSelectedSportId(sportId);
+      setSportError(null);
+    }
+    if (activeTab !== 'booking') {
+      setActiveTab('booking');
+      setTimeout(() => {
+        bookingRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 100);
+    } else {
+      bookingRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
+
+  const scrollToFacility = () => {
+    if (activeTab !== 'booking') {
+      setActiveTab('booking');
+      setTimeout(() => {
+        facilityRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 100);
+    } else {
+      facilityRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
   };
 
   const [showScheduleModal, setShowScheduleModal] = useState<boolean>(false);
@@ -320,6 +348,10 @@ export default function TrangChu() {
     dateStr: string,
     fromScheduleTab?: boolean
   ) => {
+    // Tự động gán môn theo sân mà khách bấm chọn
+    setSelectedSportId(sportId);
+    setSportError(null);
+
     // Nếu khách chưa chọn ngày ở Bước 2 và bấm vào lịch thì báo chữ đỏ & cuộn lên Bước 2
     if (!selectedDate && !fromScheduleTab) {
       setDateError('Vui lòng chọn ngày thi đấu ở Bước 2 trước khi chọn sân và giờ!');
@@ -330,7 +362,6 @@ export default function TrangChu() {
       return;
     }
 
-    setSelectedSportId(sportId);
     setSelectedStartTime(time);
     setSelectedCourt(courtName);
 
@@ -415,7 +446,7 @@ export default function TrangChu() {
     },
   };
 
-  const currentSport = sportsData[selectedSportId];
+  const currentSport = selectedSportId ? sportsData[selectedSportId] : null;
 
 
   // --- EVENT & MULTI-DAY SERIES STATE & CALCULATOR ---
@@ -700,7 +731,7 @@ export default function TrangChu() {
   };
 
   useEffect(() => {
-    if (selectedCourt && !currentSport.courts.includes(selectedCourt)) {
+    if (selectedCourt && currentSport && !currentSport.courts.includes(selectedCourt)) {
       setSelectedCourt('');
       setSelectedStartTime('');
     }
@@ -773,7 +804,7 @@ export default function TrangChu() {
 
   // Price Calculation
   const durationHours = selectedDuration / 60;
-  const totalPrice = Math.round(currentSport.pricePerHour * durationHours);
+  const totalPrice = currentSport ? Math.round(currentSport.pricePerHour * durationHours) : 0;
   const formattedPrice = totalPrice.toLocaleString('vi-VN') + 'đ';
   const selectedSlot = selectedStartTime ? `${selectedStartTime} - ${selectedEndTime}` : 'Chưa chọn giờ';
 
@@ -971,15 +1002,15 @@ export default function TrangChu() {
           <div className="grid grid-cols-2 gap-3 pt-1">
             <button
               type="button"
-              onClick={() => handleTabChange('booking')}
-              className="flex items-center justify-center gap-2 rounded-xl bg-emerald-500 px-4 py-3.5 text-xs font-black uppercase tracking-wider text-white shadow-lg shadow-emerald-500/25 transition active:scale-95 hover:bg-emerald-600"
+              onClick={() => scrollToBooking()}
+              className="flex items-center justify-center gap-2 rounded-xl bg-emerald-500 px-4 py-3.5 text-xs font-black uppercase tracking-wider text-white shadow-lg shadow-emerald-500/25 transition active:scale-95 hover:bg-emerald-600 cursor-pointer"
             >
               <Zap className='w-4 h-4' /> ĐẶT SÂN NGAY
             </button>
             <button
               type="button"
-              onClick={() => showAlert('Trải nghiệm không gian', 'Đang mở video trải nghiệm Nhà Thi Đấu COURTX!')}
-              className="flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-3.5 text-xs font-black uppercase tracking-wider text-slate-800 shadow-xs transition active:scale-95 hover:bg-slate-50"
+              onClick={scrollToFacility}
+              className="flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-3.5 text-xs font-black uppercase tracking-wider text-slate-800 shadow-xs transition active:scale-95 hover:bg-slate-50 cursor-pointer"
             >
               <Play className='w-4 h-4 fill-current' /> XEM VIDEO
             </button>
@@ -1020,7 +1051,7 @@ export default function TrangChu() {
         {/* ======================================================== */}
         {/* 2. MẶT BẰNG & CÁC MÔN THỂ THAO NỔI BẬT                  */}
         {/* ======================================================== */}
-        <section className="space-y-4 pt-4 border-t border-slate-200">
+        <section ref={facilityRef} id="facility-section" className="scroll-mt-16 space-y-4 pt-4 border-t border-slate-200">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-[10px] font-extrabold uppercase tracking-widest text-emerald-600">
@@ -1030,8 +1061,8 @@ export default function TrangChu() {
             </div>
             <button
               type="button"
-              onClick={() => handleTabChange('booking')}
-              className="text-xs font-bold text-emerald-600 hover:underline"
+              onClick={() => scrollToBooking()}
+              className="text-xs font-bold text-emerald-600 hover:underline cursor-pointer"
             >
               Xem tất cả →
             </button>
@@ -1081,11 +1112,8 @@ export default function TrangChu() {
 
                     <button
                       type="button"
-                      onClick={() => {
-                        setSelectedSportId(sport.id as any);
-                        handleTabChange('booking');
-                      }}
-                      className="rounded-xl bg-emerald-500 px-3.5 py-2 text-xs font-black uppercase tracking-wider text-white shadow-sm transition hover:bg-emerald-600 active:scale-95"
+                      onClick={() => scrollToBooking(sport.id as any)}
+                      className="rounded-xl bg-emerald-500 px-3.5 py-2 text-xs font-black uppercase tracking-wider text-white shadow-sm transition hover:bg-emerald-600 active:scale-95 cursor-pointer"
                     >
                       Đặt ngay →
                     </button>
@@ -1114,7 +1142,8 @@ export default function TrangChu() {
           </div>
 
           {/* ⚡ BƯỚC 1: CHỌN MÔN ĐẶT SÂN */}
-          <div className="rounded-2xl border border-slate-200 bg-white p-4 space-y-3 shadow-xs">
+          {/* ⚡ BƯỚC 1: CHỌN MÔN THỂ THAO & NIÊM YẾT GIÁ */}
+          <div id="step-1-sport-section" className="rounded-2xl border border-slate-200 bg-white p-4 space-y-3 shadow-xs scroll-mt-20">
             {/* Header: 1 CHỌN MÔN ĐẶT SÂN & NIÊM YẾT CHÍNH THỨC */}
             <div className="flex items-center justify-between pb-2 border-b border-slate-100">
               <div className="flex items-center gap-2">
@@ -1133,11 +1162,21 @@ export default function TrangChu() {
               </div>
             </div>
 
+            {sportError && (
+              <div className="rounded-xl bg-red-50 border border-red-200 p-2.5 text-xs font-bold text-red-600 flex items-center gap-2 animate-bounce">
+                <AlertTriangle className="w-4 h-4 shrink-0 text-red-600" />
+                <span>{sportError}</span>
+              </div>
+            )}
+
             {/* Bảng chọn 3 môn thể thao & giá niêm yết */}
             <div className="divide-y divide-slate-100 overflow-hidden rounded-xl border border-slate-200 bg-slate-50/40">
               {/* Cầu Lông */}
               <div 
-                onClick={() => setSelectedSportId('badminton')}
+                onClick={() => {
+                  setSelectedSportId('badminton');
+                  setSportError(null);
+                }}
                 className={`p-3 transition-all cursor-pointer flex items-center justify-between gap-3 ${
                   selectedSportId === 'badminton' 
                     ? 'bg-emerald-50/90 border-l-4 border-l-emerald-600 shadow-2xs' 
@@ -1170,7 +1209,10 @@ export default function TrangChu() {
 
               {/* Bóng Chuyền */}
               <div 
-                onClick={() => setSelectedSportId('volleyball')}
+                onClick={() => {
+                  setSelectedSportId('volleyball');
+                  setSportError(null);
+                }}
                 className={`p-3 transition-all cursor-pointer flex items-center justify-between gap-3 ${
                   selectedSportId === 'volleyball' 
                     ? 'bg-emerald-50/90 border-l-4 border-l-emerald-600 shadow-2xs' 
@@ -1203,7 +1245,10 @@ export default function TrangChu() {
 
               {/* Bóng Đá Mini */}
               <div 
-                onClick={() => setSelectedSportId('football')}
+                onClick={() => {
+                  setSelectedSportId('football');
+                  setSportError(null);
+                }}
                 className={`p-3 transition-all cursor-pointer flex items-center justify-between gap-3 ${
                   selectedSportId === 'football' 
                     ? 'bg-emerald-50/90 border-l-4 border-l-emerald-600 shadow-2xs' 
@@ -1441,7 +1486,7 @@ export default function TrangChu() {
             {/* Embedded Visual Interactive Schedule Grid */}
             <div className="rounded-xl overflow-hidden border border-slate-200 bg-white shadow-xs">
               <CustomerSchedule
-                initialSport={selectedSportId}
+                initialSport={selectedSportId || 'all'}
                 initialDate={scheduleDateObj}
                 selectedCourtName={selectedCourt}
                 selectedTimeStr={selectedStartTime}
@@ -1455,7 +1500,7 @@ export default function TrangChu() {
             </div>
 
             {/* Slot Selection Feedback Card */}
-            {selectedCourt && selectedStartTime ? (
+            {selectedCourt && selectedStartTime && currentSport ? (
               <div className="flex items-center justify-between rounded-xl bg-emerald-50 p-3.5 border border-emerald-200 animate-in fade-in slide-in-from-top-1 duration-200">
                 <div className="flex items-center gap-2.5">
                   <div className="w-8 h-8 rounded-lg bg-emerald-500 text-white flex items-center justify-center font-black shrink-0">
@@ -1549,8 +1594,8 @@ export default function TrangChu() {
               </div>
               <button
                 type="button"
-                onClick={() => handleTabChange('booking')}
-                className="text-xs font-bold text-emerald-700 hover:text-emerald-800 flex items-center gap-1 active:scale-95 transition shrink-0 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-200"
+                onClick={() => scrollToBooking()}
+                className="text-xs font-bold text-emerald-700 hover:text-emerald-800 flex items-center gap-1 active:scale-95 transition shrink-0 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-200 cursor-pointer"
               >
                 <span>Đặt sân</span> →
               </button>
@@ -1701,13 +1746,6 @@ export default function TrangChu() {
           </section>
         </main>
       )}
-{activeTab === 'schedule' && (
-  <CustomerSchedule 
-    onSelectSlot={(sportId, courtName, time, dateStr) => {
-      handleSelectSlotFromSchedule(sportId, courtName, time, dateStr, true);
-    }}
-  />
-)}
 
       {/* 🟢 FLOATING BUBBLE: XEM LỊCH SÂN NGAY TRÊN TRANG ĐẶT SÂN */}
       {activeTab === 'booking' && (
@@ -2626,7 +2664,7 @@ export default function TrangChu() {
                 <div className="space-y-2.5 rounded-xl bg-slate-50 p-3.5 border border-slate-200 text-xs">
                   <div className="flex items-center justify-between">
                     <span className="text-slate-500">Môn thi đấu</span>
-                    <span className="font-bold text-slate-900">{currentSport.name}</span>
+                    <span className="font-bold text-slate-900">{currentSport?.name || ''}</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-slate-500">Sân thi đấu</span>
@@ -2721,7 +2759,7 @@ export default function TrangChu() {
 
                   <div className="flex items-center justify-between">
                     <span className="text-slate-500">Đơn giá niêm yết</span>
-                    <span className="font-bold text-slate-700">{currentSport.pricePerHour.toLocaleString('vi-VN')}đ / giờ</span>
+                    <span className="font-bold text-slate-700">{currentSport ? `${currentSport.pricePerHour.toLocaleString('vi-VN')}đ / giờ` : ''}</span>
                   </div>
 
                   <div className="flex items-center justify-between border-t border-slate-200 pt-2.5">
@@ -2805,20 +2843,13 @@ export default function TrangChu() {
               <button
                 type="submit"
                 disabled={Boolean(conflictBooking)}
-                className={`w-full flex items-center justify-center gap-2 rounded-2xl py-4 text-sm font-black uppercase tracking-widest transition active:scale-95 ${
+                className={`w-full flex items-center justify-center gap-2 rounded-2xl py-4 text-sm font-black uppercase tracking-widest transition ${
                   conflictBooking
-                    ? 'bg-red-100 border-2 border-red-300 text-red-600 cursor-not-allowed shadow-none'
-                    : 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-lg shadow-emerald-500/25 cursor-pointer'
+                    ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
+                    : 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-lg shadow-emerald-500/25 cursor-pointer active:scale-95'
                 }`}
               >
-                {conflictBooking ? (
-                  <>
-                    <AlertTriangle className="w-4 h-4 text-red-600" />
-                    KHUNG GIỜ BỊ TRÙNG — VUI LÒNG ĐỔI GIỜ
-                  </>
-                ) : (
-                  <>TIẾN HÀNH THANH TOÁN ({formattedPrice})</>
-                )}
+                TIẾN HÀNH THANH TOÁN ({formattedPrice})
               </button>
             </form>
           </div>
@@ -2888,7 +2919,7 @@ export default function TrangChu() {
             </div>
 
             <div className="rounded-2xl bg-slate-50 p-4 text-left text-xs space-y-2 border border-slate-200">
-              <div className="flex justify-between"><span className="text-slate-500">Môn:</span> <span className="font-bold text-slate-900">{currentSport.name}</span></div>
+              <div className="flex justify-between"><span className="text-slate-500">Môn:</span> <span className="font-bold text-slate-900">{currentSport?.name || ''}</span></div>
               <div className="flex justify-between"><span className="text-slate-500">Sân:</span> <span className="font-bold text-emerald-600">{selectedCourt}</span></div>
               <div className="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-3">
                 <span className="text-slate-500">Ngày & giờ:</span>
@@ -2933,24 +2964,12 @@ export default function TrangChu() {
               type="button"
               onClick={() => handleTabChange('lookup')}
               className={[
-                'flex flex-col items-center gap-1 transition active:scale-95',
+                'flex flex-col items-center gap-1 transition active:scale-95 cursor-pointer',
                 activeTab === 'lookup' ? 'text-emerald-600 font-extrabold' : 'text-slate-500 hover:text-slate-800',
               ].join(' ')}
             >
               <Search className="w-5 h-5 mb-0.5" />
               <span className="text-[10px] uppercase tracking-wider">Tra cứu</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => handleTabChange('schedule')}
-              className={[
-                'flex flex-col items-center gap-1 transition active:scale-95',
-                activeTab === 'schedule' ? 'text-emerald-600 font-extrabold' : 'text-slate-500 hover:text-slate-800',
-              ].join(' ')}
-            >
-              <LayoutGrid className="w-5 h-5 mb-0.5" />
-              <span className="text-[10px] uppercase tracking-wider">Lịch sân</span>
             </button>
           </div>
         </footer>

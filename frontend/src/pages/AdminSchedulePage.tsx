@@ -2782,23 +2782,14 @@ export default function AdminSchedulePage({ onCheckoutModeChange, onBookingCheck
                 <button
                   type="submit"
                   disabled={Boolean(adminBookingConflict)}
-                  className={`flex-[2] flex items-center justify-center gap-2 rounded-2xl py-3.5 text-xs font-black uppercase tracking-wider transition active:scale-95 ${
+                  className={`flex-[2] flex items-center justify-center gap-2 rounded-2xl py-3.5 text-xs font-black uppercase tracking-wider transition ${
                     adminBookingConflict
-                      ? 'bg-red-100 border-2 border-red-300 text-red-600 cursor-not-allowed shadow-none'
-                      : 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-lg shadow-emerald-500/25 cursor-pointer'
+                      ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
+                      : 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-lg shadow-emerald-500/25 cursor-pointer active:scale-95'
                   }`}
                 >
-                  {adminBookingConflict ? (
-                    <>
-                      <AlertTriangle className="w-4 h-4 text-red-600" />
-                      KHUNG GIỜ BỊ TRÙNG
-                    </>
-                  ) : (
-                    <>
-                      <CreditCard className="w-4 h-4" />
-                      TIẾN HÀNH THANH TOÁN ({(Math.round(bookingCourt.pricePerHour * (bookingDuration / 60))).toLocaleString('vi-VN')}đ)
-                    </>
-                  )}
+                  <CreditCard className="w-4 h-4" />
+                  TIẾN HÀNH THANH TOÁN ({(Math.round(bookingCourt.pricePerHour * (bookingDuration / 60))).toLocaleString('vi-VN')}đ)
                 </button>
               </div>
             </form>

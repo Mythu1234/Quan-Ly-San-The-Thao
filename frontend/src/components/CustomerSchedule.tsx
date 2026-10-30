@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
-import { Calendar, ChevronLeft, ChevronRight, LayoutGrid, CheckCircle2, ArrowRight } from 'lucide-react';
+import { Calendar, ChevronLeft, ChevronRight, LayoutGrid, CheckCircle2, ArrowRight, ZoomIn, ZoomOut } from 'lucide-react';
 
 export interface CourtItem {
   id: string;
@@ -83,7 +83,7 @@ export interface ScheduleBooking {
 }
 
 interface CustomerScheduleProps {
-  initialSport?: 'all' | 'badminton' | 'volleyball' | 'football';
+  initialSport?: 'all' | 'badminton' | 'volleyball' | 'football' | null;
   initialDate?: Date;
   selectedCourtName?: string;
   selectedTimeStr?: string;
@@ -110,9 +110,10 @@ export default function CustomerSchedule({
   isModalMode: _isModalMode = false,
   hideHeaderControls = false,
 }: CustomerScheduleProps) {
-  const [selectedSport, setSelectedSport] = useState<'all' | 'badminton' | 'volleyball' | 'football'>(initialSport);
+  const [selectedSport, setSelectedSport] = useState<'all' | 'badminton' | 'volleyball' | 'football'>(initialSport || 'all');
   const [selectedDate, setSelectedDate] = useState<Date>(initialDate || new Date());
   const [intervalMode, setIntervalMode] = useState<30 | 60>(60); // 30 mins or 60 mins (default 1h)
+  const [zoomMode, setZoomMode] = useState<'compact' | 'standard'>('compact'); // 'compact' thu nhỏ nhiều cột (54px), 'standard' mở rộng (72px)
   const [selectedSlotModal, setSelectedSlotModal] = useState<{
     sportId: 'badminton' | 'volleyball' | 'football';
     sportName: string;
@@ -125,6 +126,8 @@ export default function CustomerSchedule({
   useEffect(() => {
     if (initialSport) {
       setSelectedSport(initialSport);
+    } else {
+      setSelectedSport('all');
     }
   }, [initialSport]);
 
@@ -140,15 +143,42 @@ export default function CustomerSchedule({
   // Operating Hours: 05:00 to 23:00 (last start slot 22:00)
   const startHour = 5;
   const endHour = 22;
-  const slotWidth = intervalMode === 30 ? 68 : 80; // px per slot column
 
-  // Auto-scroll to 14:00 (afternoon peak) on initial mount
+  // Bề ngang cột: compact 54px (60p) / 44px (30p); standard 72px (60p) / 56px (30p)
+  // Ở chế độ compact 54px, khách xem được trọn vẹn 5 - 6 cột trên màn hình điện thoại mà không bị tràn hay cắt chữ
+  const slotWidth = useMemo(() => {
+    if (zoomMode === 'compact') {
+      return intervalMode === 30 ? 44 : 54;
+    }
+    return intervalMode === 30 ? 56 : 72;
+  }, [zoomMode, intervalMode]);
+
+  // Hàm chuyển nhanh mượt mà tới các ca giờ (Sáng 05:00, Chiều 12:00, Tối 17:00)
+  const scrollToHour = (targetHour: number) => {
+    if (scrollRef.current) {
+      const colIndex = Math.max(0, targetHour - startHour);
+      const targetScroll = colIndex * slotWidth;
+      scrollRef.current.scrollTo({
+        left: targetScroll,
+        behavior: 'smooth',
+      });
+    }
+  };
+
+  // Tự động cuộn đến giờ đã chọn (hoặc 17:00 ca tối cao điểm), căn chuẩn đúng mép cột không bị cắt chữ
   useEffect(() => {
     if (scrollRef.current) {
-      const offset = (14 - startHour) * (intervalMode === 30 ? 136 : 80);
-      scrollRef.current.scrollLeft = Math.max(0, offset - 40);
+      let targetHour = 17; // Mặc định hiển thị ca tối cao điểm đông khách nhất
+      if (selectedTimeStr) {
+        const h = parseInt(selectedTimeStr.split(':')[0], 10);
+        if (!isNaN(h) && h >= startHour && h <= endHour) {
+          targetHour = h;
+        }
+      }
+      const colIndex = Math.max(0, targetHour - startHour);
+      scrollRef.current.scrollLeft = colIndex * slotWidth;
     }
-  }, [intervalMode]);
+  }, [intervalMode, slotWidth, selectedTimeStr]);
 
   const handlePrevDay = () => {
     const d = new Date(selectedDate);
@@ -229,41 +259,96 @@ export default function CustomerSchedule({
       
       {/* Compact Toolbar when Header Controls are hidden (Inline Booking Mode) */}
       {hideHeaderControls && (
-        <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 bg-white border-b border-slate-200 text-[10px]">
-          <div className="flex items-center gap-1.5">
-            <button
-              type="button"
-              onClick={() => setSelectedSport(initialSport || 'badminton')}
-              className={`px-2.5 py-1 rounded-lg font-black transition cursor-pointer ${
-                selectedSport !== 'all' ? 'bg-emerald-600 text-white shadow-2xs' : 'bg-slate-100 text-slate-600'
-              }`}
-            >
-              5 sân môn đang chọn
-            </button>
-            <button
-              type="button"
-              onClick={() => setSelectedSport('all')}
-              className={`px-2.5 py-1 rounded-lg font-black transition cursor-pointer ${
-                selectedSport === 'all' ? 'bg-slate-900 text-white shadow-2xs' : 'bg-slate-100 text-slate-600'
-              }`}
-            >
-              Xem tất cả 15 sân
-            </button>
+        <div className="space-y-0 border-b border-slate-200 bg-white">
+          <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 text-[10px]">
+            <div className="flex items-center gap-1.5">
+              {initialSport && initialSport !== 'all' && (
+                <button
+                  type="button"
+                  onClick={() => setSelectedSport(initialSport)}
+                  className={`px-2.5 py-1 rounded-lg font-black transition cursor-pointer ${
+                    selectedSport !== 'all' ? 'bg-emerald-600 text-white shadow-2xs' : 'bg-slate-100 text-slate-600'
+                  }`}
+                >
+                  Sân môn đang chọn
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => setSelectedSport('all')}
+                className={`px-2.5 py-1 rounded-lg font-black transition cursor-pointer ${
+                  selectedSport === 'all' ? 'bg-slate-900 text-white shadow-2xs' : 'bg-slate-100 text-slate-600'
+                }`}
+              >
+                {initialSport && initialSport !== 'all' ? 'Xem tất cả 15 sân' : 'Tất cả 15 sân (3 môn)'}
+              </button>
+            </div>
+
+            <div className="flex items-center gap-2 font-bold text-slate-600">
+              <span className="flex items-center gap-1 text-emerald-800">
+                <span className="w-2 h-2 rounded bg-emerald-500 border border-emerald-600"></span> 
+                Đang chọn
+              </span>
+              <span className="flex items-center gap-1 text-amber-800">
+                <span className="w-2 h-2 rounded bg-amber-100 border border-amber-400"></span> 
+                Trống
+              </span>
+              <span className="flex items-center gap-1 text-slate-400">
+                <span className="w-2 h-2 rounded bg-slate-200 border border-slate-300"></span> 
+                Đã đặt
+              </span>
+            </div>
           </div>
 
-          <div className="flex items-center gap-2.5 font-bold text-slate-600">
-            <span className="flex items-center gap-1 text-emerald-800">
-              <span className="w-2.5 h-2.5 rounded bg-emerald-500 border border-emerald-600"></span> 
-              Đang chọn
-            </span>
-            <span className="flex items-center gap-1 text-amber-800">
-              <span className="w-2.5 h-2.5 rounded bg-amber-100 border border-amber-400"></span> 
-              Có thể đặt
-            </span>
-            <span className="flex items-center gap-1 text-slate-400">
-              <span className="w-2.5 h-2.5 rounded bg-slate-200 border border-slate-300"></span> 
-              Đã đặt
-            </span>
+          {/* Quick Shift Navigation & Zoom Toggle Toolbar */}
+          <div className="flex flex-wrap items-center justify-between gap-1.5 px-2.5 py-1.5 bg-slate-50 border-t border-slate-100 text-[10px]">
+            <div className="flex items-center gap-1 overflow-x-auto no-scrollbar">
+              <button
+                type="button"
+                onClick={() => scrollToHour(5)}
+                className="flex items-center gap-0.5 px-2 py-0.5 rounded-lg font-bold bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 active:scale-95 transition cursor-pointer shrink-0 shadow-2xs"
+                title="Cuộn tới ca sáng (05:00 - 12:00)"
+              >
+                <span>🌅</span> Sáng (5h-12h)
+              </button>
+              <button
+                type="button"
+                onClick={() => scrollToHour(12)}
+                className="flex items-center gap-0.5 px-2 py-0.5 rounded-lg font-bold bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 active:scale-95 transition cursor-pointer shrink-0 shadow-2xs"
+                title="Cuộn tới ca chiều (12:00 - 17:00)"
+              >
+                <span>☀️</span> Chiều (12h-17h)
+              </button>
+              <button
+                type="button"
+                onClick={() => scrollToHour(17)}
+                className="flex items-center gap-0.5 px-2 py-0.5 rounded-lg font-extrabold bg-amber-50 hover:bg-amber-100 border border-amber-300 text-amber-900 active:scale-95 transition cursor-pointer shrink-0 shadow-2xs"
+                title="Cuộn tới ca tối cao điểm (17:00 - 23:00)"
+              >
+                <span>🌙</span> Tối (17h-23h)
+              </button>
+            </div>
+
+            <div className="flex items-center gap-1 shrink-0 ml-auto">
+              <button
+                type="button"
+                onClick={() => setZoomMode((prev) => (prev === 'compact' ? 'standard' : 'compact'))}
+                className="flex items-center gap-1 px-2.5 py-0.5 rounded-lg font-bold bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 cursor-pointer transition active:scale-95 shadow-2xs"
+                title={zoomMode === 'compact' ? 'Đang ở chế độ thu nhỏ (xem nhiều cột). Nhấn để mở rộng ô.' : 'Đang ở chế độ mở rộng. Nhấn để thu nhỏ xem nhiều cột.'}
+              >
+                {zoomMode === 'compact' ? (
+                  <>
+                    <ZoomIn className="w-3 h-3 text-emerald-600" />
+                    <span>Mở rộng</span>
+                  </>
+                ) : (
+                  <>
+                    <ZoomOut className="w-3 h-3 text-slate-600" />
+                    <span>Thu nhỏ</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -364,19 +449,66 @@ export default function CustomerSchedule({
               </select>
             </div>
 
-            <div className="flex items-center gap-2.5 font-bold text-slate-600">
+            <div className="flex items-center gap-2 font-bold text-slate-600">
               <span className="flex items-center gap-1 text-emerald-800">
-                <span className="w-2.5 h-2.5 rounded bg-emerald-500 border border-emerald-600"></span> 
+                <span className="w-2 h-2 rounded bg-emerald-500 border border-emerald-600"></span> 
                 Đang chọn
               </span>
               <span className="flex items-center gap-1 text-amber-800">
-                <span className="w-2.5 h-2.5 rounded bg-amber-100 border border-amber-400"></span> 
-                Có thể đặt
+                <span className="w-2 h-2 rounded bg-amber-100 border border-amber-400"></span> 
+                Trống
               </span>
               <span className="flex items-center gap-1 text-slate-400">
-                <span className="w-2.5 h-2.5 rounded bg-slate-200 border border-slate-300"></span> 
+                <span className="w-2 h-2 rounded bg-slate-200 border border-slate-300"></span> 
                 Đã đặt
               </span>
+            </div>
+          </div>
+
+          {/* Quick Shift Navigation & Zoom Toggle Toolbar for Modal Mode */}
+          <div className="flex flex-wrap items-center justify-between gap-1.5 pt-1 border-t border-slate-100 text-[10px]">
+            <div className="flex items-center gap-1 overflow-x-auto no-scrollbar">
+              <button
+                type="button"
+                onClick={() => scrollToHour(5)}
+                className="flex items-center gap-0.5 px-2 py-0.5 rounded-lg font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 active:scale-95 transition cursor-pointer shrink-0"
+              >
+                <span>🌅</span> Sáng (5h-12h)
+              </button>
+              <button
+                type="button"
+                onClick={() => scrollToHour(12)}
+                className="flex items-center gap-0.5 px-2 py-0.5 rounded-lg font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 active:scale-95 transition cursor-pointer shrink-0"
+              >
+                <span>☀️</span> Chiều (12h-17h)
+              </button>
+              <button
+                type="button"
+                onClick={() => scrollToHour(17)}
+                className="flex items-center gap-0.5 px-2 py-0.5 rounded-lg font-extrabold bg-amber-100 hover:bg-amber-200 text-amber-900 active:scale-95 transition cursor-pointer shrink-0"
+              >
+                <span>🌙</span> Tối (17h-23h)
+              </button>
+            </div>
+
+            <div className="flex items-center gap-1 shrink-0 ml-auto">
+              <button
+                type="button"
+                onClick={() => setZoomMode((prev) => (prev === 'compact' ? 'standard' : 'compact'))}
+                className="flex items-center gap-1 px-2.5 py-0.5 rounded-lg font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 cursor-pointer transition active:scale-95"
+              >
+                {zoomMode === 'compact' ? (
+                  <>
+                    <ZoomIn className="w-3 h-3 text-emerald-600" />
+                    <span>Mở rộng</span>
+                  </>
+                ) : (
+                  <>
+                    <ZoomOut className="w-3 h-3 text-slate-600" />
+                    <span>Thu nhỏ</span>
+                  </>
+                )}
+              </button>
             </div>
           </div>
         </div>
@@ -392,8 +524,8 @@ export default function CustomerSchedule({
         <div className="flex min-w-max">
           
           {/* Sticky Left Column: Court Names & Price Badge */}
-          <div className="sticky left-0 z-30 flex flex-col bg-white border-r border-slate-200 w-[88px] shrink-0 shadow-[3px_0_8px_rgba(0,0,0,0.06)]">
-            <div className="h-10 border-b border-slate-200 bg-slate-100 flex flex-col items-center justify-center text-[9px] font-black text-slate-700 uppercase tracking-wider sticky top-0 z-40">
+          <div className="sticky left-0 z-30 flex flex-col bg-white border-r border-slate-200 w-[74px] shrink-0 shadow-[2px_0_6px_rgba(0,0,0,0.06)]">
+            <div className="h-10 border-b border-slate-200 bg-slate-100 flex flex-col items-center justify-center text-[8px] font-black text-slate-700 uppercase tracking-tight sticky top-0 z-40 text-center px-0.5">
               DANH MỤC SÂN
             </div>
             {displayedCourts.map((court) => {
@@ -402,15 +534,15 @@ export default function CustomerSchedule({
                 <div 
                   key={court.id} 
                   className={`h-[56px] border-b border-slate-100 flex flex-col justify-center items-center px-1 relative transition ${
-                    isCourtSelected ? 'bg-emerald-50/80 border-r-2 border-r-emerald-500' : 'bg-white'
+                    isCourtSelected ? 'bg-emerald-50/90 border-r-2 border-r-emerald-500' : 'bg-white'
                   }`}
                 >
-                  <span className={`font-black text-[11px] truncate text-center w-full leading-tight ${
+                  <span className={`font-black text-[10.5px] truncate text-center w-full leading-tight ${
                     isCourtSelected ? 'text-emerald-800' : 'text-slate-900'
                   }`}>
                     {court.name}
                   </span>
-                  <span className="text-[9px] font-extrabold text-emerald-600 mt-0.5">
+                  <span className="text-[8.5px] font-extrabold text-emerald-600 mt-0.5">
                     {court.pricePerHour / 1000}k/h
                   </span>
                 </div>
@@ -426,7 +558,7 @@ export default function CustomerSchedule({
                 <div 
                   key={idx} 
                   style={{ width: `${slotWidth}px` }} 
-                  className="shrink-0 border-r border-slate-200 flex items-center justify-center text-[10px] font-extrabold text-slate-700"
+                  className="shrink-0 border-r border-slate-200 flex items-center justify-center text-[10px] font-black text-slate-700 tracking-tight"
                 >
                   {t}
                 </div>
@@ -452,10 +584,10 @@ export default function CustomerSchedule({
                           <div 
                             key={cIdx} 
                             style={{ width: `${slotWidth}px` }} 
-                            className="shrink-0 border-r border-slate-200/60 bg-slate-100/90 flex flex-col items-center justify-center text-center p-1 select-none cursor-not-allowed"
+                            className="shrink-0 border-r border-slate-200/60 bg-slate-100/90 flex flex-col items-center justify-center text-center p-0.5 select-none cursor-not-allowed"
                             title={`${court.name} đã được đặt lúc ${t}`}
                           >
-                            <span className="text-[9px] font-bold text-slate-400 leading-tight">Đã đặt</span>
+                            <span className="text-[8.5px] font-bold text-slate-400 leading-tight">Đã đặt</span>
                           </div>
                         );
                       }
@@ -473,7 +605,7 @@ export default function CustomerSchedule({
                               className="h-full bg-slate-100/90 border-r border-slate-200/60 flex flex-col items-center justify-center text-center p-0.5 select-none cursor-not-allowed"
                               title={`${court.name} đã đặt lúc ${t} - ${tSecond}`}
                             >
-                              <span className="text-[8px] font-bold text-slate-400 leading-none">Đã đặt</span>
+                              <span className="text-[7.5px] font-bold text-slate-400 leading-none">Đã đặt</span>
                             </div>
 
                             {/* Right: FREE */}
@@ -483,7 +615,7 @@ export default function CustomerSchedule({
                                 onClick={() => handleSlotClick(court.sportId, court.name, tSecond, `${(court.pricePerHour / 2).toLocaleString('vi-VN')}đ`)}
                                 className="h-full bg-emerald-500 text-white flex flex-col items-center justify-center text-center p-0.5 shadow-inner cursor-pointer"
                               >
-                                <span className="text-[8px] font-black uppercase">CHỌN</span>
+                                <span className="text-[7.5px] font-black uppercase">CHỌN</span>
                               </div>
                             ) : (
                               <div
@@ -492,7 +624,7 @@ export default function CustomerSchedule({
                                 className="h-full bg-amber-50/80 hover:bg-amber-100 flex flex-col items-center justify-center text-center cursor-pointer transition active:scale-95 group p-0.5"
                                 title={`Bấm để chọn ${court.name} lúc ${tSecond} (nửa tiếng)`}
                               >
-                                <span className="text-[8px] font-black text-amber-800 uppercase group-hover:scale-105 transition">Trống</span>
+                                <span className="text-[7.5px] font-black text-amber-800 uppercase group-hover:scale-105 transition leading-none">Trống</span>
                               </div>
                             )}
                           </div>
@@ -512,7 +644,7 @@ export default function CustomerSchedule({
                                 onClick={() => handleSlotClick(court.sportId, court.name, t, `${(court.pricePerHour / 2).toLocaleString('vi-VN')}đ`)}
                                 className="h-full bg-emerald-500 text-white flex flex-col items-center justify-center text-center p-0.5 shadow-inner cursor-pointer border-r border-emerald-600"
                               >
-                                <span className="text-[8px] font-black uppercase">CHỌN</span>
+                                <span className="text-[7.5px] font-black uppercase">CHỌN</span>
                               </div>
                             ) : (
                               <div
@@ -521,7 +653,7 @@ export default function CustomerSchedule({
                                 className="h-full bg-amber-50/80 hover:bg-amber-100 flex flex-col items-center justify-center text-center cursor-pointer transition active:scale-95 group p-0.5 border-r border-amber-200/60"
                                 title={`Bấm để chọn ${court.name} lúc ${t} (nửa tiếng)`}
                               >
-                                <span className="text-[8px] font-black text-amber-800 uppercase group-hover:scale-105 transition">Trống</span>
+                                <span className="text-[7.5px] font-black text-amber-800 uppercase group-hover:scale-105 transition leading-none">Trống</span>
                               </div>
                             )}
 
@@ -531,7 +663,7 @@ export default function CustomerSchedule({
                               className="h-full bg-slate-100/90 flex flex-col items-center justify-center text-center p-0.5 select-none cursor-not-allowed"
                               title={`${court.name} đã đặt lúc ${t.slice(0, 2)}:30`}
                             >
-                              <span className="text-[8px] font-bold text-slate-400 leading-none">Đã đặt</span>
+                              <span className="text-[7.5px] font-bold text-slate-400 leading-none">Đã đặt</span>
                             </div>
                           </div>
                         );
@@ -545,10 +677,10 @@ export default function CustomerSchedule({
                             key={cIdx} 
                             style={{ width: `${slotWidth}px` }} 
                             onClick={() => handleSlotClick(court.sportId, court.name, selectedTimeStr || t, `${court.pricePerHour.toLocaleString('vi-VN')}đ`)}
-                            className="shrink-0 border-r border-emerald-600 bg-emerald-500 text-white flex flex-col items-center justify-center text-center p-1 shadow-inner shadow-emerald-700/30 cursor-pointer animate-in zoom-in-95 duration-150"
+                            className="shrink-0 border-r border-emerald-600 bg-emerald-500 text-white flex flex-col items-center justify-center text-center p-0.5 shadow-inner shadow-emerald-700/30 cursor-pointer animate-in zoom-in-95 duration-150"
                           >
-                            <span className="text-[10px] font-black uppercase flex items-center gap-0.5">
-                              <CheckCircle2 className="w-3.5 h-3.5" /> CHỌN
+                            <span className="text-[8.5px] font-black uppercase flex items-center justify-center gap-0.5 leading-none">
+                              <CheckCircle2 className="w-3 h-3 shrink-0" /> CHỌN
                             </span>
                           </div>
                         );
@@ -559,10 +691,10 @@ export default function CustomerSchedule({
                           key={cIdx} 
                           style={{ width: `${slotWidth}px` }} 
                           onClick={() => handleSlotClick(court.sportId, court.name, t, `${court.pricePerHour.toLocaleString('vi-VN')}đ`)}
-                          className="shrink-0 border-r border-amber-200/70 bg-amber-50/70 hover:bg-amber-100 hover:border-amber-400 flex flex-col items-center justify-center text-center cursor-pointer transition active:scale-95 group p-1"
+                          className="shrink-0 border-r border-amber-200/70 bg-amber-50/70 hover:bg-amber-100 hover:border-amber-400 flex flex-col items-center justify-center text-center cursor-pointer transition active:scale-95 group p-0.5"
                           title={`Bấm để chọn ${court.name} lúc ${t}`}
                         >
-                          <span className="text-[10px] font-black text-amber-800 uppercase group-hover:scale-105 transition">
+                          <span className="text-[9px] font-black text-amber-800 uppercase group-hover:scale-105 transition leading-none">
                             Trống
                           </span>
                         </div>
@@ -578,10 +710,10 @@ export default function CustomerSchedule({
                           <div 
                             key={cIdx} 
                             style={{ width: `${slotWidth}px` }} 
-                            className="shrink-0 border-r border-slate-200/60 bg-slate-100/90 flex flex-col items-center justify-center text-center p-1 select-none cursor-not-allowed"
+                            className="shrink-0 border-r border-slate-200/60 bg-slate-100/90 flex flex-col items-center justify-center text-center p-0.5 select-none cursor-not-allowed"
                             title={`${court.name} đã được đặt lúc ${t}`}
                           >
-                            <span className="text-[9px] font-bold text-slate-400 leading-tight">Đã đặt</span>
+                            <span className="text-[8px] font-bold text-slate-400 leading-tight">Đã đặt</span>
                           </div>
                         );
                       }
@@ -592,10 +724,10 @@ export default function CustomerSchedule({
                             key={cIdx} 
                             style={{ width: `${slotWidth}px` }} 
                             onClick={() => handleSlotClick(court.sportId, court.name, selectedTimeStr || t, `${(court.pricePerHour / 2).toLocaleString('vi-VN')}đ`)}
-                            className="shrink-0 border-r border-emerald-600 bg-emerald-500 text-white flex flex-col items-center justify-center text-center p-1 shadow-inner shadow-emerald-700/30 cursor-pointer animate-in zoom-in-95 duration-150"
+                            className="shrink-0 border-r border-emerald-600 bg-emerald-500 text-white flex flex-col items-center justify-center text-center p-0.5 shadow-inner shadow-emerald-700/30 cursor-pointer animate-in zoom-in-95 duration-150"
                           >
-                            <span className="text-[10px] font-black uppercase flex items-center gap-0.5">
-                              <CheckCircle2 className="w-3.5 h-3.5" /> CHỌN
+                            <span className="text-[8.5px] font-black uppercase flex items-center justify-center gap-0.5 leading-none">
+                              <CheckCircle2 className="w-2.5 h-2.5 shrink-0" /> CHỌN
                             </span>
                           </div>
                         );
@@ -606,10 +738,10 @@ export default function CustomerSchedule({
                           key={cIdx} 
                           style={{ width: `${slotWidth}px` }} 
                           onClick={() => handleSlotClick(court.sportId, court.name, t, `${(court.pricePerHour / 2).toLocaleString('vi-VN')}đ`)}
-                          className="shrink-0 border-r border-amber-200/70 bg-amber-50/70 hover:bg-amber-100 hover:border-amber-400 flex flex-col items-center justify-center text-center cursor-pointer transition active:scale-95 group p-1"
+                          className="shrink-0 border-r border-amber-200/70 bg-amber-50/70 hover:bg-amber-100 hover:border-amber-400 flex flex-col items-center justify-center text-center cursor-pointer transition active:scale-95 group p-0.5"
                           title={`Bấm để chọn ${court.name} lúc ${t}`}
                         >
-                          <span className="text-[10px] font-black text-amber-800 uppercase group-hover:scale-105 transition">
+                          <span className="text-[8.5px] font-black text-amber-800 uppercase group-hover:scale-105 transition leading-none">
                             Trống
                           </span>
                         </div>
