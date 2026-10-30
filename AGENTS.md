@@ -15,10 +15,9 @@ Before analyzing, designing, writing code, or answering questions in this reposi
    - 5 Sân Bóng chuyền: `Sân BC-01` đến `Sân BC-05`
    - 4 Sân Bóng đá mini: `Sân BD-01` đến `Sân BD-04`
    - Chủ sân (Admin) có chức năng Thêm / Sửa / Xóa sân linh hoạt theo nhu cầu cơ sở.
-3. **VIP Monthly Subscriptions:**
-   - 3 - 6 months: -10% discount.
-   - > 6 months: -15% discount.
-   - Booked only by Staff / Admin at the desk. Flexible installment payments.
+3. **Phạm vi dự án (Project Scope Exclusion):**
+   - KHÔNG áp dụng gói khách hàng VIP / hội viên theo tháng trong phạm vi dự án.
+   - Toàn bộ đặt sân tính theo đơn giá niêm yết tiêu chuẩn, thanh toán 100% qua VietQR.
 4. **Asset & Incident Liability (Bồi thường & Bảo hành):**
    - Tracked individually by Serial/Asset ID (no total quantities).
    - Incident classification: **Do khách làm hỏng** (áp dụng bồi thường theo Bảng giá niêm yết thu lúc Checkout) vs **Bảo hành của sân** (sân chịu 100% chi phí).

@@ -1,11 +1,23 @@
 import AdminDashboard from './AdminDashboard';
-import CustomerSchedule from '../components/CustomerSchedule';
+import CustomerSchedule, { STANDARD_15_BOOKINGS } from '../components/CustomerSchedule';
 import QrCodeArtwork from '../components/QrCodeArtwork';
 import EmployeeDashboard from './employee/EmployeeDashboard';
 import VipCustomerDashboard from './VipCustomerDashboard';
 import { addBookingRequest } from '../types/bookingRequest';
 import { useState, useRef, useEffect, useMemo } from 'react';
-import { Search, MapPin, Phone, Clock, Play, Home, Calendar as CalendarIcon, X, Zap , User, Lock, Eye, EyeOff, Bell, Key, ArrowLeft, ArrowRight, Trophy, LayoutGrid, CheckCircle2, RefreshCw, MessageSquare, Copy, Check } from 'lucide-react';
+import { Search, MapPin, Phone, Clock, Play, Home, Calendar as CalendarIcon, X, Zap , User, Lock, Eye, EyeOff, Bell, Key, ArrowLeft, ArrowRight, ChevronLeft, ChevronRight, ChevronDown, Trophy, LayoutGrid, CheckCircle2, RefreshCw, MessageSquare, Copy, Check, AlertTriangle } from 'lucide-react';
+
+const parseTimeToMinutes = (t: string): number => {
+  if (!t) return 0;
+  const [h, m] = t.split(':').map(Number);
+  return (h || 0) * 60 + (m || 0);
+};
+
+const formatMinutesToTime = (mins: number): string => {
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+};
 
 // Custom SVG Icons matching Figma design
 const ShuttlecockIcon = () => (
@@ -48,7 +60,8 @@ export default function TrangChu() {
 
   // Booking Form State
   const [selectedSportId, setSelectedSportId] = useState<'badminton' | 'football' | 'volleyball'>('badminton');
-  const [selectedDate, setSelectedDate] = useState<string>('Hôm nay (29/10)');
+  const [selectedDate, setSelectedDate] = useState<string>('');
+  const [dateError, setDateError] = useState<string | null>(null);
   const [selectedCourt, setSelectedCourt] = useState<string>('');
   
   // Time Selection State
@@ -62,6 +75,7 @@ export default function TrangChu() {
   const [sendZalo, setSendZalo] = useState<boolean>(true);
 
   // Order Submission State
+  const [showBookingPopup, setShowBookingPopup] = useState<boolean>(false);
   const [showPayment, setShowPayment] = useState<boolean>(false);
   const [isSubmitted, setIsSubmitted] = useState<boolean>(false);
   const [showOTP, setShowOTP] = useState<boolean>(false);
@@ -277,6 +291,7 @@ export default function TrangChu() {
   const [otpInput, setOtpInput] = useState<string>('');
   const [otpError, setOtpError] = useState<boolean>(false);
   const [otpAction, setOtpAction] = useState<'booking' | 'cancel'>('booking');
+  const [bookingOtp, setBookingOtp] = useState<string>('123456');
   const [popup, setPopup] = useState<any>(null);
   const showAlert = (title: string, message: string) => setPopup({ type: 'alert', title, message });
   const [orderCode] = useState<string>('CX-88291');
@@ -293,11 +308,7 @@ export default function TrangChu() {
 
   const handleTabChange = (tab: 'booking' | 'lookup' | 'schedule') => {
     setActiveTab(tab);
-    if (tab === 'booking' && bookingRef.current) {
-      bookingRef.current.scrollIntoView({ behavior: 'smooth' });
-    } else if (tab === 'lookup' && lookupRef.current) {
-      lookupRef.current.scrollIntoView({ behavior: 'smooth' });
-    }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const [showScheduleModal, setShowScheduleModal] = useState<boolean>(false);
@@ -306,12 +317,40 @@ export default function TrangChu() {
     sportId: 'badminton' | 'volleyball' | 'football',
     courtName: string,
     time: string,
-    dateStr: string
+    dateStr: string,
+    fromScheduleTab?: boolean
   ) => {
+    // Nếu khách chưa chọn ngày ở Bước 2 và bấm vào lịch thì báo chữ đỏ & cuộn lên Bước 2
+    if (!selectedDate && !fromScheduleTab) {
+      setDateError('Vui lòng chọn ngày thi đấu ở Bước 2 trước khi chọn sân và giờ!');
+      const el = document.getElementById('step-2-date-section');
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+      return;
+    }
+
     setSelectedSportId(sportId);
     setSelectedStartTime(time);
     setSelectedCourt(courtName);
-    if (dateStr) {
+
+    // If starting on :30 or if 60 mins would conflict, default duration to 30 mins
+    const startMins = parseTimeToMinutes(time);
+    const hasConflictWith60 = STANDARD_15_BOOKINGS.some((b) => {
+      const isSameCourt = b.courtName === courtName || b.courtCode === courtName || courtName.includes(b.courtCode);
+      if (!isSameCourt) return false;
+      const bStart = b.startH * 60 + b.startM;
+      const bEnd = b.endH * 60 + b.endM;
+      return Math.max(startMins, bStart) < Math.min(startMins + 60, bEnd);
+    });
+
+    if (hasConflictWith60 || time.endsWith(':30')) {
+      setSelectedDuration(30);
+    } else {
+      setSelectedDuration(60);
+    }
+
+    if (fromScheduleTab && dateStr) {
       const match = dateStr.match(/(\d{1,2})\/(\d{1,2})/);
       if (match) {
         const short = `${match[1].padStart(2, '0')}/${match[2].padStart(2, '0')}`;
@@ -324,16 +363,10 @@ export default function TrangChu() {
       } else {
         setSelectedDate(dateStr);
       }
+      setDateError(null);
     }
     handleTabChange('booking');
-    setTimeout(() => {
-      const summaryEl = document.getElementById('booking-summary-section');
-      if (summaryEl) {
-        summaryEl.scrollIntoView({ behavior: 'smooth' });
-      } else if (bookingRef.current) {
-        bookingRef.current.scrollIntoView({ behavior: 'smooth' });
-      }
-    }, 150);
+    setShowBookingPopup(true);
   };
 
   // Sports Data Definitions
@@ -357,14 +390,14 @@ export default function TrangChu() {
       name: 'Bóng Đá',
       badge: 'BÓNG ĐÁ',
       tagline: 'SÂN CỎ NHÂN TẠO',
-      title: '5 Sân Bóng Đá Mini (BD-01 -> BD-05)',
+      title: '4 Sân Bóng Đá Mini (BD-01 -> BD-04)',
       description: 'Sân bóng đá cỏ nhân tạo đạt chuẩn thi đấu mini 5 - 7 người, hệ thống đèn LED chuyên nghiệp, bóng thi đấu đạt chuẩn.',
       specs: ['SÂN 5 - 7 NGƯỜI', 'ĐÈN LUX 1000', 'CỎ NHÂN TẠO'],
       pricePerHour: 200000,
       priceLabel: '200.000đ / GIỜ',
       image: '/images/hero_arena.jpg',
       icon: FootballIcon,
-      courts: ['Sân BD-01', 'Sân BD-02', 'Sân BD-03', 'Sân BD-04', 'Sân BD-05'],
+      courts: ['Sân BD-01', 'Sân BD-02', 'Sân BD-03', 'Sân BD-04'],
     },
     volleyball: {
       id: 'volleyball',
@@ -384,8 +417,6 @@ export default function TrangChu() {
 
   const currentSport = sportsData[selectedSportId];
 
-  // Tab switch between: 'vip_subscription' (Hội viên 3-12 tháng) and 'event_series' (Sự kiện & Chuỗi ngày 7-14 ngày)
-  const [contractMode, setContractMode] = useState<'vip_subscription' | 'event_series'>('vip_subscription');
 
   // --- EVENT & MULTI-DAY SERIES STATE & CALCULATOR ---
   const [eventSport, setEventSport] = useState<'badminton' | 'volleyball' | 'football' | 'all_arena'>('badminton');
@@ -503,34 +534,167 @@ export default function TrangChu() {
     setEventNotes('');
   };
 
-  // Dates list
-  const availableDates = [
-    { label: 'Hôm nay', date: '29/10' },
-    { label: 'Thứ 6', date: '30/10' },
-    { label: 'Thứ 7', date: '31/10' },
-    { label: 'Chủ Nhật', date: '01/11' },
-    { label: 'Thứ 2', date: '02/11' },
-    { label: 'Thứ 3', date: '03/11' },
-  ];
+  const daysOfWeekVi = ['Chủ Nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
+
+  // Dynamically generate 21 consecutive days from base date (29/10/2026)
+  const availableDates = useMemo(() => {
+    const list = [];
+    const base = new Date(2026, 9, 29); // 29/10/2026
+    for (let i = 0; i < 21; i++) {
+      const d = new Date(base);
+      d.setDate(base.getDate() + i);
+      const day = d.getDate().toString().padStart(2, '0');
+      const month = (d.getMonth() + 1).toString().padStart(2, '0');
+      const dow = d.getDay();
+      const label = i === 0 ? 'Hôm nay' : i === 1 ? 'Ngày mai' : daysOfWeekVi[dow];
+      const shortDate = `${day}/${month}`;
+      list.push({
+        label,
+        date: shortDate,
+      });
+    }
+    return list;
+  }, []);
 
   const scheduleDateObj = useMemo(() => {
-    if (!selectedDate) return new Date();
+    if (!selectedDate) return new Date(2026, 9, 29);
+    const fullMatch = selectedDate.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+    if (fullMatch) {
+      return new Date(parseInt(fullMatch[3], 10), parseInt(fullMatch[2], 10) - 1, parseInt(fullMatch[1], 10));
+    }
     const match = selectedDate.match(/(\d{1,2})\/(\d{1,2})/);
     if (match) {
       const day = parseInt(match[1], 10);
       const month = parseInt(match[2], 10) - 1;
-      const now = new Date();
-      return new Date(now.getFullYear(), month, day);
+      const year = month < 9 ? 2027 : 2026;
+      return new Date(year, month, day);
     }
-    return new Date();
+    return new Date(2026, 9, 29);
   }, [selectedDate]);
 
+
+  // --- INTERACTIVE MONTHLY CALENDAR DROPDOWN ---
+  const [isDatePickerOpen, setIsDatePickerOpen] = useState<boolean>(false);
+  const [calendarMonth, setCalendarMonth] = useState<Date>(() => new Date(2026, 9, 1)); // Oct 2026
+
+  useEffect(() => {
+    if (isDatePickerOpen) {
+      setCalendarMonth(new Date(scheduleDateObj.getFullYear(), scheduleDateObj.getMonth(), 1));
+    }
+  }, [isDatePickerOpen, scheduleDateObj]);
+
+  const handlePrevMonth = () => {
+    const todayBase = new Date(2026, 9, 1);
+    const prev = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() - 1, 1);
+    if (prev.getTime() < todayBase.getTime()) {
+      showAlert('Thông báo', 'Không thể xem lịch cho các tháng trước tháng hiện tại!');
+      return;
+    }
+    setCalendarMonth(prev);
+  };
+
+  const handleNextMonth = () => {
+    setCalendarMonth(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
+  };
+
+  const calendarDays = useMemo(() => {
+    const year = calendarMonth.getFullYear();
+    const month = calendarMonth.getMonth(); // 0-indexed
+    
+    // First day of month
+    const firstDay = new Date(year, month, 1);
+    // Convert to Mon = 0, ..., Sun = 6
+    const startingDayOfWeek = (firstDay.getDay() + 6) % 7; 
+    
+    // Total days in current month
+    const daysInCurrentMonth = new Date(year, month + 1, 0).getDate();
+    
+    // Days in previous month
+    const daysInPrevMonth = new Date(year, month, 0).getDate();
+    
+    const days = [];
+    
+    // Previous month trailing days
+    for (let i = startingDayOfWeek - 1; i >= 0; i--) {
+      const d = daysInPrevMonth - i;
+      days.push({
+        dayNumber: d,
+        month: month - 1,
+        year: year,
+        dateObj: new Date(year, month - 1, d),
+        isCurrentMonth: false,
+      });
+    }
+    
+    // Current month days
+    for (let i = 1; i <= daysInCurrentMonth; i++) {
+      days.push({
+        dayNumber: i,
+        month: month,
+        year: year,
+        dateObj: new Date(year, month, i),
+        isCurrentMonth: true,
+      });
+    }
+    
+    // Next month leading days to complete full rows (multiple of 7)
+    const remaining = (7 - (days.length % 7)) % 7;
+    for (let i = 1; i <= remaining; i++) {
+      days.push({
+        dayNumber: i,
+        month: month + 1,
+        year: year,
+        dateObj: new Date(year, month + 1, i),
+        isCurrentMonth: false,
+      });
+    }
+    
+    return days;
+  }, [calendarMonth]);
+
+  const handleSelectCalendarDay = (targetDate: Date) => {
+    const baseToday = new Date(2026, 9, 29); // 29/10/2026
+    baseToday.setHours(0, 0, 0, 0);
+    const target = new Date(targetDate);
+    target.setHours(0, 0, 0, 0);
+
+    if (target.getTime() < baseToday.getTime()) {
+      showAlert('Thông báo', 'Không thể chọn ngày trong quá khứ!');
+      return;
+    }
+
+    const y = target.getFullYear();
+    const m = target.getMonth() + 1;
+    const day = target.getDate();
+    const dow = target.getDay();
+
+    const isToday = y === 2026 && m === 10 && day === 29;
+    const isTomorrow = y === 2026 && m === 10 && day === 30;
+
+    const dayStr = day.toString().padStart(2, '0');
+    const monthStr = m.toString().padStart(2, '0');
+    const label = isToday ? 'Hôm nay' : isTomorrow ? 'Ngày mai' : daysOfWeekVi[dow];
+
+    setSelectedDate(`${label} (${dayStr}/${monthStr})`);
+    setIsDatePickerOpen(false);
+  };
+
+
+  // Operating timeline list of start time options: 05:00 to 22:30 (30-minute intervals)
+  const START_TIME_OPTIONS = useMemo(() => {
+    const list: string[] = [];
+    for (let h = 5; h <= 22; h++) {
+      list.push(`${h.toString().padStart(2, '0')}:00`);
+      list.push(`${h.toString().padStart(2, '0')}:30`);
+    }
+    return list;
+  }, []);
+
   const getAvailableDurations = (startTimeStr: string) => {
-    const possibleDurations = [60, 90, 120, 150, 180, 210, 240];
+    const possibleDurations = [30, 60, 90, 120, 150, 180, 210, 240];
     if (!startTimeStr) return possibleDurations;
 
-    const [h, m] = startTimeStr.split(':').map(Number);
-    const startMinutes = h * 60 + m;
+    const startMinutes = parseTimeToMinutes(startTimeStr);
     const closingTimeMinutes = 23 * 60;
     return possibleDurations.filter(duration => startMinutes + duration <= closingTimeMinutes);
   };
@@ -546,18 +710,72 @@ export default function TrangChu() {
 
   const getEndTime = (start: string, durationMins: number) => {
     if (!start) return '';
-    const [h, m] = start.split(':').map(Number);
-    const totalMins = h * 60 + m + durationMins;
-    const endH = Math.floor(totalMins / 60);
-    const endM = totalMins % 60;
-    return `${endH.toString().padStart(2, '0')}:${endM.toString().padStart(2, '0')}`;
+    const totalMins = parseTimeToMinutes(start) + durationMins;
+    return formatMinutesToTime(totalMins);
   };
+
+  const selectedEndTime = selectedStartTime ? getEndTime(selectedStartTime, selectedDuration) : '';
+
+  // End time dropdown options based on selectedStartTime
+  const endTimeOptions = useMemo(() => {
+    if (!selectedStartTime) return [];
+    const startMins = parseTimeToMinutes(selectedStartTime);
+    const maxEndMins = Math.min(23 * 60, startMins + 240); // Max 4 hours or closing 23:00
+    const list: string[] = [];
+    for (let m = startMins + 30; m <= maxEndMins; m += 30) {
+      list.push(formatMinutesToTime(m));
+    }
+    return list;
+  }, [selectedStartTime]);
+
+  const handleStartTimeChange = (newStart: string) => {
+    setSelectedStartTime(newStart);
+    const newStartMins = parseTimeToMinutes(newStart);
+    if (newStartMins + selectedDuration > 23 * 60) {
+      const maxPossibleDur = Math.max(30, 23 * 60 - newStartMins);
+      setSelectedDuration(maxPossibleDur);
+    }
+  };
+
+  const handleEndTimeChange = (newEnd: string) => {
+    if (!selectedStartTime) return;
+    const startMins = parseTimeToMinutes(selectedStartTime);
+    const endMins = parseTimeToMinutes(newEnd);
+    if (endMins > startMins) {
+      setSelectedDuration(endMins - startMins);
+    }
+  };
+
+  const handleDurationChange = (newDur: number) => {
+    setSelectedDuration(newDur);
+  };
+
+  // Real-time Booking Conflict Detection:
+  const conflictBooking = useMemo(() => {
+    if (!selectedCourt || !selectedStartTime || !selectedDuration) return null;
+    const reqStart = parseTimeToMinutes(selectedStartTime);
+    const reqEnd = reqStart + selectedDuration;
+
+    return STANDARD_15_BOOKINGS.find((b) => {
+      const isSameCourt = 
+        b.courtName === selectedCourt || 
+        b.courtCode === selectedCourt || 
+        selectedCourt.includes(b.courtCode);
+      if (!isSameCourt) return false;
+
+      const bStart = b.startH * 60 + b.startM;
+      const bEnd = b.endH * 60 + b.endM;
+
+      // Overlap condition: Math.max(start1, start2) < Math.min(end1, end2)
+      return Math.max(reqStart, bStart) < Math.min(reqEnd, bEnd);
+    });
+  }, [selectedCourt, selectedStartTime, selectedDuration]);
 
   // Price Calculation
   const durationHours = selectedDuration / 60;
-  const totalPrice = currentSport.pricePerHour * durationHours;
+  const totalPrice = Math.round(currentSport.pricePerHour * durationHours);
   const formattedPrice = totalPrice.toLocaleString('vi-VN') + 'đ';
-  const selectedSlot = selectedStartTime ? `${selectedStartTime} - ${getEndTime(selectedStartTime, selectedDuration)}` : 'Chưa chọn giờ';
+  const selectedSlot = selectedStartTime ? `${selectedStartTime} - ${selectedEndTime}` : 'Chưa chọn giờ';
 
   const handleBookingSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -567,6 +785,13 @@ export default function TrangChu() {
     }
     if (!selectedStartTime) {
       showAlert('Chưa chọn giờ', 'Vui lòng chọn giờ bắt đầu ở Bước 3!');
+      return;
+    }
+    if (conflictBooking) {
+      showAlert(
+        'Khung giờ bị trùng lịch!',
+        `Khung giờ ${selectedStartTime} - ${selectedEndTime} trên ${selectedCourt} đã bị trùng với lịch đã đặt (${conflictBooking.title || 'Đã đặt'}).\n\nVui lòng chọn khung giờ khác để tiếp tục đặt sân!`
+      );
       return;
     }
     if (!getAvailableDurations(selectedStartTime).includes(selectedDuration)) {
@@ -581,14 +806,18 @@ export default function TrangChu() {
       showAlert('Thiếu thông tin', 'Vui lòng nhập đầy đủ Họ tên và Số điện thoại!');
       return;
     }
+    const newOtp = Math.floor(100000 + Math.random() * 900000).toString();
+    setBookingOtp(newOtp);
     setOtpAction('booking');
+    setShowBookingPopup(false);
     setOtpInput('');
     setOtpError(false);
+    setSmsToast(null);
     setShowOTP(true);
   };
 
   const handleVerifyOTP = () => {
-    if (otpInput === '123456') {
+    if (otpInput === '123456' || otpInput === bookingOtp) {
       setShowOTP(false);
       setOtpInput('');
       setOtpError(false);
@@ -675,7 +904,7 @@ export default function TrangChu() {
       {/* 🟢 TOP HEADER BAR (WHITE & GREEN) */}
       <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 px-4 py-3 backdrop-blur-md shadow-xs">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
+          <div onClick={() => handleTabChange('booking')} className="flex items-center gap-3 cursor-pointer select-none">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500 text-white shadow-md shadow-emerald-500/20">
               <span className="text-xl font-black">C</span>
             </div>
@@ -694,7 +923,11 @@ export default function TrangChu() {
             <button
               type="button"
               onClick={() => handleTabChange('lookup')}
-              className="flex h-9 px-3 items-center gap-1.5 rounded-full border border-slate-200 bg-slate-100 text-xs font-bold text-slate-700 transition hover:border-emerald-500 hover:text-emerald-600 active:scale-95"
+              className={`flex h-9 px-3 items-center gap-1.5 rounded-full border text-xs font-bold transition active:scale-95 ${
+                activeTab === 'lookup'
+                  ? 'border-emerald-500 bg-emerald-50 text-emerald-700 shadow-xs'
+                  : 'border-slate-200 bg-slate-100 text-slate-700 hover:border-emerald-500 hover:text-emerald-600'
+              }`}
             >
               <Search className='w-3.5 h-3.5' />
               <span>Tra cứu</span>
@@ -706,8 +939,8 @@ export default function TrangChu() {
         </div>
       </header>
 
-      {/* ⚪ MAIN LIGHT CONTENT */}
-      {activeTab !== 'schedule' && (
+      {/* ⚪ TAB ĐẶT SÂN */}
+      {activeTab === 'booking' && (
 <main className="flex-1 space-y-6 p-4 pb-28">
 
         {/* ======================================================== */}
@@ -863,167 +1096,6 @@ export default function TrangChu() {
           </div>
         </section>
 
-        {/* ======================================================== */}
-        {/* 2.5 HỢP ĐỒNG KHÁCH ĐOÀN: VIP THÁNG & SỰ KIỆN CHUỖI NGÀY */}
-        {/* ======================================================== */}
-        <section className="space-y-3 pt-2">
-          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-xs">
-            {/* Header */}
-            <div className="border-b border-slate-100 pb-3">
-              <span className="inline-block rounded-md bg-amber-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-amber-800 border border-amber-200">
-                Chính sách khách đoàn & hội viên
-              </span>
-              <h2 className="mt-1.5 text-base font-black text-slate-900 uppercase tracking-tight">
-                Hợp đồng & Đặt sân theo gói
-              </h2>
-              <p className="mt-0.5 text-xs text-slate-500">
-                Lịch VIP cố định được nhân viên tiếp nhận tại quầy; sự kiện và chuỗi ngày có thể gửi yêu cầu trực tuyến.
-              </p>
-            </div>
-
-            {/* Segmented Controller (2 Tabs) - Clean, no icons */}
-            <div className="mt-3 grid grid-cols-2 p-1 bg-slate-100 rounded-2xl">
-              <button
-                type="button"
-                onClick={() => setContractMode('vip_subscription')}
-                className={`py-2 px-3 rounded-xl text-xs font-black transition-all cursor-pointer ${
-                  contractMode === 'vip_subscription'
-                    ? 'bg-white text-slate-900 shadow-xs'
-                    : 'text-slate-500 hover:text-slate-900'
-                }`}
-              >
-                Cố định tháng (1 - 12T)
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setContractMode('event_series')}
-                className={`py-2 px-3 rounded-xl text-xs font-black transition-all cursor-pointer ${
-                  contractMode === 'event_series'
-                    ? 'bg-white text-slate-900 shadow-xs'
-                    : 'text-slate-500 hover:text-slate-900'
-                }`}
-              >
-                Sự kiện & Chuỗi ngày (7 - 14N)
-              </button>
-            </div>
-
-            {/* TAB 1: VIP MONTHLY SUBSCRIPTION */}
-            {contractMode === 'vip_subscription' && (
-              <div className="mt-4 space-y-3 animate-in fade-in duration-150">
-                {/* 3 Tier Cards - Compact & Clean */}
-                <div className="grid grid-cols-3 gap-2">
-                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 flex flex-col justify-between">
-                    <div>
-                      <div className="text-[10px] font-bold uppercase text-slate-500">1 – 2 Tháng</div>
-                      <div className="mt-1 text-xs font-black text-slate-800">Giá chuẩn</div>
-                      <p className="mt-1 text-[11px] text-slate-500 leading-tight">Giữ cố định giờ vàng yêu thích</p>
-                    </div>
-                  </div>
-
-                  <div className="rounded-2xl border border-amber-300 bg-amber-50/80 p-3 flex flex-col justify-between">
-                    <div>
-                      <div className="text-[10px] font-black uppercase text-amber-700">3 – 6 Tháng</div>
-                      <div className="mt-1 text-xs font-black text-amber-900">Giảm 10%/giờ</div>
-                      <p className="mt-1 text-[11px] text-amber-800 leading-tight">Hạng VIP • Chia nhiều đợt đóng</p>
-                    </div>
-                  </div>
-
-                  <div className="rounded-2xl border border-amber-400 bg-amber-100 p-3 flex flex-col justify-between">
-                    <div>
-                      <div className="text-[10px] font-black uppercase text-amber-800">&gt; 6 – 12 Tháng</div>
-                      <div className="mt-1 text-xs font-black text-amber-950">Giảm 15%/giờ</div>
-                      <p className="mt-1 text-[11px] text-amber-900 leading-tight">VIP Thượng hạng • Ưu tiên vị trí sân</p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Policies & Benefits list */}
-                <div className="rounded-2xl bg-slate-50 border border-slate-200 p-3.5 space-y-2 text-xs text-slate-600">
-                  <div className="flex items-start gap-2">
-                    <span className="text-emerald-600 font-black">•</span>
-                    <span><strong>Khóa sân độc quyền:</strong> Giữ cố định khung giờ trong tuần suốt kỳ hạn hợp đồng, không lo trùng lịch hay mất sân.</span>
-                  </div>
-                  <div className="flex items-start gap-2">
-                    <span className="text-emerald-600 font-black">•</span>
-                    <span><strong>Thanh toán linh hoạt:</strong> Có thể thỏa thuận chia nhiều đợt tại quầy; thanh toán từng đợt qua mã QR VietQR của sân.</span>
-                  </div>
-                  <div className="flex items-start gap-2">
-                    <span className="text-emerald-600 font-black">•</span>
-                    <span><strong>Đặc quyền đổi dời buổi:</strong> Hỗ trợ xin dời buổi thi đấu khi bận đột xuất; xuất đầy đủ hóa đơn điện tử VAT cho CLB & Doanh nghiệp.</span>
-                  </div>
-                </div>
-
-                {/* Actions */}
-                <div className="grid grid-cols-1 gap-2 pt-1">
-                  <a
-                    href="tel:0901234567"
-                    className="w-full rounded-xl bg-emerald-600 py-3 px-4 text-xs font-black uppercase tracking-wider text-white hover:bg-emerald-700 active:scale-95 transition text-center"
-                  >
-                    Liên hệ đăng ký lịch VIP tại quầy · 0901.234.567
-                  </a>
-                </div>
-              </div>
-            )}
-
-            {/* TAB 2: EVENT & MULTI-DAY SERIES */}
-            {contractMode === 'event_series' && (
-              <div className="mt-4 space-y-3 animate-in fade-in duration-150">
-                {/* 2 Packages - Compact & Clean */}
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 flex flex-col justify-between">
-                    <div>
-                      <div className="text-[10px] font-bold uppercase text-slate-500">Chuỗi 7 – 30 Ngày</div>
-                      <div className="mt-1 text-xs font-black text-slate-800">Tập huấn & Khóa học</div>
-                      <p className="mt-1 text-[11px] text-slate-500 leading-tight">Khóa giữ nguyên cụm sân liên tục suốt đợt</p>
-                    </div>
-                  </div>
-
-                  <div className="rounded-2xl border border-emerald-300 bg-emerald-50/80 p-3 flex flex-col justify-between">
-                    <div>
-                      <div className="text-[10px] font-black uppercase text-emerald-700">Giải đấu / Đại hội</div>
-                      <div className="mt-1 text-xs font-black text-emerald-900">Bao trọn 8 ô sàn</div>
-                      <p className="mt-1 text-[11px] text-emerald-800 leading-tight">Phục vụ giải thể thao phong trào doanh nghiệp</p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Policies & Benefits list */}
-                <div className="rounded-2xl bg-slate-50 border border-slate-200 p-3.5 space-y-2 text-xs text-slate-600">
-                  <div className="flex items-start gap-2">
-                    <span className="text-emerald-600 font-black">•</span>
-                    <span><strong>Ưu đãi giờ thấp điểm:</strong> Chiết khấu 5% – 10% khi thuê khung giờ sáng, chiều hoặc thuê trọn ngày.</span>
-                  </div>
-                  <div className="flex items-start gap-2">
-                    <span className="text-emerald-600 font-black">•</span>
-                    <span><strong>Tài trợ thiết bị hậu cần:</strong> Miễn phí mượn bảng điểm lật tay, còi, áo pitch phân đội, hỗ trợ hệ thống loa mic trao giải.</span>
-                  </div>
-                  <div className="flex items-start gap-2">
-                    <span className="text-emerald-600 font-black">•</span>
-                    <span><strong>Hỗ trợ vận hành:</strong> Tặng nước khoáng cho đoàn; điều phối viên hỗ trợ kỹ thuật và bố trí mặt sàn xuyên suốt giải.</span>
-                  </div>
-                </div>
-
-                {/* Actions */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
-                  <button
-                    type="button"
-                    onClick={() => setShowEventModal(true)}
-                    className="w-full rounded-xl bg-emerald-600 py-3 px-4 text-xs font-black uppercase tracking-wider text-white hover:bg-emerald-700 active:scale-95 transition text-center cursor-pointer shadow-sm"
-                  >
-                    Đăng ký tổ chức sự kiện
-                  </button>
-                  <a
-                    href="tel:0901234567"
-                    className="w-full rounded-xl border border-slate-300 bg-white py-3 px-4 text-xs font-bold text-slate-700 hover:bg-slate-50 active:scale-95 transition text-center"
-                  >
-                    Hotline tư vấn: 0901.234.567
-                  </a>
-                </div>
-              </div>
-            )}
-          </div>
-        </section>
 
         {/* ======================================================== */}
         {/* 3. HỆ THỐNG ĐẶT SÂN TỰ ĐỘNG (LIGHT THEME)               */}
@@ -1041,78 +1113,315 @@ export default function TrangChu() {
             </p>
           </div>
 
-          {/* ⚡ BƯỚC 1: CHỌN MÔN THỂ THAO */}
+          {/* ⚡ BƯỚC 1: CHỌN MÔN ĐẶT SÂN */}
           <div className="rounded-2xl border border-slate-200 bg-white p-4 space-y-3 shadow-xs">
-            <div className="flex items-center gap-2">
-              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500 text-xs font-black text-white">1</span>
-              <h3 className="text-sm font-black uppercase tracking-wider text-slate-900">CHỌN MÔN THỂ THAO</h3>
+            {/* Header: 1 CHỌN MÔN ĐẶT SÂN & NIÊM YẾT CHÍNH THỨC */}
+            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500 text-xs font-black text-white shrink-0">1</span>
+                <h3 className="text-sm font-black uppercase tracking-wider text-slate-900">
+                  CHỌN MÔN ĐẶT SÂN
+                </h3>
+              </div>
+              <div className="flex items-center gap-1.5 shrink-0">
+                <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-emerald-800 border border-emerald-200">
+                  NIÊM YẾT CHÍNH THỨC
+                </span>
+                <span className="rounded-lg bg-slate-100 px-2.5 py-0.5 text-[10px] font-bold text-slate-600 border border-slate-200">
+                  05:00 – 23:00
+                </span>
+              </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-2">
-              {(Object.keys(sportsData) as Array<keyof typeof sportsData>).map((key) => {
-                const sp = sportsData[key];
-                const IconComponent = sp.icon;
-                const isSelected = selectedSportId === key;
+            {/* Bảng chọn 3 môn thể thao & giá niêm yết */}
+            <div className="divide-y divide-slate-100 overflow-hidden rounded-xl border border-slate-200 bg-slate-50/40">
+              {/* Cầu Lông */}
+              <div 
+                onClick={() => setSelectedSportId('badminton')}
+                className={`p-3 transition-all cursor-pointer flex items-center justify-between gap-3 ${
+                  selectedSportId === 'badminton' 
+                    ? 'bg-emerald-50/90 border-l-4 border-l-emerald-600 shadow-2xs' 
+                    : 'hover:bg-slate-100/60'
+                }`}
+              >
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className={`flex h-10 w-10 items-center justify-center rounded-xl shrink-0 transition ${
+                    selectedSportId === 'badminton' ? 'bg-emerald-600 text-white shadow-xs' : 'bg-emerald-100 text-emerald-800'
+                  }`}>
+                    <ShuttlecockIcon />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="text-xs font-black text-slate-900">Cầu Lông</span>
+                      <span className="text-[10px] font-bold text-slate-500 bg-white px-1.5 py-0.5 rounded border border-slate-200">5 sân</span>
+                      {selectedSportId === 'badminton' && (
+                        <span className="rounded-full bg-emerald-600 px-2 py-0.5 text-[9px] font-black text-white flex items-center gap-0.5">
+                          <Check className="w-2.5 h-2.5" /> ĐÃ CHỌN
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                <div className="text-right shrink-0">
+                  <div className="text-sm font-black text-emerald-600">120.000đ</div>
+                  <div className="text-[10px] font-semibold text-slate-400">/ giờ / sân</div>
+                </div>
+              </div>
 
-                return (
-                  <button
-                    key={key}
-                    type="button"
-                    onClick={() => setSelectedSportId(key as any)}
-                    className={[
-                      'flex flex-col items-center justify-center rounded-xl p-3 text-center border transition active:scale-95',
-                      isSelected
-                        ? 'border-emerald-500 bg-emerald-500 text-white font-black shadow-md shadow-emerald-500/20'
-                        : 'border-slate-200 bg-slate-50 text-slate-700 font-bold hover:border-slate-300 hover:bg-slate-100',
-                    ].join(' ')}
-                  >
-                    <IconComponent />
-                    <span className="mt-2 text-xs font-extrabold tracking-wide uppercase">{sp.name}</span>
-                  </button>
-                );
-              })}
+              {/* Bóng Chuyền */}
+              <div 
+                onClick={() => setSelectedSportId('volleyball')}
+                className={`p-3 transition-all cursor-pointer flex items-center justify-between gap-3 ${
+                  selectedSportId === 'volleyball' 
+                    ? 'bg-emerald-50/90 border-l-4 border-l-emerald-600 shadow-2xs' 
+                    : 'hover:bg-slate-100/60'
+                }`}
+              >
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className={`flex h-10 w-10 items-center justify-center rounded-xl shrink-0 transition ${
+                    selectedSportId === 'volleyball' ? 'bg-emerald-600 text-white shadow-xs' : 'bg-emerald-100 text-emerald-800'
+                  }`}>
+                    <VolleyballIcon />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="text-xs font-black text-slate-900">Bóng Chuyền</span>
+                      <span className="text-[10px] font-bold text-slate-500 bg-white px-1.5 py-0.5 rounded border border-slate-200">5 sân</span>
+                      {selectedSportId === 'volleyball' && (
+                        <span className="rounded-full bg-emerald-600 px-2 py-0.5 text-[9px] font-black text-white flex items-center gap-0.5">
+                          <Check className="w-2.5 h-2.5" /> ĐÃ CHỌN
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                <div className="text-right shrink-0">
+                  <div className="text-sm font-black text-emerald-600">150.000đ</div>
+                  <div className="text-[10px] font-semibold text-slate-400">/ giờ / sân</div>
+                </div>
+              </div>
+
+              {/* Bóng Đá Mini */}
+              <div 
+                onClick={() => setSelectedSportId('football')}
+                className={`p-3 transition-all cursor-pointer flex items-center justify-between gap-3 ${
+                  selectedSportId === 'football' 
+                    ? 'bg-emerald-50/90 border-l-4 border-l-emerald-600 shadow-2xs' 
+                    : 'hover:bg-slate-100/60'
+                }`}
+              >
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className={`flex h-10 w-10 items-center justify-center rounded-xl shrink-0 transition ${
+                    selectedSportId === 'football' ? 'bg-emerald-600 text-white shadow-xs' : 'bg-emerald-100 text-emerald-800'
+                  }`}>
+                    <FootballIcon />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="text-xs font-black text-slate-900">Bóng Đá Mini</span>
+                      <span className="text-[10px] font-bold text-slate-500 bg-white px-1.5 py-0.5 rounded border border-slate-200">4 sân</span>
+                      {selectedSportId === 'football' && (
+                        <span className="rounded-full bg-emerald-600 px-2 py-0.5 text-[9px] font-black text-white flex items-center gap-0.5">
+                          <Check className="w-2.5 h-2.5" /> ĐÃ CHỌN
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                <div className="text-right shrink-0">
+                  <div className="text-sm font-black text-emerald-600">200.000đ</div>
+                  <div className="text-[10px] font-semibold text-slate-400">/ giờ / sân</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Note bar */}
+            <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1">
+              <span>⚡ Đơn giá cố định, không phụ thu cuối tuần</span>
+              <span className="text-emerald-700 font-bold flex items-center gap-1">
+                <CheckCircle2 className="w-3.5 h-3.5" /> 100% VietQR
+              </span>
             </div>
           </div>
 
           {/* ⚡ BƯỚC 2: CHỌN NGÀY THI ĐẤU */}
-          <div className="rounded-2xl border border-slate-200 bg-white p-4 space-y-3 shadow-xs">
+          <div 
+            id="step-2-date-section"
+            className={`rounded-2xl bg-white p-4 space-y-3.5 shadow-xs transition-all ${
+              dateError ? 'border-2 border-rose-500 ring-4 ring-rose-100 shadow-md' : 'border border-slate-200'
+            }`}
+          >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500 text-xs font-black text-white">2</span>
-                <h3 className="text-sm font-black uppercase tracking-wider text-slate-900">CHỌN NGÀY THI ĐẤU</h3>
+                <span className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-black text-white ${
+                  dateError ? 'bg-rose-500 animate-pulse' : 'bg-emerald-500'
+                }`}>2</span>
+                <h3 className={`text-sm font-black uppercase tracking-wider ${
+                  dateError ? 'text-rose-600' : 'text-slate-900'
+                }`}>CHỌN NGÀY THI ĐẤU</h3>
               </div>
-              <span className="text-[10px] font-bold text-emerald-600">
-                Tháng {(scheduleDateObj.getMonth() + 1).toString().padStart(2, '0')}/{scheduleDateObj.getFullYear()}
-              </span>
+
+              {/* Interactive Calendar Picker Button */}
+              <button
+                type="button"
+                onClick={() => setIsDatePickerOpen(!isDatePickerOpen)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border transition active:scale-95 shadow-2xs cursor-pointer ${
+                  isDatePickerOpen
+                    ? 'border-emerald-600 bg-emerald-600 text-white font-black'
+                    : 'border-emerald-300 bg-emerald-50 text-emerald-800 text-xs font-black hover:bg-emerald-100'
+                }`}
+                title="Bấm để xổ lịch chọn ngày"
+              >
+                <CalendarIcon className="w-3.5 h-3.5" />
+                <span>{isDatePickerOpen ? 'Đóng lịch' : 'Chọn ngày khác'}</span>
+                <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${isDatePickerOpen ? 'rotate-180' : ''}`} />
+              </button>
             </div>
 
-            <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+            {/* Red Warning Banner when customer clicks schedule without picking a date first */}
+            {dateError && (
+              <div className="rounded-xl border border-rose-300 bg-rose-50 p-2.5 text-xs font-black text-rose-700 flex items-center gap-2 animate-bounce">
+                <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+                <span>{dateError}</span>
+              </div>
+            )}
+
+            {/* 📅 CALENDAR DROPDOWN: XỔ RA BẢNG LỊCH THÁNG TRỰC QUAN ĐỂ CHỌN */}
+            {isDatePickerOpen && (
+              <div className="rounded-2xl border-2 border-emerald-400 bg-white p-3.5 shadow-lg animate-in fade-in slide-in-from-top-2 duration-200 space-y-3">
+                {/* Month & Year header */}
+                <div className="flex items-center justify-between px-1">
+                  <button
+                    type="button"
+                    onClick={handlePrevMonth}
+                    className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 text-slate-700 active:scale-95 transition cursor-pointer"
+                    title="Tháng trước"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+
+                  <div className="text-center">
+                    <span className="text-xs font-black uppercase text-slate-900 tracking-wider">
+                      Tháng {calendarMonth.getMonth() + 1}, {calendarMonth.getFullYear()}
+                    </span>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleNextMonth}
+                    className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 text-slate-700 active:scale-95 transition cursor-pointer"
+                    title="Tháng sau"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {/* Weekday headers */}
+                <div className="grid grid-cols-7 gap-1 text-center text-[11px] font-bold text-slate-400">
+                  <div>T2</div>
+                  <div>T3</div>
+                  <div>T4</div>
+                  <div>T5</div>
+                  <div>T6</div>
+                  <div className="text-emerald-700 font-extrabold">T7</div>
+                  <div className="text-red-500 font-extrabold">CN</div>
+                </div>
+
+                {/* Days Grid */}
+                <div className="grid grid-cols-7 gap-1 text-xs">
+                  {calendarDays.map((item, idx) => {
+                    const itemTime = new Date(item.dateObj.getFullYear(), item.dateObj.getMonth(), item.dateObj.getDate()).getTime();
+                    const baseTime = new Date(2026, 9, 29).getTime(); // 29/10/2026
+                    const isPast = itemTime < baseTime;
+                    const isSelected = Boolean(selectedDate) && 
+                                       scheduleDateObj.getFullYear() === item.dateObj.getFullYear() &&
+                                       scheduleDateObj.getMonth() === item.dateObj.getMonth() &&
+                                       scheduleDateObj.getDate() === item.dateObj.getDate();
+                    const isToday = item.dateObj.getFullYear() === 2026 && item.dateObj.getMonth() === 9 && item.dateObj.getDate() === 29;
+
+                    return (
+                      <button
+                        key={idx}
+                        type="button"
+                        disabled={isPast}
+                        onClick={() => handleSelectCalendarDay(item.dateObj)}
+                        className={[
+                          'h-9 w-full rounded-xl flex flex-col items-center justify-center font-bold transition text-xs relative',
+                          !item.isCurrentMonth ? 'text-slate-300' : 'text-slate-800',
+                          isPast ? 'opacity-30 cursor-not-allowed bg-slate-50' : 'cursor-pointer hover:bg-emerald-50 hover:text-emerald-800 active:scale-95',
+                          isSelected ? 'bg-emerald-600 text-white font-black hover:bg-emerald-700 shadow-sm shadow-emerald-600/30 ring-2 ring-emerald-300' : '',
+                          isToday && !isSelected ? 'border border-emerald-500 text-emerald-700 font-black' : ''
+                        ].filter(Boolean).join(' ')}
+                      >
+                        <span>{item.dayNumber}</span>
+                        {isToday && !isSelected && (
+                          <span className="w-1 h-1 rounded-full bg-emerald-500 absolute bottom-1"></span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Quick footer */}
+                <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-xs">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedDate('Hôm nay (29/10)');
+                      setDateError(null);
+                      setIsDatePickerOpen(false);
+                    }}
+                    className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 font-bold hover:bg-slate-200 transition cursor-pointer text-[11px]"
+                  >
+                    Hôm nay (29/10)
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setIsDatePickerOpen(false)}
+                    className="px-3 py-1 rounded-lg bg-emerald-50 text-emerald-700 font-bold hover:bg-emerald-100 transition cursor-pointer text-[11px]"
+                  >
+                    Đóng lịch ✕
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Quick Date Pills: 21 Days Horizon */}
+            <div className="flex gap-2 overflow-x-auto pb-1.5 pt-0.5 no-scrollbar">
+              {/* If user picked a custom date that's not in the 21 days */}
               {selectedDate && !availableDates.some((item) => `${item.label} (${item.date})` === selectedDate) && (
                 <button
                   type="button"
-                  className="flex-shrink-0 flex flex-col items-center justify-center rounded-xl px-4 py-2.5 border border-emerald-500 bg-emerald-500 text-white font-black shadow-sm"
+                  className="flex-shrink-0 flex flex-col items-center justify-center rounded-xl px-4 py-2.5 border-2 border-emerald-600 bg-emerald-500 text-white font-black shadow-md shadow-emerald-500/25 ring-2 ring-emerald-300/50"
                 >
-                  <span className="text-[10px] font-bold uppercase opacity-90">Đã chọn</span>
+                  <span className="text-[10px] font-bold uppercase tracking-wider opacity-90">⭐ Đã chọn</span>
                   <span className="text-xs font-black mt-0.5">{selectedDate}</span>
                 </button>
               )}
+
               {availableDates.map((item) => {
                 const fullDateStr = `${item.label} (${item.date})`;
-                const isSelected = selectedDate === fullDateStr;
+                const isSelected = Boolean(selectedDate) && selectedDate === fullDateStr;
 
                 return (
                   <button
                     key={item.date}
                     type="button"
-                    onClick={() => setSelectedDate(fullDateStr)}
+                    onClick={() => {
+                      setSelectedDate(fullDateStr);
+                      setDateError(null);
+                    }}
                     className={[
-                      'flex-shrink-0 flex flex-col items-center justify-center rounded-xl px-4 py-2.5 border transition active:scale-95',
+                      'flex-shrink-0 flex flex-col items-center justify-center rounded-xl px-4 py-2.5 border transition active:scale-95 cursor-pointer',
                       isSelected
-                        ? 'border-emerald-500 bg-emerald-500 text-white font-black shadow-sm'
-                        : 'border-slate-200 bg-slate-50 text-slate-700 hover:border-slate-300',
+                        ? 'border-emerald-500 bg-emerald-500 text-white font-black shadow-md shadow-emerald-500/20'
+                        : 'border-slate-200 bg-slate-50 text-slate-700 hover:border-slate-300 hover:bg-slate-100',
                     ].join(' ')}
                   >
-                    <span className="text-[10px] font-bold uppercase opacity-80">{item.label}</span>
+                    <span className={`text-[10px] uppercase font-bold ${isSelected ? 'text-emerald-100' : 'text-slate-500'}`}>
+                      {item.label}
+                    </span>
                     <span className="text-xs font-black mt-0.5">{item.date}</span>
                   </button>
                 );
@@ -1125,14 +1434,8 @@ export default function TrangChu() {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500 text-xs font-black text-white">3</span>
-                <div>
-                  <h3 className="text-sm font-black uppercase tracking-wider text-slate-900">LỊCH SÂN TRỰC QUAN REAL-TIME</h3>
-                  <p className="text-[10px] text-slate-500 font-medium">Chạm vào ô giờ trống (màu vàng) trên bảng lịch để chọn sân & thời gian</p>
-                </div>
+                <h3 className="text-sm font-black uppercase tracking-wider text-slate-900">LỊCH SÂN TRỰC QUAN REAL-TIME</h3>
               </div>
-              <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">
-                {currentSport.name} ({currentSport.pricePerHour / 1000}k/h)
-              </span>
             </div>
 
             {/* Embedded Visual Interactive Schedule Grid */}
@@ -1166,20 +1469,17 @@ export default function TrangChu() {
                       </span>
                     </div>
                     <p className="text-[11px] text-emerald-700 font-semibold mt-0.5">
-                      {currentSport.name} • {durationHours} tiếng • {formattedPrice}
+                      {currentSport.name} • {selectedDuration === 30 ? '30 phút' : `${durationHours} tiếng`} • {formattedPrice}
                     </p>
                   </div>
                 </div>
 
                 <button
                   type="button"
-                  onClick={() => {
-                    const el = document.getElementById('booking-summary-section');
-                    if (el) el.scrollIntoView({ behavior: 'smooth' });
-                  }}
+                  onClick={() => setShowBookingPopup(true)}
                   className="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black px-3.5 py-2 active:scale-95 transition cursor-pointer shadow-xs shrink-0 flex items-center gap-1"
                 >
-                  Đặt sân này <ArrowRight className="w-3.5 h-3.5" />
+                  Mở màn hình đặt sân <ArrowRight className="w-3.5 h-3.5" />
                 </button>
               </div>
             ) : (
@@ -1188,279 +1488,11 @@ export default function TrangChu() {
               </div>
             )}
           </div>
-
-          {/* ⚡ BƯỚC 4: TÓM TẮT ĐƠN ĐẶT SÂN */}
-          <div id="booking-summary-section" className="rounded-2xl border border-slate-200 bg-white p-4 space-y-3.5 shadow-xs scroll-mt-20">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500 text-xs font-black text-white">4</span>
-                <h3 className="text-sm font-black uppercase tracking-wider text-slate-900">TÓM TẮT ĐƠN ĐẶT SÂN</h3>
-              </div>
-              {selectedCourt && selectedStartTime ? (
-                <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-[10px] font-extrabold uppercase text-emerald-700 border border-emerald-200 flex items-center gap-1">
-                  <CheckCircle2 className="w-3 h-3" /> Đã chọn sân
-                </span>
-              ) : (
-                <span className="rounded-full bg-amber-50 px-2.5 py-0.5 text-[10px] font-extrabold uppercase text-amber-700 border border-amber-200">
-                  Chờ chọn lịch
-                </span>
-              )}
-            </div>
-
-            {!selectedCourt || !selectedStartTime ? (
-              <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4 text-center text-xs text-slate-500 space-y-2">
-                <p className="font-bold text-slate-700">Chưa có thông tin lịch sân</p>
-                <p className="text-[11px] text-slate-500">Vui lòng chạm vào một ô giờ trống trên bảng lịch ở Bước 3 phía trên để tiếp tục.</p>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const el = document.getElementById('booking-schedule-section');
-                    if (el) el.scrollIntoView({ behavior: 'smooth' });
-                  }}
-                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 text-xs font-black border border-emerald-200 hover:bg-emerald-100 transition cursor-pointer"
-                >
-                  Xem bảng lịch Bước 3 👆
-                </button>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                <div className="space-y-2.5 rounded-xl bg-slate-50 p-3.5 border border-slate-200 text-xs">
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-500">Môn thi đấu</span>
-                    <span className="font-bold text-slate-900">{currentSport.name}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-500">Sân thi đấu</span>
-                    <span className="font-black text-emerald-700 text-sm">{selectedCourt}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-500">Ngày đặt</span>
-                    <span className="font-bold text-slate-900">{selectedDate}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-500">Giờ bắt đầu</span>
-                    <span className="font-bold text-slate-900">{selectedStartTime}</span>
-                  </div>
-
-                  {/* Duration Selector */}
-                  <div className="flex items-center justify-between border-t border-slate-200/80 pt-2">
-                    <span className="text-slate-600 font-bold">Thời lượng thuê:</span>
-                    <select
-                      value={selectedDuration}
-                      onChange={(e) => setSelectedDuration(Number(e.target.value))}
-                      className="rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs font-black text-slate-800 outline-none focus:border-emerald-500 cursor-pointer"
-                    >
-                      {availableDurations.map((dur) => (
-                        <option key={dur} value={dur}>
-                          {dur % 60 === 0 ? `${dur / 60} tiếng` : `${Math.floor(dur / 60)} tiếng 30 phút`}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-500">Khung giờ</span>
-                    <span className="font-bold text-emerald-800 bg-emerald-100/70 px-2 py-0.5 rounded">
-                      {selectedSlot} ({durationHours} tiếng)
-                    </span>
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-500">Đơn giá niêm yết</span>
-                    <span className="font-bold text-slate-700">{currentSport.pricePerHour.toLocaleString('vi-VN')}đ / giờ</span>
-                  </div>
-
-                  <div className="flex items-center justify-between border-t border-slate-200 pt-2.5">
-                    <span className="text-slate-700 font-black text-sm">TỔNG THANH TOÁN</span>
-                    <span className="text-2xl font-black text-emerald-600">{formattedPrice}</span>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* ⚡ BƯỚC 5: THÔNG TIN KHÁCH HÀNG & THANH TOÁN FORM */}
-          {selectedCourt && selectedStartTime && (
-            <form onSubmit={handleBookingSubmit} className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
-              <div className="rounded-2xl border border-slate-200 bg-white p-4 space-y-3 shadow-xs">
-                <div className="flex items-center gap-2">
-                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500 text-xs font-black text-white">5</span>
-                  <h3 className="text-sm font-black uppercase tracking-wider text-slate-900">THÔNG TIN NGUỜI ĐẶT</h3>
-                </div>
-
-                <div className="space-y-3 text-xs">
-                  <div>
-                    <label className="mb-1 block font-bold uppercase text-slate-500 text-[10px] tracking-wider">
-                      Họ và tên *
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={customerName}
-                      onChange={(e) => setCustomerName(e.target.value)}
-                      placeholder="Nhập họ và tên..."
-                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3 text-sm text-slate-900 placeholder-slate-400 outline-none transition focus:border-emerald-500 focus:bg-white"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="mb-1 block font-bold uppercase text-slate-500 text-[10px] tracking-wider">
-                      Số điện thoại *
-                    </label>
-                    <input
-                      type="tel"
-                      required
-                      value={customerPhone}
-                      onChange={(e) => setCustomerPhone(e.target.value)}
-                      placeholder="Nhập số điện thoại..."
-                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3 text-sm text-slate-900 placeholder-slate-400 outline-none transition focus:border-emerald-500 focus:bg-white"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="mb-1 block font-bold uppercase text-slate-500 text-[10px] tracking-wider">
-                      Ghi chú thêm (Tùy chọn)
-                    </label>
-                    <input
-                      type="text"
-                      value={customerNote}
-                      onChange={(e) => setCustomerNote(e.target.value)}
-                      placeholder="VD: Cần mượn thêm vợt, bóng..."
-                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3 text-sm text-slate-900 placeholder-slate-400 outline-none transition focus:border-emerald-500 focus:bg-white"
-                    />
-                  </div>
-
-                  <label className="flex items-center gap-2 cursor-pointer pt-1">
-                    <input
-                      type="checkbox"
-                      checked={sendZalo}
-                      onChange={(e) => setSendZalo(e.target.checked)}
-                      className="h-4 w-4 rounded border-slate-300 text-emerald-500 focus:ring-emerald-500"
-                    />
-                    <span className="text-slate-700 text-xs font-semibold">Gửi vé điện tử & thông báo nhắc lịch qua Zalo/SMS</span>
-                  </label>
-                </div>
-              </div>
-
-              {/* SUBMIT BUTTON */}
-              <button
-                type="submit"
-                className="mt-6 w-full flex items-center justify-center gap-2 rounded-2xl bg-emerald-500 py-4 text-sm font-black uppercase tracking-widest text-white shadow-lg shadow-emerald-500/25 transition hover:bg-emerald-600 active:scale-95 cursor-pointer"
-              >
-                TIẾN HÀNH THANH TOÁN ({formattedPrice})
-              </button>
-            </form>
-          )}
         </section>
 
 
         {/* ======================================================== */}
-        {/* 4. TRA CỨU THÔNG TIN ĐẶT SÂN                            */}
-        {/* ======================================================== */}
-        <section ref={lookupRef} className="scroll-mt-16 space-y-4 pt-4 border-t border-slate-200">
-          <div>
-            <p className="text-[10px] font-extrabold uppercase tracking-widest text-emerald-600">
-              ● KIỂM TRA LỊCH ĐÃ ĐẶT
-            </p>
-            <h2 className="mt-0.5 text-xl font-black text-slate-900">
-              TRA CỨU THÔNG TIN ĐẶT SÂN
-            </h2>
-            <p className="mt-1 text-xs text-slate-600">
-              Nhập số điện thoại hoặc mã đơn hàng để kiểm tra lịch thi đấu và trạng thái thanh toán.
-            </p>
-          </div>
-
-          <form onSubmit={handleLookupSearch} className="flex gap-2">
-            <input
-              type="text"
-              value={lookupQuery}
-              onChange={(e) => setLookupQuery(e.target.value)}
-              placeholder="Nhập SĐT hoặc Mã đặt sân (Ví dụ: 0912345678)"
-              className="flex-1 rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-xs text-slate-900 placeholder-slate-400 outline-none focus:border-emerald-500 shadow-xs"
-            />
-            <button
-              type="submit"
-              className="rounded-xl bg-emerald-500 px-4 py-3 text-xs font-black uppercase tracking-wider text-white hover:bg-emerald-600 transition shadow-sm"
-            >
-              TRA CỨU
-            </button>
-          </form>
-
-          {/* Lookup Demo Result */}
-          {hasSearched ? (
-            lookupResult ? (
-              <div className="rounded-2xl border border-emerald-300 bg-white p-4 space-y-3 shadow-sm">
-                <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                  <span className="font-mono text-sm font-extrabold text-slate-900">{lookupResult.code}</span>
-                  <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-[10px] font-black text-emerald-700 border border-emerald-200">
-                    {lookupResult.status}
-                  </span>
-                </div>
-
-                <div className="space-y-1.5 text-xs text-slate-700">
-                  <div className="flex justify-between"><span className="text-slate-500">Khách hàng:</span> <span className="font-bold text-slate-900">{lookupResult.name} ({lookupResult.phone})</span></div>
-                  <div className="flex justify-between"><span className="text-slate-500">Môn & Sân:</span> <span className="font-bold text-emerald-600">{lookupResult.sport} - {lookupResult.court}</span></div>
-                  <div className="flex justify-between"><span className="text-slate-500">Thời gian:</span> <span className="font-bold text-slate-900">{lookupResult.date} | {lookupResult.time}</span></div>
-                  <div className="flex justify-between"><span className="text-slate-500">Tổng tiền:</span> <span className="font-bold text-slate-900">{lookupResult.total}</span></div>
-                    {lookupResult.status === 'ĐÃ HỦY' && (
-                      <div className="flex justify-between border-t border-slate-100 pt-1.5 mt-1.5">
-                        <span className="text-slate-500">Hoàn tiền:</span> 
-                        <span className={'font-black ' + (lookupResult.paymentStatus === 'ĐÃ HOÀN TIỀN' ? 'text-emerald-600' : 'text-amber-500')}>
-                          {lookupResult.paymentStatus || 'ĐANG XỬ LÝ HOÀN TIỀN'}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-
-                <div className="flex gap-2 pt-2 border-t border-slate-100">
-                  <button type="button" onClick={() => handleRebook(lookupResult)} className="flex-1 rounded-xl bg-emerald-500 py-2.5 text-xs font-bold text-white hover:bg-emerald-600 active:scale-95 transition">
-                    Đặt lại vé
-                  </button>
-                  <button 
-                    type="button" 
-                    onClick={() => handleCancelTicket(lookupResult)} 
-                    disabled={lookupResult.status === 'ĐÃ HỦY'}
-                    className={'flex-1 rounded-xl border py-2.5 text-xs font-bold active:scale-95 transition ' + (lookupResult.status === 'ĐÃ HỦY' ? 'border-slate-200 text-slate-400 bg-slate-50' : 'border-red-200 text-red-600 hover:bg-red-50')}
-                  >
-                    {lookupResult.status === 'ĐÃ HỦY' ? 'Đã hủy' : 'Hủy vé'}
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="rounded-2xl border border-slate-200 bg-white p-6 text-center text-xs text-slate-500 shadow-xs">
-                <Search className="w-6 h-6 mx-auto mb-2 text-slate-400" />
-                Không tìm thấy thông tin đơn đặt sân phù hợp với từ khóa "<span className="text-slate-900 font-bold">{lookupQuery}</span>".
-              </div>
-            )
-          ) : (
-            <div className="rounded-2xl border border-slate-200 bg-white p-4 space-y-3 text-xs shadow-xs">
-              <div className="flex items-center justify-between text-slate-500">
-                <span className="font-bold">ĐƠN HÀNG MẪU:</span>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <button type="button" onClick={() => { setHasSearched(true); setLookupResult({
-                    code: '#CX-11111', sport: 'Bóng Đá', court: 'Sân Bóng Đá 1', name: 'Nguyễn Văn An', phone: '0912345678', date: '26/09/2026', time: '14:00 - 15:30', total: '450.000đ', status: 'ĐÃ XÁC NHẬN', hoursUntilStart: 12, sportId: 'football'
-                }); }} className="rounded-xl bg-slate-100 p-2 text-center font-bold text-slate-700 active:scale-95 hover:bg-slate-200">
-                  Vé sắp đá (&lt; 24h)
-                </button>
-                <button type="button" onClick={() => { setHasSearched(true); setLookupResult({
-                    code: '#CX-99999', sport: 'Cầu Lông', court: 'Sân Cầu Lông 2', name: 'Nguyễn Văn An', phone: '0912345678', date: '30/09/2026', time: '09:00 - 10:30', total: '180.000đ', status: 'ĐÃ XÁC NHẬN', hoursUntilStart: 48, sportId: 'badminton'
-                }); }} className="rounded-xl bg-slate-100 p-2 text-center font-bold text-slate-700 active:scale-95 hover:bg-slate-200">
-                  Vé tuần sau (&gt; 24h)
-                </button>
-                <button type="button" onClick={() => { setHasSearched(true); setLookupResult({
-                    code: '#CX-77777', sport: 'Bóng Chuyền', court: 'Sân Bóng Chuyền 1', name: 'Nguyễn Văn An', phone: '0912345678', date: '20/09/2026', time: '08:00 - 09:30', total: '300.000đ', status: 'ĐÃ HỦY', paymentStatus: 'ĐÃ HOÀN TIỀN', hoursUntilStart: -24, sportId: 'volleyball'
-                }); }} className="col-span-2 rounded-xl bg-red-50 border border-red-100 p-2 text-center font-bold text-red-600 active:scale-95 hover:bg-red-100">
-                  Vé mẫu Đã Hủy & Hoàn Tiền
-                </button>
-              </div>
-            </div>
-          )}
-        </section>
-
-
-        {/* ======================================================== */}
-        {/* 5. THÔNG TIN LIÊN HỆ & VỊ TRÍ                           */}
+        {/* 4. THÔNG TIN LIÊN HỆ & VỊ TRÍ                           */}
         {/* ======================================================== */}
         <section className="rounded-2xl border border-slate-200 bg-white p-4 space-y-3 shadow-xs">
           <div className="flex items-center gap-3">
@@ -1498,10 +1530,181 @@ export default function TrangChu() {
 
       </main>
 )}
+
+      {/* 🔍 TAB TRA CỨU THÔNG TIN ĐẶT SÂN */}
+      {activeTab === 'lookup' && (
+        <main className="flex-1 space-y-6 p-4 pb-28 animate-in fade-in duration-200">
+          <section ref={lookupRef} className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-[10px] font-extrabold uppercase tracking-widest text-emerald-600">
+                  ● KIỂM TRA LỊCH ĐÃ ĐẶT
+                </p>
+                <h2 className="mt-0.5 text-xl font-black text-slate-900">
+                  TRA CỨU THÔNG TIN ĐẶT SÂN
+                </h2>
+                <p className="mt-1 text-xs text-slate-600">
+                  Nhập số điện thoại hoặc mã đơn hàng để kiểm tra lịch thi đấu và trạng thái thanh toán.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => handleTabChange('booking')}
+                className="text-xs font-bold text-emerald-700 hover:text-emerald-800 flex items-center gap-1 active:scale-95 transition shrink-0 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-200"
+              >
+                <span>Đặt sân</span> →
+              </button>
+            </div>
+
+            <form onSubmit={handleLookupSearch} className="flex gap-2">
+              <input
+                type="text"
+                value={lookupQuery}
+                onChange={(e) => setLookupQuery(e.target.value)}
+                placeholder="Nhập SĐT hoặc Mã đặt sân (Ví dụ: 0912345678)"
+                className="flex-1 rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-xs text-slate-900 placeholder-slate-400 outline-none focus:border-emerald-500 shadow-xs"
+              />
+              <button
+                type="submit"
+                className="rounded-xl bg-emerald-500 px-4 py-3 text-xs font-black uppercase tracking-wider text-white hover:bg-emerald-600 transition shadow-sm active:scale-95 cursor-pointer"
+              >
+                TRA CỨU
+              </button>
+            </form>
+
+            {/* Lookup Demo Result */}
+            {hasSearched ? (
+              lookupResult ? (
+                <div className="rounded-2xl border border-emerald-300 bg-white p-4 space-y-3 shadow-sm">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                    <span className="font-mono text-sm font-extrabold text-slate-900">{lookupResult.code}</span>
+                    <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-[10px] font-black text-emerald-700 border border-emerald-200">
+                      {lookupResult.status}
+                    </span>
+                  </div>
+
+                  <div className="space-y-1.5 text-xs text-slate-700">
+                    <div className="flex justify-between"><span className="text-slate-500">Khách hàng:</span> <span className="font-bold text-slate-900">{lookupResult.name} ({lookupResult.phone})</span></div>
+                    <div className="flex justify-between"><span className="text-slate-500">Môn & Sân:</span> <span className="font-bold text-emerald-600">{lookupResult.sport} - {lookupResult.court}</span></div>
+                    <div className="flex justify-between"><span className="text-slate-500">Thời gian:</span> <span className="font-bold text-slate-900">{lookupResult.date} | {lookupResult.time}</span></div>
+                    <div className="flex justify-between"><span className="text-slate-500">Tổng tiền:</span> <span className="font-bold text-slate-900">{lookupResult.total}</span></div>
+                    {lookupResult.status === 'ĐÃ HỦY' && (
+                      <div className="flex justify-between border-t border-slate-100 pt-1.5 mt-1.5">
+                        <span className="text-slate-500">Hoàn tiền:</span> 
+                        <span className={'font-black ' + (lookupResult.paymentStatus === 'ĐÃ HOÀN TIỀN' ? 'text-emerald-600' : 'text-amber-500')}>
+                          {lookupResult.paymentStatus || 'ĐANG XỬ LÝ HOÀN TIỀN'}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex gap-2 pt-2 border-t border-slate-100">
+                    <button type="button" onClick={() => handleRebook(lookupResult)} className="flex-1 rounded-xl bg-emerald-500 py-2.5 text-xs font-bold text-white hover:bg-emerald-600 active:scale-95 transition">
+                      Đặt lại vé
+                    </button>
+                    <button 
+                      type="button" 
+                      onClick={() => handleCancelTicket(lookupResult)} 
+                      disabled={lookupResult.status === 'ĐÃ HỦY'}
+                      className={'flex-1 rounded-xl border py-2.5 text-xs font-bold active:scale-95 transition ' + (lookupResult.status === 'ĐÃ HỦY' ? 'border-slate-200 text-slate-400 bg-slate-50' : 'border-red-200 text-red-600 hover:bg-red-50')}
+                    >
+                      {lookupResult.status === 'ĐÃ HỦY' ? 'Đã hủy' : 'Hủy vé'}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="rounded-2xl border border-slate-200 bg-white p-6 text-center text-xs text-slate-500 shadow-xs">
+                  <Search className="w-6 h-6 mx-auto mb-2 text-slate-400" />
+                  Không tìm thấy thông tin đơn đặt sân phù hợp với từ khóa "<span className="text-slate-900 font-bold">{lookupQuery}</span>".
+                </div>
+              )
+            ) : (
+              <div className="rounded-2xl border border-slate-200 bg-white p-4 space-y-3 text-xs shadow-xs">
+                <div className="flex items-center justify-between text-slate-500">
+                  <span className="font-bold">ĐƠN HÀNG MẪU:</span>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <button type="button" onClick={() => { setHasSearched(true); setLookupResult({
+                      code: '#CX-11111', sport: 'Bóng Đá', court: 'Sân Bóng Đá 1', name: 'Nguyễn Văn An', phone: '0912345678', date: '26/09/2026', time: '14:00 - 15:30', total: '450.000đ', status: 'ĐÃ XÁC NHẬN', hoursUntilStart: 12, sportId: 'football'
+                  }); }} className="rounded-xl bg-slate-100 p-2 text-center font-bold text-slate-700 active:scale-95 hover:bg-slate-200">
+                    Vé sắp đá (&lt; 24h)
+                  </button>
+                  <button type="button" onClick={() => { setHasSearched(true); setLookupResult({
+                      code: '#CX-99999', sport: 'Cầu Lông', court: 'Sân Cầu Lông 2', name: 'Nguyễn Văn An', phone: '0912345678', date: '30/09/2026', time: '09:00 - 10:30', total: '180.000đ', status: 'ĐÃ XÁC NHẬN', hoursUntilStart: 48, sportId: 'badminton'
+                  }); }} className="rounded-xl bg-slate-100 p-2 text-center font-bold text-slate-700 active:scale-95 hover:bg-slate-200">
+                    Vé tuần sau (&gt; 24h)
+                  </button>
+                  <button type="button" onClick={() => { setHasSearched(true); setLookupResult({
+                      code: '#CX-77777', sport: 'Bóng Chuyền', court: 'Sân Bóng Chuyền 1', name: 'Nguyễn Văn An', phone: '0912345678', date: '20/09/2026', time: '08:00 - 09:30', total: '300.000đ', status: 'ĐÃ HỦY', paymentStatus: 'ĐÃ HOÀN TIỀN', hoursUntilStart: -24, sportId: 'volleyball'
+                  }); }} className="col-span-2 rounded-xl bg-red-50 border border-red-100 p-2 text-center font-bold text-red-600 active:scale-95 hover:bg-red-100">
+                    Vé mẫu Đã Hủy & Hoàn Tiền
+                  </button>
+                </div>
+              </div>
+            )}
+          </section>
+
+          {/* Chính sách hủy vé & hoàn tiền 100% VietQR */}
+          <section className="rounded-2xl border border-slate-200 bg-white p-4 space-y-2.5 text-xs shadow-xs">
+            <h3 className="font-black text-slate-900 uppercase text-[11px] tracking-wider flex items-center gap-1.5">
+              <Zap className="w-4 h-4 text-emerald-600" /> CHÍNH SÁCH HỦY VÉ & HOÀN TIỀN
+            </h3>
+            <ul className="space-y-1.5 text-slate-600 text-[11px]">
+              <li className="flex items-start gap-2">
+                <span className="text-emerald-600 font-bold">✓</span>
+                <span><strong>Hủy trước 24 giờ:</strong> Hoàn tiền 100% tự động qua VietQR.</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-amber-500 font-bold">⚠</span>
+                <span><strong>Hủy trong vòng 24 giờ trước giờ đá:</strong> Không áp dụng chính sách hoàn phí.</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-emerald-600 font-bold">✓</span>
+                <span><strong>Hỗ trợ kỹ thuật / thắc mắc:</strong> Liên hệ hotline 0912 345 678 để được giải quyết nhanh nhất.</span>
+              </li>
+            </ul>
+          </section>
+
+          {/* Section Liên hệ */}
+          <section className="rounded-2xl border border-slate-200 bg-white p-4 space-y-3 shadow-xs">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700 text-xl font-black">
+                <Home className='w-5 h-5' />
+              </div>
+              <div>
+                <h3 className="text-sm font-black text-slate-900">NHÀ THI ĐẤU ĐA NĂNG COURTX</h3>
+                <p className="text-[10px] text-slate-500">Hệ thống sân tiêu chuẩn thi đấu quốc tế</p>
+              </div>
+            </div>
+
+            <div className="space-y-1.5 text-xs text-slate-700 border-t border-slate-100 pt-3">
+              <p><MapPin className='w-3.5 h-3.5 inline mr-1 text-emerald-600' /> <strong>Địa chỉ:</strong> Số 18 Đường Thi Đấu, Phường Thể Thao, Quận Đa Năng, TP.HCM</p>
+              <p><Phone className='w-3.5 h-3.5 inline mr-1 text-emerald-600' /> <strong>Hotline đặt sân:</strong> <span className="text-emerald-600 font-bold">0912 345 678</span></p>
+              <p><Clock className='w-3.5 h-3.5 inline mr-1 text-emerald-600' /> <strong>Giờ mở cửa:</strong> 05:00 - 23:00 (Tất cả các ngày trong tuần)</p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 pt-1">
+              <a
+                href="tel:0912345678"
+                className="flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 py-2.5 text-xs font-bold text-slate-800 hover:bg-slate-100 transition"
+              >
+                <Phone className='w-3.5 h-3.5 inline mr-1 text-emerald-600' /> Gọi Hotline
+              </a>
+              <button
+                type="button"
+                onClick={() => showAlert('Chỉ đường', 'Đang mở bản đồ Google Maps tới Nhà thi đấu COURTX...')}
+                className="flex items-center justify-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50 py-2.5 text-xs font-bold text-emerald-700 hover:bg-emerald-100 transition"
+              >
+                <MapPin className='w-3.5 h-3.5 inline mr-1' /> Chỉ đường Map
+              </button>
+            </div>
+          </section>
+        </main>
+      )}
 {activeTab === 'schedule' && (
   <CustomerSchedule 
     onSelectSlot={(sportId, courtName, time, dateStr) => {
-      handleSelectSlotFromSchedule(sportId, courtName, time, dateStr);
+      handleSelectSlotFromSchedule(sportId, courtName, time, dateStr, true);
     }}
   />
 )}
@@ -1807,11 +2010,29 @@ export default function TrangChu() {
                   className={'w-full text-center text-2xl tracking-widest font-mono font-black rounded-xl border px-4 py-3 outline-none transition focus:border-emerald-500 ' + (otpError ? 'border-red-500 bg-red-50 text-red-900' : 'border-slate-200 bg-slate-50 text-slate-900')}
                 />
                 {otpError && <p className="mt-2 text-center text-[10px] font-bold text-red-500">Mã OTP không chính xác. Vui lòng thử lại!</p>}
+                <p className="text-[11px] text-slate-400 text-center mt-2">
+                  Mã mẫu thử nghiệm: <span className="font-mono font-bold text-emerald-600">{bookingOtp}</span> hoặc <span className="font-mono font-bold text-emerald-600">123456</span>
+                </p>
               </div>
 
               <div className="grid grid-cols-2 gap-3 mt-2">
-                <button onClick={() => setShowOTP(false)} type="button" className="rounded-xl border border-slate-200 py-3 text-xs font-bold text-slate-600 hover:bg-slate-50 cursor-pointer active:scale-95">Quay lại</button>
-                <button onClick={handleVerifyOTP} type="button" className="rounded-xl bg-emerald-500 py-3 text-xs font-bold text-white hover:bg-emerald-600 cursor-pointer active:scale-95">Xác nhận</button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowOTP(false);
+                    if (otpAction === 'booking') setShowBookingPopup(true);
+                  }}
+                  className="rounded-xl border border-slate-200 py-3 text-xs font-bold text-slate-600 hover:bg-slate-50 cursor-pointer active:scale-95"
+                >
+                  Quay lại
+                </button>
+                <button
+                  type="button"
+                  onClick={handleVerifyOTP}
+                  className="rounded-xl bg-emerald-500 py-3 text-xs font-bold text-white hover:bg-emerald-600 cursor-pointer active:scale-95"
+                >
+                  Xác nhận
+                </button>
               </div>
             </div>
           </div>
@@ -2355,6 +2576,251 @@ export default function TrangChu() {
                 {popup.type === 'confirm' ? 'Có, xác nhận' : 'Đóng'}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* 🟢 POPUP MODAL: MÀN HÌNH ĐẶT SÂN & THANH TOÁN (HIỆN KHI ẤN VÀO LỊCH SÂN) */}
+      {showBookingPopup && (
+        <div className="fixed top-0 bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md z-50 flex items-end sm:items-center justify-center bg-slate-900/60 p-0 sm:p-4 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="w-full max-w-md rounded-t-3xl sm:rounded-3xl bg-slate-50 p-4 sm:p-5 shadow-2xl animate-in slide-in-from-bottom-6 duration-200 max-h-[92vh] overflow-y-auto space-y-4 border border-slate-100 flex flex-col">
+            
+            {/* Mobile Drag Indicator */}
+            <div className="w-12 h-1.5 bg-slate-300 rounded-full mb-1 mx-auto sm:hidden shrink-0"></div>
+
+            {/* Header */}
+            <div className="flex items-center justify-between pb-2 border-b border-slate-200 shrink-0">
+              <div className="flex items-center gap-2">
+                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700 font-black">
+                  <CalendarIcon className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black uppercase tracking-wider text-slate-900">CHI TIẾT ĐẶT SÂN</h3>
+                  <p className="text-[10px] text-slate-500 font-medium">Kiểm tra thông tin & tiến hành thanh toán</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowBookingPopup(false)}
+                className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-200/70 hover:bg-slate-200 text-slate-600 transition cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Booking Form */}
+            <form onSubmit={handleBookingSubmit} className="space-y-4">
+              
+              {/* Card 4: TÓM TẮT ĐƠN ĐẶT SÂN */}
+              <div className="rounded-2xl border border-slate-200 bg-white p-4 space-y-3 shadow-xs">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500 text-xs font-black text-white">4</span>
+                    <h3 className="text-sm font-black uppercase tracking-wider text-slate-900">TÓM TẮT ĐƠN ĐẶT SÂN</h3>
+                  </div>
+                  <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-[10px] font-extrabold uppercase text-emerald-700 border border-emerald-200 flex items-center gap-1">
+                    <CheckCircle2 className="w-3 h-3" /> ĐÃ CHỌN SÂN
+                  </span>
+                </div>
+
+                <div className="space-y-2.5 rounded-xl bg-slate-50 p-3.5 border border-slate-200 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-500">Môn thi đấu</span>
+                    <span className="font-bold text-slate-900">{currentSport.name}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-500">Sân thi đấu</span>
+                    <span className="font-black text-emerald-700 text-sm">{selectedCourt}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-500">Ngày đặt</span>
+                    <span className="font-bold text-slate-900">{selectedDate}</span>
+                  </div>
+
+                  {/* Start Time Selector */}
+                  <div className="flex items-center justify-between border-t border-slate-200/80 pt-2">
+                    <span className="text-slate-600 font-bold">Giờ bắt đầu:</span>
+                    <select
+                      value={selectedStartTime}
+                      onChange={(e) => handleStartTimeChange(e.target.value)}
+                      className={`rounded-lg border px-2.5 py-1 text-xs font-black outline-none cursor-pointer transition ${
+                        conflictBooking 
+                          ? 'border-red-500 bg-red-50 text-red-700 ring-2 ring-red-200' 
+                          : 'border-slate-300 bg-white text-slate-800 focus:border-emerald-500'
+                      }`}
+                    >
+                      {START_TIME_OPTIONS.map((t) => (
+                        <option key={t} value={t}>{t}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* End Time Selector */}
+                  <div className="flex items-center justify-between pt-0.5">
+                    <span className="text-slate-600 font-bold">Giờ kết thúc:</span>
+                    <select
+                      value={selectedEndTime}
+                      onChange={(e) => handleEndTimeChange(e.target.value)}
+                      className={`rounded-lg border px-2.5 py-1 text-xs font-black outline-none cursor-pointer transition ${
+                        conflictBooking 
+                          ? 'border-red-500 bg-red-50 text-red-700 ring-2 ring-red-200' 
+                          : 'border-slate-300 bg-white text-slate-800 focus:border-emerald-500'
+                      }`}
+                    >
+                      {endTimeOptions.map((t) => (
+                        <option key={t} value={t}>{t}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Duration Selector */}
+                  <div className="flex items-center justify-between pt-0.5">
+                    <span className="text-slate-600 font-bold">Thời lượng thuê:</span>
+                    <select
+                      value={selectedDuration}
+                      onChange={(e) => handleDurationChange(Number(e.target.value))}
+                      className="rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs font-black text-slate-800 outline-none focus:border-emerald-500 cursor-pointer"
+                    >
+                      {availableDurations.map((dur) => (
+                        <option key={dur} value={dur}>
+                          {dur === 30 ? '30 phút (nửa tiếng)' : dur % 60 === 0 ? `${dur / 60} tiếng` : `${Math.floor(dur / 60)} tiếng 30 phút`}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-500">Khung giờ</span>
+                    <span className={`font-bold px-2 py-0.5 rounded ${
+                      conflictBooking
+                        ? 'text-red-700 bg-red-100 border border-red-300'
+                        : 'text-emerald-800 bg-emerald-100/70'
+                    }`}>
+                      {selectedSlot} ({selectedDuration === 30 ? '30 phút' : `${durationHours} tiếng`})
+                    </span>
+                  </div>
+
+                  {/* 🚨 RED CONFLICT WARNING BANNER */}
+                  {conflictBooking && (
+                    <div className="rounded-xl border-2 border-red-500 bg-red-50 p-3 text-xs text-red-700 space-y-1.5 animate-in fade-in duration-150">
+                      <div className="flex items-center gap-1.5 font-black text-red-800 uppercase text-[11px]">
+                        <AlertTriangle className="w-4 h-4 text-red-600 shrink-0" />
+                        <span>KHÔNG THỂ ĐẶT — KHUNG GIỜ ĐÃ BỊ TRÙNG!</span>
+                      </div>
+                      <p className="text-[11px] font-medium text-red-700 leading-relaxed">
+                        Khung giờ <span className="font-black text-red-900 bg-red-100 px-1.5 py-0.5 rounded">{selectedStartTime} – {selectedEndTime}</span> bị trùng với lịch đặt trước trên {selectedCourt}:
+                      </p>
+                      <div className="rounded-lg bg-white border border-red-200 px-2.5 py-1 text-[11px] font-black text-red-900">
+                        📌 {conflictBooking.title || `Đã đặt (${conflictBooking.startH.toString().padStart(2, '0')}:${conflictBooking.startM.toString().padStart(2, '0')} - ${conflictBooking.endH.toString().padStart(2, '0')}:${conflictBooking.endM.toString().padStart(2, '0')})`}
+                      </div>
+                      <p className="text-[10px] font-bold text-red-600">
+                        👉 Vui lòng đổi Giờ bắt đầu hoặc Giờ kết thúc để chọn khung giờ còn trống!
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-500">Đơn giá niêm yết</span>
+                    <span className="font-bold text-slate-700">{currentSport.pricePerHour.toLocaleString('vi-VN')}đ / giờ</span>
+                  </div>
+
+                  <div className="flex items-center justify-between border-t border-slate-200 pt-2.5">
+                    <span className="text-slate-700 font-black text-sm">TỔNG THANH TOÁN</span>
+                    <span className={`text-2xl font-black ${conflictBooking ? 'text-slate-400 line-through' : 'text-emerald-600'}`}>
+                      {formattedPrice}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Card 5: THÔNG TIN NGƯỜI ĐẶT */}
+              <div className="rounded-2xl border border-slate-200 bg-white p-4 space-y-3 shadow-xs">
+                <div className="flex items-center gap-2">
+                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500 text-xs font-black text-white">5</span>
+                  <h3 className="text-sm font-black uppercase tracking-wider text-slate-900">THÔNG TIN NGUỜI ĐẶT</h3>
+                </div>
+
+                <div className="space-y-3 text-xs">
+                  <div>
+                    <label className="mb-1 block font-bold uppercase text-slate-500 text-[10px] tracking-wider">
+                      HỌ VÀ TÊN *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={customerName}
+                      onChange={(e) => setCustomerName(e.target.value)}
+                      placeholder="Nhập họ và tên..."
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3 text-sm text-slate-900 placeholder-slate-400 outline-none transition focus:border-emerald-500 focus:bg-white"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-1 block font-bold uppercase text-slate-500 text-[10px] tracking-wider">
+                      SỐ ĐIỆN THOẠI *
+                    </label>
+                    <input
+                      type="tel"
+                      required
+                      value={customerPhone}
+                      onChange={(e) => setCustomerPhone(e.target.value)}
+                      placeholder="Nhập số điện thoại..."
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3 text-sm text-slate-900 placeholder-slate-400 outline-none transition focus:border-emerald-500 focus:bg-white"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-1 block font-bold uppercase text-slate-500 text-[10px] tracking-wider">
+                      GHI CHÚ THÊM (TÙY CHỌN)
+                    </label>
+                    <input
+                      type="text"
+                      value={customerNote}
+                      onChange={(e) => setCustomerNote(e.target.value)}
+                      placeholder="VD: Cần mượn thêm vợt, bóng..."
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3 text-sm text-slate-900 placeholder-slate-400 outline-none transition focus:border-emerald-500 focus:bg-white"
+                    />
+                  </div>
+
+                  <label className="flex items-center gap-2 cursor-pointer pt-1">
+                    <input
+                      type="checkbox"
+                      checked={sendZalo}
+                      onChange={(e) => setSendZalo(e.target.checked)}
+                      className="h-4 w-4 rounded border-slate-300 text-emerald-500 focus:ring-emerald-500 cursor-pointer"
+                    />
+                    <span className="text-slate-700 text-xs font-semibold">Gửi vé điện tử & thông báo nhắc lịch qua Zalo/SMS</span>
+                  </label>
+                </div>
+              </div>
+
+              {/* Submit Button & Conflict Alert */}
+              {conflictBooking && (
+                <div className="rounded-xl border border-red-200 bg-red-50 p-2.5 text-center text-[11px] font-bold text-red-700 animate-in fade-in flex items-center justify-center gap-1.5">
+                  <AlertTriangle className="w-3.5 h-3.5 text-red-600 shrink-0" />
+                  <span>Khung giờ đã bị trùng lịch! Vui lòng chọn giờ khác để tiếp tục.</span>
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={Boolean(conflictBooking)}
+                className={`w-full flex items-center justify-center gap-2 rounded-2xl py-4 text-sm font-black uppercase tracking-widest transition active:scale-95 ${
+                  conflictBooking
+                    ? 'bg-red-100 border-2 border-red-300 text-red-600 cursor-not-allowed shadow-none'
+                    : 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-lg shadow-emerald-500/25 cursor-pointer'
+                }`}
+              >
+                {conflictBooking ? (
+                  <>
+                    <AlertTriangle className="w-4 h-4 text-red-600" />
+                    KHUNG GIỜ BỊ TRÙNG — VUI LÒNG ĐỔI GIỜ
+                  </>
+                ) : (
+                  <>TIẾN HÀNH THANH TOÁN ({formattedPrice})</>
+                )}
+              </button>
+            </form>
           </div>
         </div>
       )}

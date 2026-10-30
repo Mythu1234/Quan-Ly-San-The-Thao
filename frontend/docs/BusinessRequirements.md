@@ -5,8 +5,7 @@ BẮT BUỘC PHẢI ĐỌC TÀI LIỆU NÀY TRƯỚC KHI BẮT ĐẦU BẤT KỲ
 Tất cả các logic về:
 - Đơn giá thuê sân (Cầu lông 120k, Bóng chuyền 150k, Bóng đá 200k)
 - Danh mục sân: 5 sân Cầu lông (CL-01 -> CL-05), 5 sân Bóng chuyền (BC-01 -> BC-05), 4 sân Bóng đá mini (BD-01 -> BD-04)
-- Chức năng Admin tự Thêm / Sửa / Xóa sân linh hoạt
-- Gói VIP tháng (giảm 10% và 15%), theo dõi thanh toán nhiều đợt
+- KHÔNG ÁP DỤNG GÓI VIP THÁNG / HỘI VIÊN TRONG PHẠM VI DỰ ÁN
 - Quản lý thiết bị từng chiếc (Asset Serial), tự động thu hồi khi Checkout
 - Báo cáo sự cố CSVC: Phân loại Do khách làm hỏng (đền bù theo Bảng giá niêm yết) hoặc Bảo hành của sân vận động
 - Quản lý nhân sự và tài khoản nhân viên (Soft delete, tự đổi mật khẩu)
@@ -73,7 +72,6 @@ Các thông tin này là cơ sở cốt lõi để lập trình logic xử lý, 
 
 ## 4. PHẠM VI KHÁCH HÀNG & YÊU CẦU ĐẶT SÂN
 
-* Sân không kinh doanh gói khách hàng VIP/thành viên theo tháng; không tạo, tiếp nhận hoặc hiển thị yêu cầu đặt sân thuộc nhóm VIP.
 * Form tiếp nhận đặt sân tại quầy dùng một luồng đặt sân thông thường, không phân loại khách thành “trải nghiệm” hoặc “sự kiện”. Nhân viên ghi nhận khách, môn/sân, ngày đặt, giờ bắt đầu và thời lượng.
 * Yêu cầu sự kiện/chuỗi ngày trên website (nếu có) được xử lý ở luồng riêng, không phải loại đặt sân tại quầy.
 * Dữ liệu yêu cầu VIP cũ (nếu có) không hiển thị trong danh sách yêu cầu đặt sân.
@@ -89,22 +87,11 @@ Các thông tin này là cơ sở cốt lõi để lập trình logic xử lý, 
 2. **Theo dõi Số tiền đã trả & Số tiền còn lại:**
    * Tại mọi thời điểm, hệ thống tự động xác định số tiền khách còn phải nộp:
      $$\text{Số tiền còn lại} = \text{Tổng tiền phải trả} - \text{Tổng số tiền đã thanh toán qua các đợt}$$
-   * **Trạng thái thanh toán của đơn đặt sân:**
-     * `CHUA_THANH_TOAN`: Khách chưa thanh toán đợt nào.
-     * `DA_COC_HOAC_MOT_PHAN`: Đơn đặt sân cũ hoặc ngoại lệ đã thanh toán một phần (Số tiền còn lại > 0).
-     * `DA_THANH_TOAN_DU`: Khách đã thanh toán đủ 100% (Số tiền còn lại = 0).
-   * Khi khách hoàn tất đóng đợt tiền cuối cùng, hệ thống cập nhật số tiền còn lại về 0đ và chuyển trạng thái sang `DA_THANH_TOAN_DU`.
-<<<<<<< Updated upstream
+
 3. **Quy định Hóa đơn điện tử:**
    * Không thiết kế bảng Hóa đơn riêng biệt gây dư thừa. Thông tin xuất hóa đơn điện tử được tích hợp trực tiếp vào mỗi lần thanh toán (`thanh_toan`).
    * Khi khách hàng doanh nghiệp yêu cầu hóa đơn cho đợt thanh toán, nhân viên ghi nhận `so_hoa_don` điện tử (từ hệ thống xuất HĐĐT liên kết) và `ngay_xuat_hoa_don`. Khách lẻ không lấy hóa đơn thì giá trị này để trống (`NULL`).
 4. **Vé đặt sân:**
-=======
-2. **Quy định Hóa đơn điện tử:**
-   * Không thiết kế bảng Hóa đơn riêng biệt gây dư thừa. Thông tin xuất hóa đơn điện tử được tích hợp trực tiếp vào mỗi lần thanh toán (`chi_tiet_thanh_toan`).
-   * Khi khách hàng doanh nghiệp yêu cầu hóa đơn cho đợt thanh toán, nhân viên ghi nhận `so_hoa_don` điện tử và `ngay_xuat_hoa_don`. Khách lẻ không lấy hóa đơn thì giá trị này để trống (`NULL`).
-3. **Vé đặt sân:**
->>>>>>> Stashed changes
    * Không sử dụng bảng Vé điện tử riêng. Mã đặt sân (`ma_dat_san`) kiêm luôn vai trò của Mã vé điện tử để khách quét QR đối soát và làm thủ tục Check-in/Check-out.
 
 ---
@@ -127,11 +114,7 @@ Các thông tin này là cơ sở cốt lõi để lập trình logic xử lý, 
   * Nếu khách chơi quá 10 phút, hệ thống bắt đầu tính phụ phí lố giờ, **tính cộng dồn toàn bộ thời gian trễ** (bao gồm cả 10 phút ân hạn ban đầu).
   * Tiền phụ phí làm tròn theo block 15 phút hoặc 30 phút dựa theo đơn giá theo giờ của bộ môn đang chơi.
 * **Tổng kết thu tiền lúc Checkout:**
-<<<<<<< Updated upstream
   $$\text{Tổng tiền thu lúc Checkout} = \text{Khoản thanh toán còn thiếu (nếu có)} + \text{Phụ phí chơi thêm giờ} + \text{Phí bồi thường sự cố (nếu có)}$$
-=======
-  $$\text{Tổng tiền thu lúc Checkout} = \text{Tiền cọc còn thiếu (nếu cọc 50%)} + \text{Phụ phí chơi thêm giờ} + \text{Tiền bồi thường sự cố hư hại (nếu do khách làm hỏng)}$$
->>>>>>> Stashed changes
 
 ---
 
@@ -210,22 +193,10 @@ Hệ thống thiết lập bảng vai trò (`vai_tro`) chuẩn hóa với 3 nhó
    * Quản trị toàn bộ hệ thống: Cấu hình giá thuê sân, **Thêm / Sửa / Xóa sân**, quản lý trang thiết bị CSVC, quản lý nhân viên và tài khoản, phê duyệt hoàn tiền, xem báo cáo doanh thu tài chính tổng hợp.
 2. **Nhân viên (Staff / Employee - `STAFF`):**
    * Check-in / Check-out cho khách, tính phụ phí thêm giờ lúc thanh toán.
-<<<<<<< Updated upstream
    * Tiếp nhận đặt sân thông thường tại quầy theo ngày, giờ và thời lượng khách chọn.
    * Chủ động hủy sân khi phát sinh sự cố cơ sở vật chất đột xuất.
    * Báo cáo sự cố hỏng hóc trang thiết bị, cập nhật nhật ký bảo trì.
 3. **Khách hàng (Customer - `CUSTOMER`):**
    * Đăng ký tài khoản, tra cứu tình trạng sân trống theo thời gian thực.
-   * Đặt sân trực tuyến, thanh toán đủ 100% qua mã QR VietQR của sân; không đặt cọc.
-=======
-   * Tạo lịch đặt sân tại quầy cho khách và tạo lịch cố định dài hạn cho Khách VIP tháng.
-   * Báo cáo sự cố hỏng hóc trang thiết bị, chọn phân loại **Do khách làm hỏng** (áp dụng bồi thường) hoặc **Bảo hành của sân**, cập nhật nhật ký bảo dưỡng.
-   * Chủ động hủy sân khi phát sinh sự cố cơ sở vật chất đột xuất.
-3. **Khách hàng VIP (VIP Customer - `VIP`):**
-   * Khách hàng đăng ký gói thuê cố định từ 3 tháng trở lên, hưởng ưu đãi chiết khấu 10% - 15% trên đơn giá thuê.
-   * Được hỗ trợ chia đợt thanh toán linh hoạt.
-4. **Khách hàng thường (Customer - `CUSTOMER`):**
-   * Đăng ký tài khoản, tra cứu tình trạng sân trống theo thời gian thực.
-   * Đặt sân trực tuyến, thanh toán cọc 50% hoặc 100% qua QR ngân hàng / quẹt thẻ hoặc trả theo nhiều kỳ.
->>>>>>> Stashed changes
+   * Đặt sân trực tuyến, thanh toán đủ 100% qua mã QR VietQR của sân; không áp dụng đặt cọc hay các gói VIP tháng.
    * Xem lịch sử đặt chỗ, chủ động hủy vé trước 24 giờ.

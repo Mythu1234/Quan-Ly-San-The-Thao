@@ -47,27 +47,27 @@ export interface CourtBookingRecord {
 
 export const STANDARD_15_BOOKINGS: CourtBookingRecord[] = [
   // Cầu lông
-  { id: 'b-cl1-1', courtCode: 'CL-01', courtName: 'Sân CL-01', sportId: 'badminton', startH: 6, startM: 0, endH: 7, endM: 0, title: 'Đã đặt' },
-  { id: 'b-cl1-2', courtCode: 'CL-01', courtName: 'Sân CL-01', sportId: 'badminton', startH: 17, startM: 0, endH: 19, endM: 0, title: 'Đã đặt' },
-  { id: 'b-cl2-1', courtCode: 'CL-02', courtName: 'Sân CL-02', sportId: 'badminton', startH: 8, startM: 0, endH: 9, endM: 30, title: 'Đã đặt' },
-  { id: 'b-cl2-2', courtCode: 'CL-02', courtName: 'Sân CL-02', sportId: 'badminton', startH: 18, startM: 0, endH: 20, endM: 0, title: 'Đã đặt' },
-  { id: 'b-cl3-1', courtCode: 'CL-03', courtName: 'Sân CL-03', sportId: 'badminton', startH: 14, startM: 0, endH: 16, endM: 0, title: 'Đã đặt' },
-  { id: 'b-cl4-1', courtCode: 'CL-04', courtName: 'Sân CL-04', sportId: 'badminton', startH: 19, startM: 0, endH: 21, endM: 0, title: 'Đã đặt' },
-  { id: 'b-cl5-1', courtCode: 'CL-05', courtName: 'Sân CL-05', sportId: 'badminton', startH: 7, startM: 0, endH: 8, endM: 30, title: 'Đã đặt' },
+  { id: 'b-cl1-1', courtCode: 'CL-01', courtName: 'Sân CL-01', sportId: 'badminton', startH: 6, startM: 0, endH: 7, endM: 30, title: 'Tuấn Hưng (06:00 - 07:30 • Đã đặt)' },
+  { id: 'b-cl1-2', courtCode: 'CL-01', courtName: 'Sân CL-01', sportId: 'badminton', startH: 17, startM: 0, endH: 19, endM: 0, title: 'Đã đặt (17:00 - 19:00)' },
+  { id: 'b-cl2-1', courtCode: 'CL-02', courtName: 'Sân CL-02', sportId: 'badminton', startH: 8, startM: 0, endH: 9, endM: 30, title: 'Ngọc Mai (08:00 - 09:30 • Đã đặt)' },
+  { id: 'b-cl2-2', courtCode: 'CL-02', courtName: 'Sân CL-02', sportId: 'badminton', startH: 18, startM: 0, endH: 20, endM: 0, title: 'Đã đặt (18:00 - 20:00)' },
+  { id: 'b-cl3-1', courtCode: 'CL-03', courtName: 'Sân CL-03', sportId: 'badminton', startH: 14, startM: 0, endH: 15, endM: 30, title: 'Minh Trí (14:00 - 15:30 • Chờ duyệt hủy)' },
+  { id: 'b-cl4-1', courtCode: 'CL-04', courtName: 'Sân CL-04', sportId: 'badminton', startH: 19, startM: 0, endH: 21, endM: 0, title: 'Thành Long (19:00 - 21:00 • Đã đặt)' },
+  { id: 'b-cl5-1', courtCode: 'CL-05', courtName: 'Sân CL-05', sportId: 'badminton', startH: 7, startM: 0, endH: 8, endM: 30, title: 'Quang Thắng (07:00 - 08:30 • Đang dùng)' },
 
   // Bóng chuyền
-  { id: 'b-bc1-1', courtCode: 'BC-01', courtName: 'Sân BC-01', sportId: 'volleyball', startH: 8, startM: 0, endH: 10, endM: 0, title: 'Đã đặt' },
-  { id: 'b-bc1-2', courtCode: 'BC-01', courtName: 'Sân BC-01', sportId: 'volleyball', startH: 16, startM: 0, endH: 18, endM: 0, title: 'Đã đặt' },
-  { id: 'b-bc2-1', courtCode: 'BC-02', courtName: 'Sân BC-02', sportId: 'volleyball', startH: 15, startM: 0, endH: 17, endM: 0, title: 'Đã đặt' },
-  { id: 'b-bc3-1', courtCode: 'BC-03', courtName: 'Sân BC-03', sportId: 'volleyball', startH: 18, startM: 0, endH: 20, endM: 0, title: 'Đã đặt' },
-  { id: 'b-bc5-1', courtCode: 'BC-05', courtName: 'Sân BC-05', sportId: 'volleyball', startH: 19, startM: 0, endH: 21, endM: 0, title: 'Đã đặt' },
+  { id: 'b-bc1-1', courtCode: 'BC-01', courtName: 'Sân BC-01', sportId: 'volleyball', startH: 8, startM: 0, endH: 10, endM: 0, title: 'CLB Vigor Volley (08:00 - 10:00 • Đang dùng)' },
+  { id: 'b-bc1-2', courtCode: 'BC-01', courtName: 'Sân BC-01', sportId: 'volleyball', startH: 16, startM: 0, endH: 18, endM: 0, title: 'Đã đặt (16:00 - 18:00)' },
+  { id: 'b-bc2-1', courtCode: 'BC-02', courtName: 'Sân BC-02', sportId: 'volleyball', startH: 15, startM: 0, endH: 17, endM: 0, title: 'Hồng Quân (15:00 - 17:00 • Đã đặt)' },
+  { id: 'b-bc3-1', courtCode: 'BC-03', courtName: 'Sân BC-03', sportId: 'volleyball', startH: 18, startM: 0, endH: 20, endM: 0, title: 'Đội Trẻ Quận 7 (18:00 - 20:00 • Đã đặt)' },
+  { id: 'b-bc5-1', courtCode: 'BC-05', courtName: 'Sân BC-05', sportId: 'volleyball', startH: 19, startM: 0, endH: 21, endM: 0, title: 'Hoàng Nam (19:00 - 21:00 • Đã đặt)' },
 
   // Bóng đá mini
-  { id: 'b-bd1-1', courtCode: 'BD-01', courtName: 'Sân BD-01', sportId: 'football', startH: 6, startM: 0, endH: 7, endM: 30, title: 'Đã đặt' },
-  { id: 'b-bd1-2', courtCode: 'BD-01', courtName: 'Sân BD-01', sportId: 'football', startH: 17, startM: 0, endH: 19, endM: 0, title: 'Đã đặt' },
-  { id: 'b-bd2-1', courtCode: 'BD-02', courtName: 'Sân BD-02', sportId: 'football', startH: 18, startM: 0, endH: 20, endM: 0, title: 'Đã đặt' },
-  { id: 'b-bd3-1', courtCode: 'BD-03', courtName: 'Sân BD-03', sportId: 'football', startH: 19, startM: 0, endH: 21, endM: 0, title: 'Đã đặt' },
-  { id: 'b-bd4-1', courtCode: 'BD-04', courtName: 'Sân BD-04', sportId: 'football', startH: 17, startM: 30, endH: 19, endM: 0, title: 'Đã đặt' },
+  { id: 'b-bd1-1', courtCode: 'BD-01', courtName: 'Sân BD-01', sportId: 'football', startH: 6, startM: 0, endH: 7, endM: 30, title: 'Văn Hoàng (06:00 - 07:30 • Đã đặt)' },
+  { id: 'b-bd1-2', courtCode: 'BD-01', courtName: 'Sân BD-01', sportId: 'football', startH: 17, startM: 0, endH: 19, endM: 0, title: 'Đã đặt (17:00 - 19:00)' },
+  { id: 'b-bd2-1', courtCode: 'BD-02', courtName: 'Sân BD-02', sportId: 'football', startH: 18, startM: 0, endH: 20, endM: 0, title: 'Bảo Long FC (18:00 - 20:00 • Đang dùng)' },
+  { id: 'b-bd3-1', courtCode: 'BD-03', courtName: 'Sân BD-03', sportId: 'football', startH: 19, startM: 0, endH: 21, endM: 0, title: 'Huy Khánh (19:00 - 21:00 • Đã đặt)' },
+  { id: 'b-bd4-1', courtCode: 'BD-04', courtName: 'Sân BD-04', sportId: 'football', startH: 17, startM: 30, endH: 19, endM: 0, title: 'Anh Em FC (17:30 - 19:00 • Đã đặt)' },
 ];
 
 export interface ScheduleBooking {
@@ -210,7 +210,7 @@ export default function CustomerSchedule({
   };
 
   const handleSlotClick = (sportId: 'badminton' | 'volleyball' | 'football', courtName: string, time: string, price: string) => {
-    if (isInlineBookingMode && onSelectSlot) {
+    if (onSelectSlot) {
       onSelectSlot(sportId, courtName, time, formatDate(selectedDate));
       return;
     }
@@ -439,60 +439,197 @@ export default function CustomerSchedule({
                 <div key={court.id} className="flex h-[56px] border-b border-slate-200/50">
                   {times.map((t, cIdx) => {
                     const cellStart = parseTimeToMinutes(t);
-                    const cellEnd = cellStart + intervalMode;
-                    const occupyingBooking = getBookingAt(court.code, cellStart, cellEnd);
                     const selStartMin = selectedTimeStr ? parseTimeToMinutes(selectedTimeStr) : -1;
                     const selEndMin = selStartMin >= 0 ? selStartMin + (selectedDurationMinutes || 60) : -1;
-                    const isSelected = selectedCourtName === court.name && selStartMin >= 0 && cellStart >= selStartMin && cellStart < selEndMin;
 
-                    // 1. OCCUPIED / BOOKED SLOT
-                    if (occupyingBooking) {
+                    if (intervalMode === 60) {
+                      const bFirst = getBookingAt(court.code, cellStart, cellStart + 30);
+                      const bSecond = getBookingAt(court.code, cellStart + 30, cellStart + 60);
+
+                      // Case 1: Both halves occupied
+                      if (bFirst && bSecond) {
+                        return (
+                          <div 
+                            key={cIdx} 
+                            style={{ width: `${slotWidth}px` }} 
+                            className="shrink-0 border-r border-slate-200/60 bg-slate-100/90 flex flex-col items-center justify-center text-center p-1 select-none cursor-not-allowed"
+                            title={`${court.name} đã được đặt lúc ${t}`}
+                          >
+                            <span className="text-[9px] font-bold text-slate-400 leading-tight">Đã đặt</span>
+                          </div>
+                        );
+                      }
+
+                      // Case 2: First half occupied, second half FREE (e.g. 07:00-07:30 booked, 07:30-08:00 FREE)
+                      if (bFirst && !bSecond) {
+                        const tSecond = `${t.slice(0, 2)}:30`;
+                        const isSelectedSecond = selectedCourtName === court.name && selStartMin >= 0 && (cellStart + 30) >= selStartMin && (cellStart + 30) < selEndMin;
+                        const halfPrice = Math.round(court.pricePerHour / 2 / 1000);
+
+                        return (
+                          <div key={cIdx} style={{ width: `${slotWidth}px` }} className="shrink-0 flex border-r border-slate-200/60">
+                            {/* Left: Occupied */}
+                            <div 
+                              style={{ width: `${slotWidth / 2}px` }} 
+                              className="h-full bg-slate-100/90 border-r border-slate-200/60 flex flex-col items-center justify-center text-center p-0.5 select-none cursor-not-allowed"
+                              title={`${court.name} đã đặt lúc ${t} - ${tSecond}`}
+                            >
+                              <span className="text-[8px] font-bold text-slate-400 leading-none">Đã đặt</span>
+                            </div>
+
+                            {/* Right: FREE */}
+                            {isSelectedSecond ? (
+                              <div
+                                style={{ width: `${slotWidth / 2}px` }}
+                                onClick={() => handleSlotClick(court.sportId, court.name, tSecond, `${(court.pricePerHour / 2).toLocaleString('vi-VN')}đ`)}
+                                className="h-full bg-emerald-500 text-white flex flex-col items-center justify-center text-center p-0.5 shadow-inner cursor-pointer"
+                              >
+                                <span className="text-[8px] font-black uppercase">CHỌN</span>
+                                <span className="text-[7px] font-extrabold">{halfPrice}k</span>
+                              </div>
+                            ) : (
+                              <div
+                                style={{ width: `${slotWidth / 2}px` }}
+                                onClick={() => handleSlotClick(court.sportId, court.name, tSecond, `${(court.pricePerHour / 2).toLocaleString('vi-VN')}đ`)}
+                                className="h-full bg-amber-50/80 hover:bg-amber-100 flex flex-col items-center justify-center text-center cursor-pointer transition active:scale-95 group p-0.5"
+                                title={`Bấm để chọn ${court.name} lúc ${tSecond} (nửa tiếng - ${(court.pricePerHour / 2).toLocaleString('vi-VN')}đ)`}
+                              >
+                                <span className="text-[8px] font-black text-amber-800 uppercase group-hover:scale-105 transition">Trống</span>
+                                <span className="text-[7px] font-bold text-amber-700">{halfPrice}k</span>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      }
+
+                      // Case 3: First half FREE, second half occupied
+                      if (!bFirst && bSecond) {
+                        const isSelectedFirst = selectedCourtName === court.name && selStartMin >= 0 && cellStart >= selStartMin && cellStart < selEndMin;
+                        const halfPrice = Math.round(court.pricePerHour / 2 / 1000);
+
+                        return (
+                          <div key={cIdx} style={{ width: `${slotWidth}px` }} className="shrink-0 flex border-r border-slate-200/60">
+                            {/* Left: FREE */}
+                            {isSelectedFirst ? (
+                              <div
+                                style={{ width: `${slotWidth / 2}px` }}
+                                onClick={() => handleSlotClick(court.sportId, court.name, t, `${(court.pricePerHour / 2).toLocaleString('vi-VN')}đ`)}
+                                className="h-full bg-emerald-500 text-white flex flex-col items-center justify-center text-center p-0.5 shadow-inner cursor-pointer border-r border-emerald-600"
+                              >
+                                <span className="text-[8px] font-black uppercase">CHỌN</span>
+                                <span className="text-[7px] font-extrabold">{halfPrice}k</span>
+                              </div>
+                            ) : (
+                              <div
+                                style={{ width: `${slotWidth / 2}px` }}
+                                onClick={() => handleSlotClick(court.sportId, court.name, t, `${(court.pricePerHour / 2).toLocaleString('vi-VN')}đ`)}
+                                className="h-full bg-amber-50/80 hover:bg-amber-100 flex flex-col items-center justify-center text-center cursor-pointer transition active:scale-95 group p-0.5 border-r border-amber-200/60"
+                                title={`Bấm để chọn ${court.name} lúc ${t} (nửa tiếng - ${(court.pricePerHour / 2).toLocaleString('vi-VN')}đ)`}
+                              >
+                                <span className="text-[8px] font-black text-amber-800 uppercase group-hover:scale-105 transition">Trống</span>
+                                <span className="text-[7px] font-bold text-amber-700">{halfPrice}k</span>
+                              </div>
+                            )}
+
+                            {/* Right: Occupied */}
+                            <div 
+                              style={{ width: `${slotWidth / 2}px` }} 
+                              className="h-full bg-slate-100/90 flex flex-col items-center justify-center text-center p-0.5 select-none cursor-not-allowed"
+                              title={`${court.name} đã đặt lúc ${t.slice(0, 2)}:30`}
+                            >
+                              <span className="text-[8px] font-bold text-slate-400 leading-none">Đã đặt</span>
+                            </div>
+                          </div>
+                        );
+                      }
+
+                      // Case 4: Entire 1 hour FREE
+                      const isSelected = selectedCourtName === court.name && selStartMin >= 0 && cellStart >= selStartMin && cellStart < selEndMin;
+                      if (isSelected) {
+                        return (
+                          <div 
+                            key={cIdx} 
+                            style={{ width: `${slotWidth}px` }} 
+                            onClick={() => handleSlotClick(court.sportId, court.name, selectedTimeStr || t, `${court.pricePerHour.toLocaleString('vi-VN')}đ`)}
+                            className="shrink-0 border-r border-emerald-600 bg-emerald-500 text-white flex flex-col items-center justify-center text-center p-1 shadow-inner shadow-emerald-700/30 cursor-pointer animate-in zoom-in-95 duration-150"
+                          >
+                            <span className="text-[10px] font-black uppercase flex items-center gap-0.5">
+                              <CheckCircle2 className="w-3.5 h-3.5" /> CHỌN
+                            </span>
+                            <span className="text-[8px] font-extrabold opacity-90">{court.pricePerHour / 1000}k</span>
+                          </div>
+                        );
+                      }
+
                       return (
                         <div 
                           key={cIdx} 
                           style={{ width: `${slotWidth}px` }} 
-                          className="shrink-0 border-r border-slate-200/60 bg-slate-100/90 flex flex-col items-center justify-center text-center p-1 select-none cursor-not-allowed"
-                          title={`${court.name} đã được đặt lúc ${t}`}
+                          onClick={() => handleSlotClick(court.sportId, court.name, t, `${court.pricePerHour.toLocaleString('vi-VN')}đ`)}
+                          className="shrink-0 border-r border-amber-200/70 bg-amber-50/70 hover:bg-amber-100 hover:border-amber-400 flex flex-col items-center justify-center text-center cursor-pointer transition active:scale-95 group p-1"
+                          title={`Bấm để chọn ${court.name} lúc ${t} (${court.pricePerHour.toLocaleString('vi-VN')}đ/h)`}
                         >
-                          <span className="text-[9px] font-bold text-slate-400 leading-tight">Đã đặt</span>
-                        </div>
-                      );
-                    }
-
-                    // 2. CURRENTLY SELECTED SLOT
-                    if (isSelected) {
-                      return (
-                        <div 
-                          key={cIdx} 
-                          style={{ width: `${slotWidth}px` }} 
-                          onClick={() => handleSlotClick(court.sportId, court.name, selectedTimeStr || t, `${court.pricePerHour.toLocaleString('vi-VN')}đ`)}
-                          className="shrink-0 border-r border-emerald-600 bg-emerald-500 text-white flex flex-col items-center justify-center text-center p-1 shadow-inner shadow-emerald-700/30 cursor-pointer animate-in zoom-in-95 duration-150"
-                        >
-                          <span className="text-[10px] font-black uppercase flex items-center gap-0.5">
-                            <CheckCircle2 className="w-3.5 h-3.5" /> CHỌN
+                          <span className="text-[9px] font-black text-amber-800 uppercase group-hover:scale-105 transition">
+                            Trống
                           </span>
-                          <span className="text-[8px] font-extrabold opacity-90">{court.pricePerHour / 1000}k</span>
+                          <span className="text-[8px] font-bold text-amber-700">
+                            {court.pricePerHour / 1000}k
+                          </span>
+                        </div>
+                      );
+                    } else {
+                      // intervalMode === 30 (30-min view)
+                      const cellEnd = cellStart + 30;
+                      const occupyingBooking = getBookingAt(court.code, cellStart, cellEnd);
+                      const isSelected = selectedCourtName === court.name && selStartMin >= 0 && cellStart >= selStartMin && cellStart < selEndMin;
+                      const halfPrice = Math.round(court.pricePerHour / 2 / 1000);
+
+                      if (occupyingBooking) {
+                        return (
+                          <div 
+                            key={cIdx} 
+                            style={{ width: `${slotWidth}px` }} 
+                            className="shrink-0 border-r border-slate-200/60 bg-slate-100/90 flex flex-col items-center justify-center text-center p-1 select-none cursor-not-allowed"
+                            title={`${court.name} đã được đặt lúc ${t}`}
+                          >
+                            <span className="text-[9px] font-bold text-slate-400 leading-tight">Đã đặt</span>
+                          </div>
+                        );
+                      }
+
+                      if (isSelected) {
+                        return (
+                          <div 
+                            key={cIdx} 
+                            style={{ width: `${slotWidth}px` }} 
+                            onClick={() => handleSlotClick(court.sportId, court.name, selectedTimeStr || t, `${(court.pricePerHour / 2).toLocaleString('vi-VN')}đ`)}
+                            className="shrink-0 border-r border-emerald-600 bg-emerald-500 text-white flex flex-col items-center justify-center text-center p-1 shadow-inner shadow-emerald-700/30 cursor-pointer animate-in zoom-in-95 duration-150"
+                          >
+                            <span className="text-[10px] font-black uppercase flex items-center gap-0.5">
+                              <CheckCircle2 className="w-3.5 h-3.5" /> CHỌN
+                            </span>
+                            <span className="text-[8px] font-extrabold opacity-90">{halfPrice}k</span>
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <div 
+                          key={cIdx} 
+                          style={{ width: `${slotWidth}px` }} 
+                          onClick={() => handleSlotClick(court.sportId, court.name, t, `${(court.pricePerHour / 2).toLocaleString('vi-VN')}đ`)}
+                          className="shrink-0 border-r border-amber-200/70 bg-amber-50/70 hover:bg-amber-100 hover:border-amber-400 flex flex-col items-center justify-center text-center cursor-pointer transition active:scale-95 group p-1"
+                          title={`Bấm để chọn ${court.name} lúc ${t} (30 phút: ${(court.pricePerHour / 2).toLocaleString('vi-VN')}đ)`}
+                        >
+                          <span className="text-[9px] font-black text-amber-800 uppercase group-hover:scale-105 transition">
+                            Trống
+                          </span>
+                          <span className="text-[8px] font-bold text-amber-700">
+                            {halfPrice}k
+                          </span>
                         </div>
                       );
                     }
-
-                    // 3. AVAILABLE / FREE SLOT
-                    return (
-                      <div 
-                        key={cIdx} 
-                        style={{ width: `${slotWidth}px` }} 
-                        onClick={() => handleSlotClick(court.sportId, court.name, t, `${court.pricePerHour.toLocaleString('vi-VN')}đ`)}
-                        className="shrink-0 border-r border-amber-200/70 bg-amber-50/70 hover:bg-amber-100 hover:border-amber-400 flex flex-col items-center justify-center text-center cursor-pointer transition active:scale-95 group p-1"
-                        title={`Bấm để chọn ${court.name} lúc ${t} (${court.pricePerHour.toLocaleString('vi-VN')}đ/h)`}
-                      >
-                        <span className="text-[9px] font-black text-amber-800 uppercase group-hover:scale-105 transition">
-                          Trống
-                        </span>
-                        <span className="text-[8px] font-bold text-amber-700">
-                          {court.pricePerHour / 1000}k
-                        </span>
-                      </div>
-                    );
                   })}
                 </div>
               ))}
