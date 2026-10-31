@@ -1,4 +1,4 @@
-export interface Employee {
+﻿export interface Employee {
   id: string;
   name: string;
   phone: string;
@@ -1690,7 +1690,7 @@ export const INITIAL_INCIDENTS: FacilityIncident[] = [
         id: 'TL-05',
         time: '10:30',
         title: 'Đã nghiệm thu & kiểm tra lật số',
-        description: 'Đã bôi trơn và kiểm tra lật mượt mà các số từ 00 đến 30.',
+        description: 'Đã bôi trơn và kiểm tra lật mượt mà các số từ 00 VNDến 30.',
         active: true
       }
     ],

@@ -75,9 +75,9 @@ export const INITIAL_ADMIN_BOOKINGS: BookingDetail[] = [
     endM: 30,
     time: '06:00 - 07:30',
     paymentStatus: 'Đã thanh toán đủ qua VietQR',
-    total: '180.000 đ',
-    paidAmount: '180.000 đ',
-    remaining: '0 đ',
+    total: '180.000 VND',
+    paidAmount: '180.000 VND',
+    remaining: '0 VND',
     status: 'Đang sử dụng',
   },
   {
@@ -94,9 +94,9 @@ export const INITIAL_ADMIN_BOOKINGS: BookingDetail[] = [
     endM: 30,
     time: '07:00 - 08:30',
     paymentStatus: 'Đã thanh toán đủ qua VietQR',
-    total: '210.000 đ',
-    paidAmount: '210.000 đ',
-    remaining: '0 đ',
+    total: '210.000 VND',
+    paidAmount: '210.000 VND',
+    remaining: '0 VND',
     status: 'Đã đặt',
   },
   {
@@ -113,9 +113,9 @@ export const INITIAL_ADMIN_BOOKINGS: BookingDetail[] = [
     endM: 30,
     time: '08:00 - 09:30',
     paymentStatus: 'Đã thanh toán đủ qua VietQR',
-    total: '180.000 đ',
-    paidAmount: '180.000 đ',
-    remaining: '0 đ',
+    total: '180.000 VND',
+    paidAmount: '180.000 VND',
+    remaining: '0 VND',
     status: 'Đã đặt',
   },
   {
@@ -132,9 +132,9 @@ export const INITIAL_ADMIN_BOOKINGS: BookingDetail[] = [
     endM: 30,
     time: '14:00 - 15:30',
     paymentStatus: 'Đã thanh toán đủ qua VietQR',
-    total: '210.000 đ',
-    paidAmount: '210.000 đ',
-    remaining: '0 đ',
+    total: '210.000 VND',
+    paidAmount: '210.000 VND',
+    remaining: '0 VND',
     status: 'Đã đặt',
   },
   {
@@ -151,9 +151,9 @@ export const INITIAL_ADMIN_BOOKINGS: BookingDetail[] = [
     endM: 0,
     time: '19:00 - 21:00',
     paymentStatus: 'Đã thanh toán đủ qua VietQR',
-    total: '240.000 đ',
-    paidAmount: '240.000 đ',
-    remaining: '0 đ',
+    total: '240.000 VND',
+    paidAmount: '240.000 VND',
+    remaining: '0 VND',
     status: 'Đã đặt',
   },
 
@@ -172,9 +172,9 @@ export const INITIAL_ADMIN_BOOKINGS: BookingDetail[] = [
     endM: 0,
     time: '08:00 - 10:00',
     paymentStatus: 'Đã thanh toán đủ qua VietQR',
-    total: '300.000 đ',
-    paidAmount: '300.000 đ',
-    remaining: '0 đ',
+    total: '300.000 VND',
+    paidAmount: '300.000 VND',
+    remaining: '0 VND',
     status: 'Đã đặt',
   },
   {
@@ -191,9 +191,9 @@ export const INITIAL_ADMIN_BOOKINGS: BookingDetail[] = [
     endM: 0,
     time: '15:00 - 17:00',
     paymentStatus: 'Đã thanh toán đủ qua VietQR',
-    total: '300.000 đ',
-    paidAmount: '300.000 đ',
-    remaining: '0 đ',
+    total: '300.000 VND',
+    paidAmount: '300.000 VND',
+    remaining: '0 VND',
     status: 'Đã đặt',
   },
   {
@@ -210,9 +210,9 @@ export const INITIAL_ADMIN_BOOKINGS: BookingDetail[] = [
     endM: 0,
     time: '18:00 - 20:00',
     paymentStatus: 'Đã thanh toán đủ qua VietQR',
-    total: '300.000 đ',
-    paidAmount: '300.000 đ',
-    remaining: '0 đ',
+    total: '300.000 VND',
+    paidAmount: '300.000 VND',
+    remaining: '0 VND',
     status: 'Đã đặt',
   },
   {
@@ -229,9 +229,9 @@ export const INITIAL_ADMIN_BOOKINGS: BookingDetail[] = [
     endM: 0,
     time: '19:00 - 21:00',
     paymentStatus: 'Đã thanh toán đủ qua VietQR',
-    total: '300.000 đ',
-    paidAmount: '300.000 đ',
-    remaining: '0 đ',
+    total: '300.000 VND',
+    paidAmount: '300.000 VND',
+    remaining: '0 VND',
     status: 'Đã đặt',
   },
 
@@ -250,9 +250,9 @@ export const INITIAL_ADMIN_BOOKINGS: BookingDetail[] = [
     endM: 30,
     time: '06:00 - 07:30',
     paymentStatus: 'Đã thanh toán đủ qua VietQR',
-    total: '300.000 đ',
-    paidAmount: '300.000 đ',
-    remaining: '0 đ',
+    total: '300.000 VND',
+    paidAmount: '300.000 VND',
+    remaining: '0 VND',
     status: 'Đã đặt',
   },
   {
@@ -269,9 +269,9 @@ export const INITIAL_ADMIN_BOOKINGS: BookingDetail[] = [
     endM: 0,
     time: '18:00 - 20:00',
     paymentStatus: 'Đã thanh toán đủ qua VietQR',
-    total: '400.000 đ',
-    paidAmount: '400.000 đ',
-    remaining: '0 đ',
+    total: '400.000 VND',
+    paidAmount: '400.000 VND',
+    remaining: '0 VND',
     status: 'Đã đặt',
   },
   {
@@ -288,9 +288,9 @@ export const INITIAL_ADMIN_BOOKINGS: BookingDetail[] = [
     endM: 0,
     time: '19:00 - 21:00',
     paymentStatus: 'Đã thanh toán đủ qua VietQR',
-    total: '400.000 đ',
-    paidAmount: '400.000 đ',
-    remaining: '0 đ',
+    total: '400.000 VND',
+    paidAmount: '400.000 VND',
+    remaining: '0 VND',
     status: 'Đã đặt',
   },
   {
@@ -307,9 +307,9 @@ export const INITIAL_ADMIN_BOOKINGS: BookingDetail[] = [
     endM: 0,
     time: '17:30 - 19:00',
     paymentStatus: 'Đã thanh toán đủ qua VietQR',
-    total: '300.000 đ',
-    paidAmount: '300.000 đ',
-    remaining: '0 đ',
+    total: '300.000 VND',
+    paidAmount: '300.000 VND',
+    remaining: '0 VND',
     status: 'Đã đặt',
   },
 ];
@@ -401,21 +401,21 @@ export default function AdminSchedulePage({ onCheckoutModeChange, onBookingCheck
         id: 'badminton',
         name: 'Cầu Lông',
         icon: '🏸',
-        priceText: '120.000 đ/h',
+        priceText: '120.000 VND/h',
         courts: displayedCourts.filter((c) => c.sportId === 'badminton'),
       },
       {
         id: 'volleyball',
         name: 'Bóng Chuyền',
         icon: '🏐',
-        priceText: '150.000 đ/h',
+        priceText: '150.000 VND/h',
         courts: displayedCourts.filter((c) => c.sportId === 'volleyball'),
       },
       {
         id: 'football',
         name: 'Bóng Đá Mini',
         icon: '⚽',
-        priceText: '200.000 đ/h',
+        priceText: '200.000 VND/h',
         courts: displayedCourts.filter((c) => c.sportId === 'football'),
       },
     ];
@@ -664,9 +664,9 @@ export default function AdminSchedulePage({ onCheckoutModeChange, onBookingCheck
       endM: endMin % 60,
       time: `${bookingStartTime} - ${bookingEndTime}`,
       paymentStatus: 'Đã thanh toán đủ qua VietQR',
-      total: `${totalAmount.toLocaleString('vi-VN')} đ`,
-      paidAmount: `${totalAmount.toLocaleString('vi-VN')} đ`,
-      remaining: '0 đ',
+      total: `${totalAmount.toLocaleString('vi-VN')} VND`,
+      paidAmount: `${totalAmount.toLocaleString('vi-VN')} VND`,
+      remaining: '0 VND',
       status: 'Đã đặt',
     };
 
@@ -716,9 +716,9 @@ export default function AdminSchedulePage({ onCheckoutModeChange, onBookingCheck
       sport: 'Cầu lông',
       time: '11:30 - 13:00',
       paymentStatus: 'Đã thanh toán đủ qua VietQR',
-      total: '180.000 đ',
-      paidAmount: '180.000 đ',
-      remaining: '0 đ',
+      total: '180.000 VND',
+      paidAmount: '180.000 VND',
+      remaining: '0 VND',
       status: 'Chờ duyệt hủy',
     },
     {
@@ -729,9 +729,9 @@ export default function AdminSchedulePage({ onCheckoutModeChange, onBookingCheck
       sport: 'Cầu lông',
       time: '14:00 - 15:30',
       paymentStatus: 'Đã thanh toán đủ qua VietQR',
-      total: '210.000 đ',
-      paidAmount: '210.000 đ',
-      remaining: '0 đ',
+      total: '210.000 VND',
+      paidAmount: '210.000 VND',
+      remaining: '0 VND',
       status: 'Chờ duyệt hủy',
     },
     {
@@ -742,9 +742,9 @@ export default function AdminSchedulePage({ onCheckoutModeChange, onBookingCheck
       sport: 'Cầu lông',
       time: '07:00 - 08:30',
       paymentStatus: 'Đã thanh toán đủ qua VietQR',
-      total: '210.000 đ',
-      paidAmount: '210.000 đ',
-      remaining: '0 đ',
+      total: '210.000 VND',
+      paidAmount: '210.000 VND',
+      remaining: '0 VND',
       status: 'Chờ duyệt hủy',
     },
   ];
@@ -753,139 +753,144 @@ export default function AdminSchedulePage({ onCheckoutModeChange, onBookingCheck
     const courtNumber = checkinBooking.court.match(/\d+/)?.[0]?.padStart(2, '0') ?? '01';
 
     return (
-      <div className="flex-1 min-h-0 overflow-y-auto bg-[#f8f6ff] px-3 py-3">
+      <div className="flex-1 min-h-0 overflow-y-auto bg-slate-50 px-3 py-3">
+        {/* Back button */}
         <button
           type="button"
           onClick={() => {
             setCheckinBooking(null);
             onCheckoutModeChange?.(false);
           }}
-          className="mb-3 flex items-center gap-1.5 rounded-lg bg-white px-3 py-2 text-[11px] font-black text-slate-700 shadow-sm ring-1 ring-slate-200 active:scale-95"
+          className="mb-3 flex items-center gap-1.5 rounded-lg bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-500 shadow-sm ring-1 ring-slate-200 transition-colors hover:text-slate-700 active:scale-95"
         >
           <ArrowLeft className="h-3.5 w-3.5" />
           Quay lại lịch sân
         </button>
 
-        <div className="mb-4">
-          <div className="mb-2 flex justify-end">
-            <span className="rounded-full bg-blue-50 px-2.5 py-1 text-[10px] font-black uppercase text-blue-700 shadow-sm ring-1 ring-blue-300">
+        {/* Header */}
+        <div className="mb-3">
+          <p className="mb-0.5 text-[10px] font-semibold uppercase tracking-widest text-slate-400">Chi tiết lượt đặt</p>
+          <div className="flex items-center gap-2">
+            <h2 className="text-[17px] font-black tracking-tight text-slate-900">#{checkinBooking.code}</h2>
+            <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-blue-500 ring-1 ring-blue-100">
               Đã đặt chỗ
-            </span>
-          </div>
-          <div className="flex items-center justify-between gap-3">
-            <h2 className="min-w-0 text-[17px] font-black uppercase tracking-tight text-slate-950">Chi tiết lượt đặt</h2>
-            <span className="rounded-full bg-slate-200 px-2.5 py-1 text-[10px] font-black text-slate-600">
-              Mã đặt: #{checkinBooking.code}
             </span>
           </div>
         </div>
 
-        <section className="mb-4 flex items-center gap-3 rounded-2xl bg-indigo-100 p-4 shadow-sm ring-1 ring-indigo-100">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-blue-600 text-white">
-            <Clock3 className="h-6 w-6" />
+        {/* Countdown banner */}
+        <section className="mb-2 flex items-center gap-2.5 rounded-xl bg-indigo-50 p-3 ring-1 ring-indigo-100">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-indigo-400">
+            <Clock3 className="h-4 w-4" />
           </div>
           <div className="min-w-0 flex-1">
-            <h3 className="text-[15px] font-black text-slate-950">Bắt đầu sau 35 phút nữa</h3>
-            <p className="mt-0.5 text-[11px] font-medium text-slate-600">Sẵn sàng nhận khách lúc 17:50</p>
+            <p className="text-[12px] font-black text-slate-800">Bắt đầu sau <span className="text-red-500">35 phút nữa</span></p>
+            <p className="text-[10px] font-medium text-slate-400">Sẵn sàng nhận khách lúc 17:50</p>
           </div>
-          <ChevronRight className="h-5 w-5 shrink-0 text-blue-700" />
+          <ChevronRight className="h-3.5 w-3.5 shrink-0 text-slate-300" />
         </section>
 
-        <section className="mb-4 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-100">
-          <div className="mb-4 flex items-center justify-between gap-2">
-            <h3 className="flex items-center gap-1.5 text-[11px] font-black uppercase tracking-wide text-slate-600">
-              <UserRound className="h-4 w-4" />
-              Thông tin khách hàng
-            </h3>
-            <span className="rounded-full bg-indigo-100 px-2.5 py-1 text-[9px] font-black text-slate-700">Standard Member</span>
+        {/* Customer info */}
+        <section className="mb-2 rounded-xl bg-white p-3 shadow-sm ring-1 ring-slate-100">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-slate-400">
+              <UserRound className="h-3 w-3" />
+              Khách hàng
+            </div>
+            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-500">Standard Member</span>
           </div>
-          <div className="flex items-center gap-4">
-            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-[24px] font-black text-emerald-700">
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-[17px] font-black text-indigo-600">
               {checkinBooking.customerName.trim().charAt(0)}
             </div>
             <div className="min-w-0 flex-1">
-              <h4 className="truncate text-[15px] font-black text-slate-950">{checkinBooking.customerName}</h4>
-              <p className="mt-1 text-[13px] font-semibold tracking-[0.08em] text-slate-600">{checkinBooking.phone}</p>
+              <p className="truncate text-[14px] font-black text-slate-900">{checkinBooking.customerName}</p>
+              <p className="mt-0.5 flex items-center gap-1 text-[11px] font-medium tracking-[0.06em] text-slate-500">
+                <Phone className="h-3 w-3 shrink-0" />
+                {checkinBooking.phone}
+              </p>
             </div>
-            <button type="button" className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-emerald-300 text-emerald-950 active:scale-95">
-              <Phone className="h-5 w-5 fill-current" />
-            </button>
           </div>
-          <p className="mt-4 flex items-center gap-1.5 text-[11px] font-medium text-slate-600">
-            <Clock3 className="h-4 w-4 text-amber-700" />
-            Lịch sử: Đã chơi 14 trận • Không có vi phạm hủy muộn
-          </p>
+          <div className="mt-2 flex items-center gap-1.5 rounded-lg bg-slate-50 px-2 py-1.5">
+            <Clock3 className="h-3 w-3 shrink-0 text-amber-500" />
+            <p className="text-[10px] font-medium text-slate-500">Đã chơi 14 trận • Không có vi phạm hủy muộn</p>
+          </div>
         </section>
 
-        <section className="mb-4 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-100">
-          <div className="mb-3 flex items-center justify-between gap-2">
-            <h3 className="flex items-center gap-1.5 text-[11px] font-black uppercase tracking-wide text-slate-600">
-              <MapPin className="h-4 w-4" />
-              Sân đấu & Thời gian
-            </h3>
-            <span className="rounded-full bg-emerald-200 px-2.5 py-1 text-[9px] font-black text-emerald-900">{checkinBooking.sport} Trong Nhà</span>
+        {/* Court & Time */}
+        <section className="mb-2 rounded-xl bg-white p-3 shadow-sm ring-1 ring-slate-100">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-slate-400">
+              <MapPin className="h-3 w-3" />
+              Sân & Thời gian
+            </div>
+            <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-600 ring-1 ring-emerald-200">{checkinBooking.sport}</span>
           </div>
-          <div className="mb-3 flex items-center gap-3 rounded-xl bg-indigo-100 p-3">
-            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-emerald-700 text-[18px] font-black text-white">
+          <div className="mb-2 flex items-center gap-2.5 rounded-lg bg-slate-50 p-2.5 ring-1 ring-slate-100">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-600 text-[14px] font-black text-white">
               S{courtNumber}
             </div>
             <div className="min-w-0">
-              <h4 className="text-[16px] font-black uppercase text-slate-950">{checkinBooking.court} <span className="text-emerald-700">•</span></h4>
-              <p className="mt-0.5 text-[11px] font-medium text-slate-600">Khu A tiêu chuẩn thảm Yonex • Tiêu chuẩn</p>
+              <p className="text-[13px] font-black text-slate-900">
+                SÂN CL-{courtNumber} <span className="text-emerald-500">•</span>
+              </p>
+              <p className="text-[10px] font-medium text-slate-400">Khu A • Thảm Yonex tiêu chuẩn</p>
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="rounded-xl bg-indigo-50 p-3">
-              <p className="text-[10px] font-black uppercase text-slate-600">Ngày thi đấu</p>
-              <p className="mt-1 text-[15px] font-black text-slate-950">Hôm nay</p>
-              <p className="text-[12px] font-medium text-slate-600">15/10/2026</p>
+          <div className="grid grid-cols-2 gap-2">
+            <div className="rounded-lg bg-slate-50 p-2.5 ring-1 ring-slate-100">
+              <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Ngày thi đấu</p>
+              <p className="mt-1 text-[13px] font-black text-slate-900">Hôm nay</p>
+              <p className="text-[10px] font-medium text-slate-400">15/10/2026</p>
             </div>
-            <div className="rounded-xl bg-indigo-50 p-3">
-              <p className="text-[10px] font-black uppercase text-slate-600">Khung giờ chơi</p>
-              <p className="mt-1 text-[15px] font-black text-blue-700">{checkinBooking.time}</p>
-              <p className="text-[12px] font-medium text-slate-600">Tổng thời lượng: 90 phút</p>
+            <div className="rounded-lg bg-slate-50 p-2.5 ring-1 ring-slate-100">
+              <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Khung giờ</p>
+              <p className="mt-1 text-[13px] font-black text-slate-900">{checkinBooking.time}</p>
+              <p className="text-[10px] font-medium text-slate-400">90 phút</p>
             </div>
           </div>
         </section>
 
-        <section className="mb-4 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-100">
-          <div className="mb-4 flex items-center justify-between gap-2">
-            <h3 className="flex items-center gap-1.5 text-[11px] font-black uppercase tracking-wide text-slate-600">
-              <CreditCard className="h-4 w-4" />
+        {/* Finance */}
+        <section className="mb-3 rounded-xl bg-white p-3 shadow-sm ring-1 ring-slate-100">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-slate-400">
+              <CreditCard className="h-3 w-3" />
               Tài chính & Thanh toán
-            </h3>
-            <span className="rounded-full bg-indigo-100 px-2.5 py-1 text-[9px] font-black uppercase tracking-wide text-slate-700">VietQR • 100%</span>
+            </div>
+            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-500">VietQR • 100%</span>
           </div>
-          <div className="space-y-3">
+          <div className="space-y-2">
             <div className="flex items-start justify-between gap-3">
-              <span className="text-[13px] font-medium leading-snug text-slate-700">Tổng giá tiền sân (90 phút • 120.000 đ/h)</span>
-              <span className="shrink-0 text-[15px] font-black text-slate-950">{checkinBooking.total}</span>
+              <span className="text-[11px] font-medium leading-snug text-slate-500">Tổng tiền sân (90 phút • 120.000 VND/h)</span>
+              <span className="shrink-0 text-[13px] font-black text-slate-900">{checkinBooking.total}</span>
             </div>
             <div className="flex items-center justify-between gap-3">
-              <span className="flex items-center gap-1.5 text-[13px] font-medium text-slate-700">
-                <span className="h-3 w-3 rounded-full bg-emerald-700" />
-                Đã thanh toán 100% qua VietQR
+              <span className="flex items-center gap-1.5 text-[11px] font-medium text-slate-500">
+                <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                Đã thanh toán qua VietQR
               </span>
-              <span className="text-[15px] font-black text-emerald-700">-{checkinBooking.paidAmount}</span>
+              <span className="text-[13px] font-black text-emerald-600">-{checkinBooking.paidAmount}</span>
             </div>
-            <div className="flex items-center justify-between gap-3 border-t border-indigo-100 pt-3">
-              <span className="text-[14px] font-black text-slate-950">Khoản cần thu tại quầy:</span>
-              <span className="text-[15px] font-black text-red-700">{checkinBooking.remaining}</span>
+            <div className="flex items-center justify-between gap-3 rounded-lg bg-slate-50 px-2.5 py-2 ring-1 ring-slate-100">
+              <span className="text-[12px] font-black text-slate-700">Khoản cần thu tại quầy</span>
+              <span className="text-[14px] font-black text-slate-900">{checkinBooking.remaining}</span>
             </div>
           </div>
         </section>
 
-        <div className="mb-5 grid grid-cols-2 gap-3">
+        {/* Action buttons */}
+        <div className="mb-4 grid grid-cols-2 gap-2">
           <button
             type="button"
             onClick={() => {
               setCheckinBooking(null);
               onCheckoutModeChange?.(false);
             }}
-            className="flex h-12 min-w-0 items-center justify-center gap-2 rounded-xl bg-emerald-700 px-3 text-[14px] font-black text-white shadow-sm active:scale-[0.99]"
+            className="flex h-10 min-w-0 items-center justify-center gap-1.5 rounded-xl bg-emerald-600 px-3 text-[11px] font-black text-white shadow-md active:scale-[0.98]"
           >
-            <CheckCircle2 className="h-5 w-5 shrink-0" />
-            <span className="truncate">Check-in Sân</span>
+            <CheckCircle2 className="h-4 w-4 shrink-0" />
+            <span className="truncate">Check-In Sân</span>
           </button>
           <button
             type="button"
@@ -894,9 +899,9 @@ export default function AdminSchedulePage({ onCheckoutModeChange, onBookingCheck
               setCheckinBooking(null);
               onCheckoutModeChange?.(true);
             }}
-            className="flex h-12 min-w-0 items-center justify-center gap-2 rounded-xl border border-red-200 bg-red-50 px-3 text-[14px] font-black text-red-700 shadow-sm active:scale-[0.99]"
+            className="flex h-10 min-w-0 items-center justify-center gap-1.5 rounded-xl bg-red-500 px-3 text-[11px] font-black text-white shadow-sm active:scale-[0.98]"
           >
-            <CircleX className="h-5 w-5 shrink-0" />
+            <CircleX className="h-4 w-4 shrink-0" />
             <span className="truncate">Hủy đặt sân</span>
           </button>
         </div>
@@ -1725,169 +1730,189 @@ export default function AdminSchedulePage({ onCheckoutModeChange, onBookingCheck
   }
 
   if (checkoutBooking) {
-    const additionalCharges = 45_000;
+    const equipmentDamage = 45_000; // Khoản bồi thường thiết bị hư hỏng (0 nếu không có)
     const bookingBalance = Number(checkoutBooking.remaining.replace(/\D/g, ''));
-    const amountDue = `${(bookingBalance + additionalCharges).toLocaleString('vi-VN')} đ`;
-    const actualTotal = Number(checkoutBooking.total.replace(/\D/g, '')) + additionalCharges;
+    const amountDue = bookingBalance + equipmentDamage;
+    const amountDueStr = `${amountDue.toLocaleString('vi-VN')} VND`;
+    const hasExtraCharge = amountDue > 0;
 
     return (
       <div className="flex-1 min-h-0 overflow-y-auto bg-slate-50 px-3 py-3">
+        {/* Back button */}
         <button
           type="button"
           onClick={() => {
             setCheckoutBooking(null);
             onCheckoutModeChange?.(false);
           }}
-          className="mb-3 flex items-center gap-1.5 rounded-lg bg-white px-3 py-2 text-[11px] font-black text-slate-700 shadow-sm ring-1 ring-slate-200 active:scale-95"
+          className="mb-3 flex items-center gap-1.5 rounded-lg bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-500 shadow-sm ring-1 ring-slate-200 transition-colors hover:text-slate-700 active:scale-95"
         >
           <ArrowLeft className="h-3.5 w-3.5" />
           Quay lại lịch sân
         </button>
 
-        <div className="mb-3 flex items-center justify-between">
-          <div className="min-w-0">
-            <div className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wide text-slate-500">
-              <FileText className="h-3.5 w-3.5 text-emerald-700" />
-              <span>{checkoutBooking.court}</span>
-            </div>
-            <h2 className="mt-1 text-xl font-black uppercase tracking-tight text-slate-950">Quyết toán check-out</h2>
+        {/* Header */}
+        <div className="mb-3 flex items-start justify-between gap-3">
+          <div>
+            <p className="mb-0.5 flex items-center gap-1 text-[10px] font-semibold uppercase tracking-widest text-slate-400">
+              <FileText className="h-3 w-3 text-amber-500" />
+              {checkoutBooking.court}
+            </p>
+            <h2 className="text-[17px] font-black tracking-tight text-slate-900">Quyết toán Check-Out</h2>
           </div>
-          <span className="shrink-0 rounded-full bg-slate-200 px-2.5 py-1 text-[10px] font-black text-slate-600">
-            Mã đặt: {checkoutBooking.code}
+          <span className="mt-0.5 rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-amber-600 ring-1 ring-amber-200">
+            {checkoutBooking.code}
           </span>
         </div>
 
-        <section className="mb-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex items-start gap-3 min-w-0">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100">
-                <UserRound className="h-6 w-6" />
+        {/* Customer info */}
+        <section className="mb-2 rounded-xl bg-white p-3 shadow-sm ring-1 ring-slate-100">
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-600 ring-1 ring-emerald-100">
+              <UserRound className="h-5 w-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-[14px] font-black text-slate-900">{checkoutBooking.customerName}</p>
+              <div className="mt-0.5 flex items-center gap-1.5">
+                <span className="rounded-full bg-amber-50 px-1.5 py-0.5 text-[9px] font-black text-amber-600 ring-1 ring-amber-100">Hội viên VIP</span>
+                <p className="flex items-center gap-1 text-[11px] font-medium text-slate-500">
+                  <Phone className="h-3 w-3 shrink-0" />
+                  {checkoutBooking.phone}
+                </p>
               </div>
-              <div className="min-w-0">
-                <h3 className="truncate text-[17px] font-black text-slate-950">{checkoutBooking.customerName}</h3>
-                <span className="mt-1 inline-flex rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-black text-amber-700 ring-1 ring-amber-100">
-                  Hội viên VIP
+            </div>
+          </div>
+          <div className="mt-2.5 grid grid-cols-3 gap-1.5 border-t border-slate-50 pt-2.5">
+            <div className="rounded-lg bg-slate-50 px-2 py-1.5 text-center text-[9px] font-semibold text-slate-500 ring-1 ring-slate-100">Khách thân thiết</div>
+            <div className="rounded-lg bg-slate-50 px-2 py-1.5 text-center text-[9px] font-semibold text-slate-500 ring-1 ring-slate-100">12 lượt/tháng</div>
+            <div className="rounded-lg bg-orange-50 px-2 py-1.5 text-center text-[9px] font-black text-orange-600 ring-1 ring-orange-100">Đang sử dụng</div>
+          </div>
+        </section>
+
+        {/* Time section */}
+        <section className="mb-2 rounded-xl bg-white p-3 shadow-sm ring-1 ring-slate-100">
+          <div className="mb-2 flex items-center justify-between">
+            <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-slate-400">
+              <Clock3 className="h-3 w-3 text-emerald-500" />
+              Thời gian sử dụng
+            </div>
+            <span className="text-[10px] font-medium text-slate-400">Thứ 7, 24/10/2026</span>
+          </div>
+          <div className="grid grid-cols-3 gap-1.5">
+            <div className="rounded-lg bg-slate-50 p-2.5 ring-1 ring-slate-100">
+              <p className="text-[9px] font-bold uppercase tracking-wide text-slate-400">Check-in thực</p>
+              <p className="mt-1 text-[15px] font-black text-slate-900">08:02</p>
+              <p className="text-[9px] font-medium text-slate-400">Sớm 8 phút</p>
+            </div>
+            <div className="rounded-lg bg-slate-50 p-2.5 ring-1 ring-slate-100">
+              <p className="text-[9px] font-bold uppercase tracking-wide text-slate-400">Hạn lịch đặt</p>
+              <p className="mt-1 text-[15px] font-black text-slate-900">09:30</p>
+              <p className="text-[9px] font-medium text-slate-400">90 phút</p>
+            </div>
+            <div className="rounded-lg bg-emerald-50 p-2.5 ring-1 ring-emerald-100">
+              <p className="text-[9px] font-bold uppercase tracking-wide text-emerald-600">Check-out</p>
+              <p className="mt-1 text-[15px] font-black text-emerald-700">09:38</p>
+              <p className="text-[9px] font-medium text-slate-400">Trả sân</p>
+            </div>
+          </div>
+          <div className="mt-2 flex items-start gap-1.5 rounded-lg bg-slate-50 px-2.5 py-2 ring-1 ring-slate-100">
+            <CheckCircle2 className="mt-0.5 h-3 w-3 shrink-0 text-emerald-500" />
+            <p className="text-[10px] font-medium text-slate-500">
+              Khách đã thanh toán đủ 100% trước. Không tính phụ phí thêm giờ — muốn đá tiếp vui lòng đặt sân mới.
+            </p>
+          </div>
+        </section>
+
+        {/* Payment breakdown */}
+        <section className="mb-2 rounded-xl bg-white p-3 shadow-sm ring-1 ring-slate-100">
+          <div className="mb-2 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-slate-400">
+            <FileText className="h-3 w-3 text-blue-400" />
+            Bảng kê thanh toán & quyết toán
+          </div>
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-medium text-slate-500">Tiền sân theo lịch đặt (1.5h)</span>
+              <span className="text-[13px] font-black text-slate-900">{checkoutBooking.total}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="flex items-center gap-1.5 text-[11px] font-medium text-slate-500">
+                <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                Đã thanh toán 100% qua VietQR
+              </span>
+              <span className="text-[13px] font-black text-emerald-600">-{checkoutBooking.paidAmount}</span>
+            </div>
+
+            {/* Bồi thường thiết bị — chỉ hiện khi có phát sinh */}
+            {equipmentDamage > 0 && (
+              <div className="flex items-center justify-between rounded-lg bg-red-50 px-2.5 py-1.5 ring-1 ring-red-100">
+                <span className="flex items-center gap-1.5 text-[11px] font-semibold text-red-600">
+                  <AlertTriangle className="h-3 w-3 shrink-0" />
+                  Bồi thường thiết bị hư hỏng
                 </span>
-                <p className="mt-1 text-[12px] font-semibold text-slate-500">{checkoutBooking.phone} • Mã: KH-0482</p>
+                <span className="text-[13px] font-black text-red-600">+{equipmentDamage.toLocaleString('vi-VN')} VND</span>
               </div>
-            </div>
-            <button type="button" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-600 active:scale-95">
-              <Phone className="h-4 w-4" />
-            </button>
-          </div>
-          <div className="mt-4 grid grid-cols-3 gap-2 border-t border-slate-100 pt-3">
-            <div className="rounded-lg bg-slate-100 px-2 py-2 text-center text-[10px] font-bold text-slate-500">Khách thân thiết</div>
-            <div className="rounded-lg bg-slate-100 px-2 py-2 text-center text-[10px] font-bold text-slate-500">12 lượt đặt/tháng</div>
-            <div className="rounded-lg bg-orange-100 px-2 py-2 text-center text-[10px] font-black text-orange-700">Đang sử dụng</div>
-          </div>
-        </section>
+            )}
 
-        <section className="mb-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="mb-3 flex items-center justify-between">
-            <h3 className="flex items-center gap-1.5 text-[14px] font-black text-slate-900">
-              <Clock3 className="h-4 w-4 text-emerald-700" />
-              Thời gian sử dụng thực tế
-            </h3>
-            <span className="text-[11px] font-bold text-slate-500">Thứ 7, 24/10/2026</span>
-          </div>
-          <div className="grid grid-cols-3 gap-2">
-            <div className="rounded-lg bg-slate-100 p-3">
-              <p className="text-[10px] font-bold text-slate-500">Check-in thực</p>
-              <p className="mt-1 text-lg font-black text-slate-950">08:02</p>
-              <p className="text-[10px] font-semibold text-slate-500">Sớm 8 phút</p>
-            </div>
-            <div className="rounded-lg bg-slate-100 p-3">
-              <p className="text-[10px] font-bold text-slate-500">Hạn lịch đặt</p>
-              <p className="mt-1 text-lg font-black text-slate-950">09:30</p>
-              <p className="text-[10px] font-semibold text-slate-500">Tổng: 90 phút</p>
-            </div>
-            <div className="rounded-lg bg-emerald-100 p-3">
-              <p className="text-[10px] font-bold text-emerald-700">Check-out hiện tại</p>
-              <p className="mt-1 text-lg font-black text-emerald-800">09:38</p>
-              <p className="text-[10px] font-black text-emerald-700">+8 phút lố</p>
-            </div>
-          </div>
-          <div className="mt-3 rounded-lg bg-emerald-50 p-3 text-[12px] leading-relaxed text-slate-600">
-            <p className="font-black text-emerald-700">Trong 10 phút nhắc nhở ân hạn (09:30 - 09:40) - Không tính phụ phí thêm giờ</p>
-            <p className="mt-1">Chỉ sau mốc 10 phút ân hạn mới áp dụng phụ phí theo cấu hình hệ thống.</p>
-          </div>
-        </section>
-
-        <section className="mb-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <h3 className="mb-3 flex items-center gap-1.5 text-[14px] font-black text-slate-900">
-            <FileText className="h-4 w-4 text-blue-600" />
-            Bảng kê chi tiết thanh toán & quyết toán
-          </h3>
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-[13px] font-semibold text-slate-600">Tiền sân theo hợp đồng đặt (1.5h)</span>
-              <span className="text-[15px] font-black text-slate-950">{checkoutBooking.total}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-[13px] font-semibold text-slate-600">Đã thanh toán đủ qua VietQR</span>
-              <span className="text-[15px] font-black text-emerald-700">-{checkoutBooking.paidAmount}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-[13px] font-semibold text-slate-600">Phụ phí thêm giờ</span>
-              <span className="text-[15px] font-black text-slate-600">0đ</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-[13px] font-semibold text-slate-600">Khoản phát sinh đã ghi nhận</span>
-              <span className="text-[15px] font-black text-slate-950">+{additionalCharges.toLocaleString('vi-VN')}đ</span>
-            </div>
-            <div className="border-t border-slate-100 pt-3">
-              <div className="flex items-center justify-between">
-                <span className="text-[13px] font-semibold text-slate-500">Tổng giá trị thực tế tiêu dùng</span>
-                <span className="text-[15px] font-black text-slate-950">{actualTotal.toLocaleString('vi-VN')}đ</span>
-              </div>
-              <div className="mt-3 flex items-center justify-between gap-3 rounded-xl bg-indigo-100 px-4 py-3">
-                <div className="min-w-0">
-                  <p className="text-[11px] font-black uppercase text-slate-700">Số tiền còn phải thu</p>
-                  <p className="text-[10px] font-black text-orange-700">Cần thu đủ trước khi bàn giao sân</p>
+            {/* Tổng kết */}
+            {hasExtraCharge ? (
+              <div className="flex items-center justify-between rounded-xl bg-amber-50 px-3 py-2.5 ring-1 ring-amber-100">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-wide text-slate-700">Số tiền cần thu thêm</p>
+                  <p className="text-[9px] font-semibold text-orange-500">Bồi thường thiết bị theo bảng giá</p>
                 </div>
-                <p className="shrink-0 text-3xl font-black text-emerald-800">{amountDue}</p>
+                <p className="text-[22px] font-black text-red-600">{amountDueStr}</p>
               </div>
-            </div>
+            ) : (
+              <div className="flex items-center justify-between rounded-xl bg-emerald-50 px-3 py-2.5 ring-1 ring-emerald-100">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-wide text-emerald-700">Thanh toán hoàn tất</p>
+                  <p className="text-[9px] font-medium text-slate-500">Khách đã thanh toán đủ 100% — không có khoản phát sinh</p>
+                </div>
+                <p className="text-[17px] font-black text-emerald-600">0 VND</p>
+              </div>
+            )}
           </div>
         </section>
 
-        <section className="mb-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="mb-3 flex items-center justify-between">
-            <h3 className="flex items-center gap-1.5 text-[14px] font-black text-slate-900">
-              <AlertTriangle className="h-4 w-4 text-amber-700" />
+        {/* Incident notes */}
+        <section className="mb-2 rounded-xl bg-white p-3 shadow-sm ring-1 ring-slate-100">
+          <div className="mb-2 flex items-center justify-between">
+            <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-slate-400">
+              <AlertTriangle className="h-3 w-3 text-amber-500" />
               Ghi nhận sự cố & thiết bị phát sinh
-            </h3>
-            <button type="button" className="text-[11px] font-black text-emerald-700">Thêm ghi chú</button>
+            </div>
+            <button type="button" className="text-[10px] font-black text-emerald-600">Thêm ghi chú</button>
           </div>
-          <label className="text-[11px] font-bold text-slate-600">Mô tả tình trạng hiện trường trả sân:</label>
+          <label className="text-[10px] font-semibold text-slate-500">Mô tả tình trạng hiện trường trả sân:</label>
           <textarea
-            className="mt-2 h-20 w-full resize-none rounded-lg border border-slate-100 bg-slate-100 p-3 text-[13px] outline-none"
+            className="mt-1.5 h-16 w-full resize-none rounded-lg bg-slate-50 p-2.5 text-[12px] outline-none ring-1 ring-slate-100 placeholder:text-slate-300"
             placeholder="Ví dụ: Hỏng lưới, gãy cán vợt thuê, mượn bóng chưa trả..."
           />
-          <p className="mt-2 rounded-lg bg-indigo-50 p-2 text-[11px] font-semibold leading-relaxed text-slate-600">
-            Không tự động tính tiền đền bù nếu chưa có mức được cấp thẩm quyền phê duyệt.
-          </p>
+
         </section>
 
-        <section className="mb-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <h3 className="mb-3 text-[14px] font-black text-slate-900">Hình thức thu tiền</h3>
-          <div className="grid grid-cols-1 gap-2">
-            <button type="button" className="rounded-xl bg-indigo-100 px-2 py-4 text-[12px] font-black text-emerald-700">
-              <QrCode className="mx-auto mb-1 h-5 w-5" />
-              Chuyển khoản 100% qua VietQR của sân
-            </button>
-          </div>
-          <div className="mt-3 flex items-center gap-3 rounded-xl bg-slate-100 p-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-white">
-              <QrCode className="h-7 w-7 text-slate-800" />
+        {/* Payment method — chỉ hiện khi có khoản cần thu thêm */}
+        {hasExtraCharge && (
+          <section className="mb-3 rounded-xl bg-white p-3 shadow-sm ring-1 ring-slate-100">
+            <div className="mb-2 text-[10px] font-bold uppercase tracking-widest text-slate-400">Thu tiền bồi thường qua VietQR</div>
+            <div className="flex flex-col items-center gap-1.5">
+              <img
+                src="/images/QR.png"
+                alt="Mã VietQR thanh toán"
+                className="w-48 rounded-2xl"
+              />
+              <div className="text-center">
+                <p className="text-[12px] font-black text-slate-900">TRINH THI MY THU</p>
+                <p className="text-[10px] font-medium text-slate-500">5125 3918 888</p>
+                <p className="mt-1 text-[10px] font-medium text-slate-400">
+                  Nội dung: CK {checkoutBooking.code.replace('BK-', '')} {amountDue.toLocaleString('vi-VN').replace(/\D/g, '')}K
+                </p>
+              </div>
             </div>
-            <div>
-              <p className="text-[13px] font-black text-slate-900">Mã VietQR Động</p>
-              <p className="text-[12px] font-semibold text-slate-500">Nội dung: CK {checkoutBooking.code.replace('BK-', '')} {amountDue.replace(/\D/g, '')}K</p>
-            </div>
-          </div>
-        </section>
+          </section>
+        )}
 
+        {/* Confirm button */}
         <button
           type="button"
           onClick={() => {
@@ -1895,10 +1920,10 @@ export default function AdminSchedulePage({ onCheckoutModeChange, onBookingCheck
             setCheckoutBooking(null);
             onCheckoutModeChange?.(false);
           }}
-          className="mb-4 flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-emerald-700 text-[14px] font-black text-white shadow-lg active:scale-[0.99] cursor-pointer"
+          className="mb-4 flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 text-[12px] font-black text-white shadow-md active:scale-[0.99] cursor-pointer"
         >
-          <CheckCircle2 className="h-5 w-5" />
-          Xác nhận thu {amountDue} & Hoàn tất Check-out (Thu hồi thiết bị về kho)
+          <CheckCircle2 className="h-4 w-4 shrink-0" />
+          <span>Xác nhận Check-out</span>
         </button>
       </div>
     );
@@ -2370,18 +2395,18 @@ export default function AdminSchedulePage({ onCheckoutModeChange, onBookingCheck
             onClick={() => setSelectedBooking(null)}
           />
           <section className="max-h-[86vh] overflow-y-auto rounded-t-2xl border-t border-slate-200 bg-white shadow-2xl">
-            <div className="flex justify-center pt-3 pb-1">
+            <div className="flex justify-center pt-2 pb-0">
               <button
                 type="button"
                 aria-label="Mở chi tiết lượt đặt đầy đủ"
                 onClick={() => openCheckinDetail(selectedBooking)}
                 className="rounded-full px-4 py-1 active:scale-95"
               >
-                <span className="block h-1.5 w-10 rounded-full bg-slate-300" />
+                <span className="block h-1 w-8 rounded-full bg-slate-200" />
               </button>
             </div>
 
-            <div className="flex items-center justify-between border-b border-slate-100 px-4 pb-3 pt-2">
+            <div className="flex items-center justify-between border-b border-slate-100 px-4 pb-2 pt-1">
               <div className="flex items-center gap-2.5">
                 <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-50 text-amber-700 ring-1 ring-amber-100">
                   <UserRound className="h-4 w-4" />
@@ -2406,55 +2431,58 @@ export default function AdminSchedulePage({ onCheckoutModeChange, onBookingCheck
               </button>
             </div>
 
-            <div className="space-y-3 bg-slate-50 px-3 py-3">
-              <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
-                <div className="grid grid-cols-2 gap-x-5 gap-y-3">
+            <div className="space-y-2 bg-slate-50 px-3 py-2.5">
+              {/* Info grid */}
+              <div className="rounded-lg border border-slate-100 bg-white p-2.5 shadow-sm">
+                <div className="grid grid-cols-2 gap-x-4 gap-y-2">
                   <div>
-                    <p className="text-[10px] font-semibold text-slate-500">Khách hàng</p>
-                    <p className="mt-0.5 text-[13px] font-black text-slate-900">{selectedBooking.customerName}</p>
+                    <p className="text-[9px] font-semibold uppercase tracking-wide text-slate-400">Khách hàng</p>
+                    <p className="mt-0.5 text-[12px] font-black text-slate-900">{selectedBooking.customerName}</p>
                   </div>
                   <div>
-                    <p className="text-[10px] font-semibold text-slate-500">Số điện thoại</p>
-                    <p className="mt-0.5 text-[13px] font-black text-emerald-700">{selectedBooking.phone}</p>
+                    <p className="text-[9px] font-semibold uppercase tracking-wide text-slate-400">Số điện thoại</p>
+                    <p className="mt-0.5 text-[12px] font-black text-emerald-600">{selectedBooking.phone}</p>
                   </div>
                   <div>
-                    <p className="text-[10px] font-semibold text-slate-500">Sân & Bộ môn</p>
-                    <p className="mt-0.5 text-[13px] font-black text-slate-900">{selectedBooking.court}</p>
-                    <p className="text-[10px] font-semibold text-slate-500">{selectedBooking.sport}</p>
+                    <p className="text-[9px] font-semibold uppercase tracking-wide text-slate-400">Sân & Bộ môn</p>
+                    <p className="mt-0.5 text-[12px] font-black text-slate-900">{selectedBooking.court}</p>
+                    <p className="text-[9px] font-medium text-slate-400">{selectedBooking.sport}</p>
                   </div>
                   <div>
-                    <p className="text-[10px] font-semibold text-slate-500">Khung thời gian</p>
-                    <p className="mt-0.5 text-[13px] font-black text-slate-900">{selectedBooking.time}</p>
+                    <p className="text-[9px] font-semibold uppercase tracking-wide text-slate-400">Khung thời gian</p>
+                    <p className="mt-0.5 text-[12px] font-black text-slate-900">{selectedBooking.time}</p>
                   </div>
                   <div>
-                    <p className="text-[10px] font-semibold text-slate-500">Trạng thái thanh toán</p>
-                    <p className="mt-0.5 text-[12px] font-black text-emerald-700">{selectedBooking.paymentStatus}</p>
+                    <p className="text-[9px] font-semibold uppercase tracking-wide text-slate-400">Trạng thái Thanh toán</p>
+                    <p className="mt-0.5 text-[11px] font-black text-emerald-600">{selectedBooking.paymentStatus}</p>
                   </div>
                   <div>
-                    <p className="text-[10px] font-semibold text-slate-500">Tổng số tiền</p>
-                    <p className="mt-0.5 text-[13px] font-black text-emerald-700">{selectedBooking.total}</p>
+                    <p className="text-[9px] font-semibold uppercase tracking-wide text-slate-400">Tổng tiền</p>
+                    <p className="mt-0.5 text-[12px] font-black text-slate-900">{selectedBooking.total}</p>
                   </div>
                 </div>
               </div>
 
-              <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
-                <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                  <span className="text-[11px] font-bold text-slate-500">Đã thanh toán qua VietQR</span>
-                  <span className="text-[13px] font-black text-emerald-700">{selectedBooking.paidAmount}</span>
+              {/* Payment summary */}
+              <div className="rounded-lg border border-slate-100 bg-white px-2.5 py-2 shadow-sm">
+                <div className="flex items-center justify-between border-b border-slate-50 pb-1.5">
+                  <span className="text-[10px] font-medium text-slate-500">Đã thanh toán qua VietQR</span>
+                  <span className="text-[12px] font-black text-emerald-600">{selectedBooking.paidAmount}</span>
                 </div>
-                <div className="flex items-center justify-between pt-2">
-                  <span className="text-[11px] font-bold text-red-500">Còn lại cần thu khi nhận sân</span>
-                  <span className="text-[13px] font-black text-red-600">{selectedBooking.remaining}</span>
+                <div className="flex items-center justify-between pt-1.5">
+                  <span className="text-[10px] font-bold text-red-500">Còn lại cần thu khi nhận sân</span>
+                  <span className="text-[12px] font-black text-red-500">{selectedBooking.remaining}</span>
                 </div>
               </div>
 
+              {/* Action buttons */}
               <div className="space-y-2">
                 {selectedBooking.status === 'Đã đặt' && (
                   <div className="grid grid-cols-2 gap-2">
                     <button
                       type="button"
                       onClick={() => openCheckinDetail(selectedBooking)}
-                      className="flex h-10 items-center justify-center gap-1.5 rounded bg-emerald-700 px-2 text-[11px] font-black text-white shadow-sm transition active:scale-[0.99]"
+                      className="flex h-10 items-center justify-center gap-1.5 rounded-xl bg-emerald-600 px-2 text-[11px] font-black text-white shadow-sm transition active:scale-[0.99]"
                     >
                       <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
                       <span className="truncate">Check-in sân</span>
@@ -2466,7 +2494,7 @@ export default function AdminSchedulePage({ onCheckoutModeChange, onBookingCheck
                         setSelectedBooking(null);
                         onCheckoutModeChange?.(true);
                       }}
-                      className="flex h-10 items-center justify-center gap-1.5 rounded border border-red-100 bg-white px-2 text-[11px] font-black text-red-600 shadow-sm transition active:scale-[0.99]"
+                      className="flex h-10 items-center justify-center gap-1.5 rounded-xl bg-red-500 px-2 text-[11px] font-black text-white shadow-sm transition active:scale-[0.99]"
                     >
                       <Ban className="h-3.5 w-3.5 shrink-0" />
                       <span className="truncate">Hủy đặt sân</span>
@@ -2483,10 +2511,10 @@ export default function AdminSchedulePage({ onCheckoutModeChange, onBookingCheck
                         setSelectedBooking(null);
                         onCheckoutModeChange?.(true);
                       }}
-                      className="flex h-10 items-center justify-center gap-1.5 rounded border border-slate-200 bg-white text-[11px] font-black text-slate-800 shadow-sm transition active:scale-[0.99]"
+                      className="flex h-10 items-center justify-center gap-1.5 rounded-xl bg-amber-500 px-2 text-[11px] font-black text-white shadow-sm transition active:scale-[0.99]"
                     >
-                      <Undo2 className="h-3.5 w-3.5" />
-                      Kết thúc / Trả sân
+                      <Undo2 className="h-3.5 w-3.5 shrink-0" />
+                      <span className="truncate">Kết thúc / Trả sân</span>
                     </button>
                     <button
                       type="button"
@@ -2495,23 +2523,23 @@ export default function AdminSchedulePage({ onCheckoutModeChange, onBookingCheck
                         setSelectedBooking(null);
                         onCheckoutModeChange?.(true);
                       }}
-                      className="flex h-10 items-center justify-center gap-1.5 rounded border border-red-100 bg-white text-[11px] font-black text-red-600 shadow-sm transition active:scale-[0.99]"
+                      className="flex h-10 items-center justify-center gap-1.5 rounded-xl bg-red-500 px-2 text-[11px] font-black text-white shadow-sm transition active:scale-[0.99]"
                     >
-                      <Ban className="h-3.5 w-3.5" />
-                      Hủy đặt sân
+                      <Ban className="h-3.5 w-3.5 shrink-0" />
+                      <span className="truncate">Hủy đặt sân</span>
                     </button>
                   </div>
                 )}
 
                 {selectedBooking.status === 'Đã hủy' && (
-                  <div className="rounded-lg border border-slate-200 bg-slate-100 px-3 py-2 text-[11px] font-bold leading-relaxed text-slate-600">
+                  <div className="rounded-lg bg-slate-100 px-3 py-2 text-[10px] font-medium text-slate-500">
                     Lượt đặt đã hủy. Không còn thao tác sân khả dụng.
                   </div>
                 )}
               </div>
 
               {(selectedBooking.status === 'Đã đặt' || selectedBooking.status === 'Đang sử dụng') && (
-                <div className="flex items-start gap-1.5 px-1 text-[9px] italic leading-relaxed text-slate-400">
+                <div className="flex items-start gap-1.5 px-0.5 text-[9px] italic leading-relaxed text-slate-400">
                   <Phone className="mt-0.5 h-3 w-3 shrink-0" />
                   <p>Lưu ý: Thao tác hủy thủ công sẽ gửi tin nhắn SMS xác nhận tự động hoàn tiền/cấn trừ cho khách.</p>
                 </div>

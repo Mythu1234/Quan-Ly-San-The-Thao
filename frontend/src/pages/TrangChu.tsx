@@ -1,4 +1,4 @@
-import AdminDashboard from './AdminDashboard';
+﻿import AdminDashboard from './AdminDashboard';
 import CustomerSchedule, { STANDARD_15_BOOKINGS } from '../components/CustomerSchedule';
 import QrCodeArtwork from '../components/QrCodeArtwork';
 import EmployeeDashboard from './employee/EmployeeDashboard';
@@ -411,7 +411,7 @@ export default function TrangChu() {
       description: 'Mặt thảm BWF tiêu chuẩn 4.5mm chống trượt, hệ thống đèn chiếu sáng chống chói Lux LED 1000+, trần cao 11m.',
       specs: ['MẶT THẢM BWF', 'CHỐNG CHÓI', 'CHUẨN 4.5MM'],
       pricePerHour: 120000,
-      priceLabel: '120.000đ / GIỜ',
+      priceLabel: '120.000 VND / GIỜ',
       image: '/images/badminton.jpg',
       icon: ShuttlecockIcon,
       courts: ['Sân CL-01', 'Sân CL-02', 'Sân CL-03', 'Sân CL-04', 'Sân CL-05'],
@@ -425,7 +425,7 @@ export default function TrangChu() {
       description: 'Sân bóng đá cỏ nhân tạo đạt chuẩn thi đấu mini 5 - 7 người, hệ thống đèn LED chuyên nghiệp, bóng thi đấu đạt chuẩn.',
       specs: ['SÂN 5 - 7 NGƯỜI', 'ĐÈN LUX 1000', 'CỎ NHÂN TẠO'],
       pricePerHour: 200000,
-      priceLabel: '200.000đ / GIỜ',
+      priceLabel: '200.000 VND / GIỜ',
       image: '/images/hero_arena.jpg',
       icon: FootballIcon,
       courts: ['Sân BD-01', 'Sân BD-02', 'Sân BD-03', 'Sân BD-04'],
@@ -439,7 +439,7 @@ export default function TrangChu() {
       description: 'Sân bóng chuyền trong nhà mái che cao 12m, thảm thi đấu Taraflex xịn, trụ và lưới căng chuẩn FIVB thi đấu.',
       specs: ['THẢM TARAFLEX', 'MÁI CHE 12M', 'ĐÈN LUX 1000'],
       pricePerHour: 150000,
-      priceLabel: '150.000đ / GIỜ',
+      priceLabel: '150.000 VND / GIỜ',
       image: '/images/volleyball.jpg',
       icon: VolleyballIcon,
       courts: ['Sân BC-01', 'Sân BC-02', 'Sân BC-03', 'Sân BC-04', 'Sân BC-05'],
@@ -888,7 +888,7 @@ export default function TrangChu() {
         court: 'Sân Bóng Đá 1',
         date: '28/09/2026',
         time: '18:00 - 19:30 (1.5 giờ)',
-        total: '450.000đ',
+        total: '450.000 VND',
         status: 'ĐÃ XÁC NHẬN',
         paymentStatus: 'Đã thanh toán qua VietQR',
         hoursUntilStart: 12,
@@ -1202,7 +1202,7 @@ export default function TrangChu() {
                   </div>
                 </div>
                 <div className="text-right shrink-0">
-                  <div className="text-sm font-black text-emerald-600">120.000đ</div>
+                  <div className="text-sm font-black text-emerald-600">120.000 VND</div>
                   <div className="text-[10px] font-semibold text-slate-400">/ giờ / sân</div>
                 </div>
               </div>
@@ -1238,7 +1238,7 @@ export default function TrangChu() {
                   </div>
                 </div>
                 <div className="text-right shrink-0">
-                  <div className="text-sm font-black text-emerald-600">150.000đ</div>
+                  <div className="text-sm font-black text-emerald-600">150.000 VND</div>
                   <div className="text-[10px] font-semibold text-slate-400">/ giờ / sân</div>
                 </div>
               </div>
@@ -1274,7 +1274,7 @@ export default function TrangChu() {
                   </div>
                 </div>
                 <div className="text-right shrink-0">
-                  <div className="text-sm font-black text-emerald-600">200.000đ</div>
+                  <div className="text-sm font-black text-emerald-600">200.000 VND</div>
                   <div className="text-[10px] font-semibold text-slate-400">/ giờ / sân</div>
                 </div>
               </div>
@@ -1670,17 +1670,17 @@ export default function TrangChu() {
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   <button type="button" onClick={() => { setHasSearched(true); setLookupResult({
-                      code: '#CX-11111', sport: 'Bóng Đá', court: 'Sân Bóng Đá 1', name: 'Nguyễn Văn An', phone: '0912345678', date: '26/09/2026', time: '14:00 - 15:30', total: '450.000đ', status: 'ĐÃ XÁC NHẬN', hoursUntilStart: 12, sportId: 'football'
+                      code: '#CX-11111', sport: 'Bóng Đá', court: 'Sân Bóng Đá 1', name: 'Nguyễn Văn An', phone: '0912345678', date: '26/09/2026', time: '14:00 - 15:30', total: '450.000 VND', status: 'ĐÃ XÁC NHẬN', hoursUntilStart: 12, sportId: 'football'
                   }); }} className="rounded-xl bg-slate-100 p-2 text-center font-bold text-slate-700 active:scale-95 hover:bg-slate-200">
                     Vé sắp đá (&lt; 24h)
                   </button>
                   <button type="button" onClick={() => { setHasSearched(true); setLookupResult({
-                      code: '#CX-99999', sport: 'Cầu Lông', court: 'Sân Cầu Lông 2', name: 'Nguyễn Văn An', phone: '0912345678', date: '30/09/2026', time: '09:00 - 10:30', total: '180.000đ', status: 'ĐÃ XÁC NHẬN', hoursUntilStart: 48, sportId: 'badminton'
+                      code: '#CX-99999', sport: 'Cầu Lông', court: 'Sân Cầu Lông 2', name: 'Nguyễn Văn An', phone: '0912345678', date: '30/09/2026', time: '09:00 - 10:30', total: '180.000 VND', status: 'ĐÃ XÁC NHẬN', hoursUntilStart: 48, sportId: 'badminton'
                   }); }} className="rounded-xl bg-slate-100 p-2 text-center font-bold text-slate-700 active:scale-95 hover:bg-slate-200">
                     Vé tuần sau (&gt; 24h)
                   </button>
                   <button type="button" onClick={() => { setHasSearched(true); setLookupResult({
-                      code: '#CX-77777', sport: 'Bóng Chuyền', court: 'Sân Bóng Chuyền 1', name: 'Nguyễn Văn An', phone: '0912345678', date: '20/09/2026', time: '08:00 - 09:30', total: '300.000đ', status: 'ĐÃ HỦY', paymentStatus: 'ĐÃ HOÀN TIỀN', hoursUntilStart: -24, sportId: 'volleyball'
+                      code: '#CX-77777', sport: 'Bóng Chuyền', court: 'Sân Bóng Chuyền 1', name: 'Nguyễn Văn An', phone: '0912345678', date: '20/09/2026', time: '08:00 - 09:30', total: '300.000 VND', status: 'ĐÃ HỦY', paymentStatus: 'ĐÃ HOÀN TIỀN', hoursUntilStart: -24, sportId: 'volleyball'
                   }); }} className="col-span-2 rounded-xl bg-red-50 border border-red-100 p-2 text-center font-bold text-red-600 active:scale-95 hover:bg-red-100">
                     Vé mẫu Đã Hủy & Hoàn Tiền
                   </button>

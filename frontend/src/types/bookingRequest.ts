@@ -1,4 +1,4 @@
-export type CustomerType = 'trai_nghiem' | 'event_series';
+﻿export type CustomerType = 'trai_nghiem' | 'event_series';
 
 export interface BookingRequest {
   id: string;
@@ -149,7 +149,7 @@ export const INITIAL_BOOKING_REQUESTS: BookingRequest[] = [
       {
         date: '15/10/2026 17:25',
         staffName: 'Lễ tân',
-        note: 'Đã nhận đủ 180.000đ qua VietQR và xuất vé QR.'
+        note: 'Đã nhận đủ 180.000 VND qua VietQR và xuất vé QR.'
       }
     ]
   }
