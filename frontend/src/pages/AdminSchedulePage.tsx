@@ -676,6 +676,10 @@ export default function AdminSchedulePage({ onCheckoutModeChange, onBookingCheck
 
   const handleConfirmPaymentSuccess = () => {
     if (!pendingBookingData) return;
+    const confirmed = window.confirm(
+      'Chỉ xác nhận sau khi chủ sân hoặc nhân viên đã kiểm tra và thấy tiền thực nhận trong tài khoản ngân hàng. Tiếp tục?',
+    );
+    if (!confirmed) return;
     setAdminBookings((prev) => [...prev, pendingBookingData]);
     setPaymentSuccessBooking(pendingBookingData);
     setShowPaymentModal(false);
@@ -2830,7 +2834,6 @@ export default function AdminSchedulePage({ onCheckoutModeChange, onBookingCheck
                 <p className="font-mono font-bold text-slate-900 bg-white py-1 rounded border border-slate-200 uppercase">
                   CX {pendingBookingData.court.replace(/ /g, '').toUpperCase()} {pendingBookingData.phone.replace(/[\s.-]/g, '')}
                 </p>
-                <p className="mt-2 text-[10px] text-slate-500">Mã QR minh họa, chưa dùng để chuyển khoản thật.</p>
               </div>
             </div>
 
@@ -2841,11 +2844,13 @@ export default function AdminSchedulePage({ onCheckoutModeChange, onBookingCheck
                   <span className="h-2 w-2 bg-white rounded-full"></span>
                 </span>
               </div>
-              <p className="text-xs font-bold text-emerald-600">Đang lắng nghe giao dịch...</p>
-              <p className="text-[10px] text-slate-400">Tự động xác nhận khi có biến động số dư</p>
+              <p className="text-xs font-bold text-emerald-700">Chờ chủ sân/nhân viên đối soát</p>
+              <p className="max-w-xs text-center text-[10px] leading-4 text-slate-500">
+                Chỉ xác nhận sau khi kiểm tra thấy tiền đã vào tài khoản ngân hàng.
+              </p>
             </div>
 
-            <div className="w-full mt-6 grid grid-cols-2 gap-3">
+            <div className="w-full mt-6 grid grid-cols-1 gap-2 sm:grid-cols-2 sm:gap-3">
               <button
                 type="button"
                 onClick={handleCancelPayment}
@@ -2856,9 +2861,9 @@ export default function AdminSchedulePage({ onCheckoutModeChange, onBookingCheck
               <button
                 type="button"
                 onClick={handleConfirmPaymentSuccess}
-                className="rounded-xl bg-slate-900 py-3 text-xs font-bold text-white hover:bg-slate-800 cursor-pointer active:scale-95"
+                className="rounded-xl bg-emerald-800 py-3 text-xs font-bold text-white hover:bg-emerald-900 cursor-pointer active:scale-95"
               >
-                Mô phỏng Đã CK
+                Xác nhận đã nhận tiền
               </button>
             </div>
           </div>

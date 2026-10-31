@@ -682,11 +682,11 @@ export const INITIAL_TRANSACTIONS: Transaction[] = [
     status: 'pending_refund',
     statusLabel: 'Chờ duyệt hoàn tiền VietQR',
     date: '01/10/2026 14:20',
-    courtInfo: 'Cầu lông - Sân 03',
+    courtInfo: 'Cầu lông - Sân CL-03',
     timeSlot: '02/10/2026 · 18:00 - 19:30',
     bankRef: 'FT2427519920188',
     ticketCode: '#CX-88291',
-    refundReason: 'Khách hủy vé trước >24h theo chính sách hoàn cọc 100%'
+    refundReason: 'Khách hủy vé trước 24 giờ, đủ điều kiện hoàn 100% số tiền đã thanh toán.'
   },
   {
     id: 'TX02',
@@ -698,7 +698,7 @@ export const INITIAL_TRANSACTIONS: Transaction[] = [
     status: 'success',
     statusLabel: 'Thành công (Đã ghi nhận)',
     date: '01/10/2026 09:15',
-    courtInfo: 'Bóng chuyền - Cụm sân 1-4',
+    courtInfo: 'Bóng chuyền - Sân BC-01',
     timeSlot: '01/10/2026 · 14:00 - 16:00',
     bankRef: 'FT24298177263011',
     ticketCode: '#APX-8921'
@@ -708,12 +708,12 @@ export const INITIAL_TRANSACTIONS: Transaction[] = [
     code: '#TX-2024-9175',
     customerName: 'FC Vô Địch',
     customerPhone: '0978 889 999',
-    amount: 800000,
+    amount: 400000,
     type: 'booking',
     status: 'success',
-    statusLabel: 'Thành công (Đã cọc)',
+    statusLabel: 'Thành công (Đã thanh toán đủ qua VietQR)',
     date: '01/10/2026 08:30',
-    courtInfo: 'Bóng đá - Toàn sân (Ô 1-8)',
+    courtInfo: 'Bóng đá mini - Sân BD-01',
     timeSlot: '01/10/2026 · 17:00 - 19:00',
     bankRef: 'FT2429816550293',
     ticketCode: '#SOC-3912'
@@ -728,7 +728,7 @@ export const INITIAL_TRANSACTIONS: Transaction[] = [
     status: 'success',
     statusLabel: 'Thành công (VietQR)',
     date: '01/10/2026 15:10',
-    courtInfo: 'Cầu lông - Sân 01',
+    courtInfo: 'Cầu lông - Sân CL-01',
     timeSlot: '01/10/2026 · 17:30 - 19:30',
     bankRef: 'FT2429819920311',
     ticketCode: '#CX-88302'
@@ -743,7 +743,7 @@ export const INITIAL_TRANSACTIONS: Transaction[] = [
     status: 'refunded',
     statusLabel: 'Đã hoàn tiền VietQR',
     date: '01/10/2026 16:05',
-    courtInfo: 'Cầu lông - Sân 02',
+    courtInfo: 'Cầu lông - Sân CL-02',
     timeSlot: '02/10/2026 · 06:00 - 07:00',
     bankRef: 'MB-0983456123',
     ticketCode: '#CX-88315',
@@ -757,11 +757,11 @@ export const INITIAL_TRANSACTIONS: Transaction[] = [
     amount: 450000,
     type: 'booking',
     status: 'success',
-    statusLabel: 'Thành công (Tiền mặt)',
+    statusLabel: 'Thành công (Đã thanh toán đủ qua VietQR)',
     date: '01/10/2026 17:20',
-    courtInfo: 'Bóng chuyền - Cụm sân 5-8',
+    courtInfo: 'Bóng chuyền - Sân BC-05',
     timeSlot: '01/10/2026 · 18:00 - 21:00',
-    bankRef: 'CS2429821102938',
+    bankRef: 'FT2429821102938',
     ticketCode: '#VC-4402'
   },
   {
@@ -774,7 +774,7 @@ export const INITIAL_TRANSACTIONS: Transaction[] = [
     status: 'success',
     statusLabel: 'Thành công (VietQR)',
     date: '01/10/2026 18:00',
-    courtInfo: 'Cầu lông - Sân 06',
+    courtInfo: 'Cầu lông - Sân CL-05',
     timeSlot: '01/10/2026 · 19:30 - 21:00',
     bankRef: 'FT2429822301982',
     ticketCode: '#CX-88329'
@@ -789,11 +789,11 @@ export const INITIAL_TRANSACTIONS: Transaction[] = [
     status: 'pending_refund',
     statusLabel: 'Chờ duyệt hoàn tiền VietQR',
     date: '01/10/2026 19:30',
-    courtInfo: 'Bóng đá - Toàn sàn (Ô 1-8)',
+    courtInfo: 'Bóng đá mini - Sân BD-02',
     timeSlot: '03/10/2026 · 18:00 - 21:00',
     bankRef: 'MB-0909333444',
     ticketCode: '#SOC-3928',
-    refundReason: 'Đổi lịch giao hữu công ty sang tuần sau, xin hoàn cọc'
+    refundReason: 'Đổi lịch giao hữu công ty sang tuần sau, xin hoàn 100% số tiền đã thanh toán.'
   },
   {
     id: 'TX09',
@@ -803,11 +803,11 @@ export const INITIAL_TRANSACTIONS: Transaction[] = [
     amount: 240000,
     type: 'booking',
     status: 'success',
-    statusLabel: 'Thành công (POS Quẹt thẻ)',
+    statusLabel: 'Thành công (Đã thanh toán đủ qua VietQR)',
     date: '01/10/2026 20:15',
-    courtInfo: 'Cầu lông - Sân 04',
+    courtInfo: 'Cầu lông - Sân CL-04',
     timeSlot: '01/10/2026 · 21:00 - 23:00',
-    bankRef: 'POS2429825591024',
+    bankRef: 'FT2429825591024',
     ticketCode: '#CX-88340'
   }
 ];
@@ -1697,4 +1697,3 @@ export const INITIAL_INCIDENTS: FacilityIncident[] = [
     technicianNote: 'Đã vệ sinh và tra mỡ bôi trơn chốt xoay, hoạt động hoàn hảo.'
   }
 ];
-

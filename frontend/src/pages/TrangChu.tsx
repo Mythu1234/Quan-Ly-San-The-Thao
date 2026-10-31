@@ -834,7 +834,11 @@ export default function TrangChu() {
     }
   };
 
-  const simulatePaymentSuccess = () => {
+  const confirmPaymentReceived = () => {
+    const confirmed = window.confirm(
+      'Chỉ xác nhận sau khi chủ sân hoặc nhân viên đã kiểm tra và thấy tiền thực nhận trong tài khoản ngân hàng. Tiếp tục?',
+    );
+    if (!confirmed) return;
     setShowPayment(false);
     setIsSubmitted(true);
   };
@@ -2847,7 +2851,6 @@ export default function TrangChu() {
                   <p className="text-2xl font-black text-emerald-600">{totalPrice.toLocaleString('vi-VN')}đ</p>
                 <p className="text-slate-500 mt-2">Nội dung chuyển khoản:</p>
                 <p className="font-mono font-bold text-slate-900 bg-white py-1 rounded border border-slate-200 uppercase">CX {selectedCourt.replace(/ /g, '')} {customerPhone}</p>
-                <p className="mt-2 text-[10px] text-slate-500">Mã QR minh họa, chưa dùng để chuyển khoản thật.</p>
               </div>
             </div>
 
@@ -2858,13 +2861,15 @@ export default function TrangChu() {
                    <span className="h-2 w-2 bg-white rounded-full"></span>
                  </span>
                </div>
-               <p className="text-xs font-bold text-emerald-600">Đang lắng nghe giao dịch...</p>
-               <p className="text-[10px] text-slate-400">Tự động xác nhận khi có biến động số dư</p>
+               <p className="text-xs font-bold text-emerald-700">Chờ chủ sân/nhân viên đối soát</p>
+               <p className="max-w-xs text-center text-[10px] leading-4 text-slate-500">
+                 Chỉ xác nhận sau khi kiểm tra thấy tiền đã vào tài khoản ngân hàng.
+               </p>
             </div>
 
-            <div className="w-full mt-6 grid grid-cols-2 gap-3">
+            <div className="w-full mt-6 grid grid-cols-1 gap-2 sm:grid-cols-2 sm:gap-3">
               <button onClick={() => setShowPayment(false)} type="button" className="rounded-xl border border-slate-200 py-3 text-xs font-bold text-slate-600 hover:bg-slate-50 cursor-pointer active:scale-95">Hủy giao dịch</button>
-              <button onClick={simulatePaymentSuccess} type="button" className="rounded-xl bg-slate-900 py-3 text-xs font-bold text-white hover:bg-slate-800 cursor-pointer active:scale-95">Mô phỏng Đã CK</button>
+              <button onClick={confirmPaymentReceived} type="button" className="rounded-xl bg-emerald-800 py-3 text-xs font-bold text-white hover:bg-emerald-900 cursor-pointer active:scale-95">Xác nhận đã nhận tiền</button>
             </div>
           </div>
         </div>
