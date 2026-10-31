@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Menu,
   User as UserIcon,
@@ -10,18 +10,15 @@ import {
   Dumbbell,
   Trash2,
   CheckCircle2,
-  ClipboardList,
 } from 'lucide-react';
 import AdminSchedulePage from './AdminSchedulePage';
 import AdminSetupReminderPage from './AdminSetupReminderPage';
-import AdminBookingRequestsView from '../components/admin/AdminBookingRequestsView';
 import StaffList from '../components/admin/StaffList';
 import AddStaffView from '../components/admin/AddStaffView';
 import StaffDetailView from '../components/admin/StaffDetailView';
 import EditStaffView from '../components/admin/EditStaffView';
 import WalletRevenueView from '../components/admin/WalletRevenueView';
 import FacilityManagementView from '../components/admin/FacilityManagementView';
-import { getStoredBookingRequests } from '../types/bookingRequest';
 import type { Employee, Transaction, FacilityEquipment, CourtStatusItem, FacilityIncident } from '../types/admin';
 import { INITIAL_EMPLOYEES, INITIAL_TRANSACTIONS, INITIAL_EQUIPMENT, INITIAL_COURT_STATUSES, INITIAL_INCIDENTS } from '../types/admin';
 import { employeeApiService } from '../services/employeeService';
@@ -33,7 +30,7 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   const [isSetupMode, setIsSetupMode] = useState(false);
   const showScheduleControls = !isCheckoutMode && !isSetupMode;
   
-  const [activeTab, setActiveTab] = useState<'lich_san' | 'yeu_cau_dat_san' | 'nhan_vien' | 'vi_thu' | 'co_so_vat_chat'>('lich_san');
+  const [activeTab, setActiveTab] = useState<'lich_san' | 'nhan_vien' | 'vi_thu' | 'co_so_vat_chat'>('lich_san');
   const [employees, setEmployees] = useState<Employee[]>(INITIAL_EMPLOYEES);
   const [transactions, setTransactions] = useState<Transaction[]>(INITIAL_TRANSACTIONS);
   const [equipments, setEquipments] = useState<FacilityEquipment[]>(INITIAL_EQUIPMENT);
@@ -42,15 +39,7 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   const [staffSubView, setStaffSubView] = useState<'list' | 'add' | 'detail' | 'edit'>('list');
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
 
-  const pendingRequestsCount = useMemo(() => {
-    try {
-      return getStoredBookingRequests().filter(r => r.status === 'pending').length;
-    } catch {
-      return 0;
-    }
-  }, [activeTab]);
-
-  const handleTabChange = (tabId: 'lich_san' | 'yeu_cau_dat_san' | 'nhan_vien' | 'vi_thu' | 'co_so_vat_chat') => {
+  const handleTabChange = (tabId: 'lich_san' | 'nhan_vien' | 'vi_thu' | 'co_so_vat_chat') => {
     setActiveTab(tabId);
     setSidebarOpen(false);
     if (tabId === 'nhan_vien') setStaffSubView('list');
@@ -496,7 +485,7 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
 
 
   return (
-    <div className="flex h-screen bg-slate-50 text-slate-900 w-full animate-in fade-in zoom-in-95 duration-300 relative overflow-hidden">
+    <div data-admin-dashboard="true" className="flex h-screen bg-slate-50 text-slate-900 w-full animate-in fade-in zoom-in-95 duration-300 relative overflow-hidden">
       {sidebarOpen && (
         <div className="absolute inset-0 z-[200] flex">
           <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setSidebarOpen(false)} />
@@ -513,19 +502,6 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
               >
                 <LayoutGrid className="w-4 h-4" /> Lịch sân
               </div>
-              <div 
-                onClick={() => handleTabChange('yeu_cau_dat_san')}
-                className={`flex items-center justify-between px-3 py-3 rounded-xl font-bold text-sm cursor-pointer ${activeTab === 'yeu_cau_dat_san' ? 'bg-emerald-700 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50'}`}
-              >
-                <div className="flex items-center gap-3">
-                  <ClipboardList className="w-4 h-4" /> Yêu cầu đặt sân
-                </div>
-                {pendingRequestsCount > 0 && (
-                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${activeTab === 'yeu_cau_dat_san' ? 'bg-white text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
-                    {pendingRequestsCount} chờ
-                  </span>
-                )}
-              </div>
               <div
                 onClick={() => handleTabChange('nhan_vien')}
                 className={`flex items-center gap-3 px-3 py-3 rounded-xl font-bold text-sm cursor-pointer ${activeTab === 'nhan_vien' ? 'bg-emerald-700 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50'}`}
@@ -536,7 +512,7 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                 onClick={() => handleTabChange('vi_thu')}
                 className={`flex items-center gap-3 px-3 py-3 rounded-xl font-bold text-sm cursor-pointer ${activeTab === 'vi_thu' ? 'bg-emerald-700 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50'}`}
               >
-                <Wallet className="w-4 h-4" /> Ví & Thu
+                <Wallet className="w-4 h-4" /> Thống kê đặt sân
               </div>
               <div
                 onClick={() => handleTabChange('co_so_vat_chat')}
@@ -566,18 +542,6 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
             <button onClick={() => setSidebarOpen(true)} className="w-10 h-10 flex items-center justify-center text-emerald-700 active:scale-95 bg-emerald-50 rounded-lg">
               <Menu className="w-5 h-5" />
             </button>
-            <button
-              type="button"
-              onClick={() => handleTabChange('yeu_cau_dat_san')}
-              className={`hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition active:scale-95 cursor-pointer ${
-                activeTab === 'yeu_cau_dat_san'
-                  ? 'bg-emerald-700 text-white shadow-xs'
-                  : 'bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100'
-              }`}
-            >
-              <ClipboardList className="w-3.5 h-3.5" />
-              <span>Tiếp nhận yêu cầu {pendingRequestsCount > 0 ? `(${pendingRequestsCount})` : ''}</span>
-            </button>
           </div>
           <div className="flex flex-col items-center">
             <span className="font-black text-slate-800 tracking-tight uppercase text-sm">COURTX HUB</span>
@@ -586,18 +550,6 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
             </span>
           </div>
           <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => handleTabChange('yeu_cau_dat_san')}
-              className={`sm:hidden flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-bold transition active:scale-95 cursor-pointer ${
-                activeTab === 'yeu_cau_dat_san'
-                  ? 'bg-emerald-700 text-white shadow-xs'
-                  : 'bg-amber-100 text-amber-800'
-              }`}
-            >
-              <ClipboardList className="w-3 h-3" />
-              <span>Yêu cầu {pendingRequestsCount > 0 ? `(${pendingRequestsCount})` : ''}</span>
-            </button>
             <button onClick={onLogout} className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 active:scale-95 hover:bg-red-50 hover:text-red-600 transition">
               <LogOut className="w-4 h-4" />
             </button>
@@ -631,10 +583,6 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
               />
             )}
           </>
-        )}
-
-        {activeTab === 'yeu_cau_dat_san' && (
-          <AdminBookingRequestsView />
         )}
 
         {activeTab === 'nhan_vien' && (
@@ -674,7 +622,7 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
         )}
 
         {activeTab === 'vi_thu' && (
-          <div className="flex-1 overflow-y-auto overflow-x-hidden bg-slate-50 relative custom-scrollbar">
+          <div className="min-w-0 w-full flex-1 overflow-y-auto overflow-x-hidden bg-slate-50 relative custom-scrollbar">
             <WalletRevenueView
               transactions={transactions}
               onProcessRefund={handleProcessRefund}
