@@ -5,7 +5,7 @@ import EmployeeDashboard from './employee/EmployeeDashboard';
 import VipCustomerDashboard from './VipCustomerDashboard';
 import { addBookingRequest } from '../types/bookingRequest';
 import { useState, useRef, useEffect, useMemo } from 'react';
-import { Search, MapPin, Phone, Clock, Play, Home, Calendar as CalendarIcon, X, Zap , User, Lock, Eye, EyeOff, Bell, Key, ArrowLeft, ArrowRight, ChevronLeft, ChevronRight, ChevronDown, Trophy, CheckCircle2, RefreshCw, MessageSquare, Copy, Check, AlertTriangle } from 'lucide-react';
+import { Search, MapPin, Phone, Clock, Play, Home, Calendar as CalendarIcon, X, Zap , User, Lock, Eye, EyeOff, Bell, Key, ArrowLeft, ArrowRight, ChevronLeft, ChevronRight, ChevronDown, Trophy, CheckCircle2, RefreshCw, MessageSquare, Copy, Check, AlertTriangle, ReceiptText, Printer } from 'lucide-react';
 
 const parseTimeToMinutes = (t: string): number => {
   if (!t) return 0;
@@ -79,6 +79,7 @@ export default function TrangChu() {
   const [showBookingPopup, setShowBookingPopup] = useState<boolean>(false);
   const [showPayment, setShowPayment] = useState<boolean>(false);
   const [isSubmitted, setIsSubmitted] = useState<boolean>(false);
+  const [showReceipt, setShowReceipt] = useState<boolean>(false);
   const [showOTP, setShowOTP] = useState<boolean>(false);
   const [showLogin, setShowLogin] = useState<boolean>(false);
   const [showPassword, setShowPassword] = useState<boolean>(false);
@@ -865,14 +866,15 @@ export default function TrangChu() {
     }
   };
 
-  const confirmPaymentReceived = () => {
-    const confirmed = window.confirm(
-      'Chỉ xác nhận sau khi chủ sân hoặc nhân viên đã kiểm tra và thấy tiền thực nhận trong tài khoản ngân hàng. Tiếp tục?',
-    );
-    if (!confirmed) return;
-    setShowPayment(false);
-    setIsSubmitted(true);
-  };
+  // Giả định tự động hoàn tất thanh toán sau 4 giây khi khách quét mã VietQR
+  useEffect(() => {
+    if (!showPayment) return;
+    const timer = setTimeout(() => {
+      setShowPayment(false);
+      setIsSubmitted(true);
+    }, 4000);
+    return () => clearTimeout(timer);
+  }, [showPayment]);
 
   const handleLookupSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -2892,15 +2894,17 @@ export default function TrangChu() {
                    <span className="h-2 w-2 bg-white rounded-full"></span>
                  </span>
                </div>
-               <p className="text-xs font-bold text-emerald-700">Chờ chủ sân/nhân viên đối soát</p>
-               <p className="max-w-xs text-center text-[10px] leading-4 text-slate-500">
-                 Chỉ xác nhận sau khi kiểm tra thấy tiền đã vào tài khoản ngân hàng.
-               </p>
+               <p className="text-xs font-bold text-emerald-700">Đang chờ hệ thống ghi nhận thanh toán...</p>
             </div>
 
-            <div className="w-full mt-6 grid grid-cols-1 gap-2 sm:grid-cols-2 sm:gap-3">
-              <button onClick={() => setShowPayment(false)} type="button" className="rounded-xl border border-slate-200 py-3 text-xs font-bold text-slate-600 hover:bg-slate-50 cursor-pointer active:scale-95">Hủy giao dịch</button>
-              <button onClick={confirmPaymentReceived} type="button" className="rounded-xl bg-emerald-800 py-3 text-xs font-bold text-white hover:bg-emerald-900 cursor-pointer active:scale-95">Xác nhận đã nhận tiền</button>
+            <div className="w-full mt-6">
+              <button
+                onClick={() => setShowPayment(false)}
+                type="button"
+                className="w-full rounded-xl border border-slate-200 py-3 text-xs font-bold text-slate-600 hover:bg-slate-50 cursor-pointer active:scale-95"
+              >
+                Hủy giao dịch
+              </button>
             </div>
           </div>
         </div>
@@ -2937,13 +2941,119 @@ export default function TrangChu() {
               Thông tin xác nhận & vé QR đã được hệ thống gửi qua Zalo/SMS tới số <strong className="text-slate-900">{customerPhone}</strong>.
             </p>
 
-            <button
-              type="button"
-              onClick={() => setIsSubmitted(false)}
-              className="w-full rounded-xl bg-emerald-500 py-3 text-xs font-black uppercase tracking-wider text-white hover:bg-emerald-600"
-            >
-              HOÀN TẤT & QUAY LẠI
-            </button>
+            <p className="text-center text-[11px] text-amber-800 bg-amber-50 border border-amber-200/90 rounded-xl py-2 px-3">
+              ⚠️ <strong>Lưu ý:</strong> Vui lòng in biên nhận để kiểm tra vé tại quầy.
+            </p>
+
+            <div className="flex gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setShowReceipt(true)}
+                className="w-full rounded-xl border border-emerald-600 bg-emerald-50/70 py-3 text-xs font-bold uppercase tracking-wider text-emerald-800 hover:bg-emerald-100 flex items-center justify-center gap-2 transition cursor-pointer active:scale-95 shadow-sm"
+              >
+                <ReceiptText className="w-4 h-4 text-emerald-700" />
+                Biên nhận
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsSubmitted(false)}
+                className="w-full rounded-xl bg-emerald-500 py-3 text-xs font-black uppercase tracking-wider text-white hover:bg-emerald-600 cursor-pointer active:scale-95 transition shadow-sm shadow-emerald-500/20"
+              >
+                HOÀN TẤT
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 🧾 MODAL BIÊN NHẬN THANH TOÁN (RECEIPT MODAL) */}
+      {showReceipt && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm animate-fade-in">
+          <div className="w-full max-w-sm rounded-3xl border border-slate-200 bg-white p-5 shadow-2xl space-y-4 animate-in zoom-in-95 duration-150">
+            {/* Header Biên nhận */}
+            <div className="flex items-start justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700">
+                  <ReceiptText className="h-5 w-5" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-black text-slate-900 uppercase tracking-wide">Biên nhận đặt sân</h4>
+                  <p className="text-[11px] text-slate-500">CourtX Arena · Hóa đơn điện tử</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowReceipt(false)}
+                className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700 cursor-pointer transition"
+                aria-label="Đóng biên nhận"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Chi tiết biên nhận */}
+            <div className="space-y-2 rounded-2xl bg-slate-50/90 p-3.5 border border-slate-200/80 text-xs">
+              <div className="flex justify-between items-center">
+                <span className="text-slate-500">Mã biên nhận (Vé):</span>
+                <span className="font-mono font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">{orderCode}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Khách hàng:</span>
+                <span className="font-bold text-slate-900">{customerName}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Số điện thoại:</span>
+                <span className="font-medium text-slate-700">{customerPhone}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Bộ môn & Sân:</span>
+                <span className="font-bold text-slate-900">{currentSport?.name || ''} · {selectedCourt}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Thời gian:</span>
+                <span className="font-semibold text-slate-800">{selectedDate} · {selectedSlot}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Phương thức:</span>
+                <span className="font-bold text-emerald-700">VietQR (100%)</span>
+              </div>
+              <div className="flex justify-between border-t border-dashed border-slate-200 pt-2 text-sm">
+                <span className="font-bold text-slate-700">Tổng tiền thanh toán:</span>
+                <span className="font-black text-emerald-600">{totalPrice.toLocaleString('vi-VN')} đ</span>
+              </div>
+              <div className="flex justify-between items-center text-[11px] pt-1 text-slate-500">
+                <span>Trạng thái:</span>
+                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800">
+                  <Check className="h-3 w-3" /> Đã thanh toán
+                </span>
+              </div>
+            </div>
+
+            <p className="text-center text-[11px] text-amber-700 bg-amber-50 border border-amber-200/80 rounded-xl py-2 px-3">
+              ⚠️ <strong>Lưu ý:</strong> Vui lòng in biên nhận để kiểm tra vé tại quầy.
+            </p>
+
+
+
+            {/* Nút hành động */}
+            <div className="grid grid-cols-2 gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => window.print()}
+                className="flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 active:scale-95 transition cursor-pointer"
+              >
+                <Printer className="h-3.5 w-3.5" />
+                In biên nhận
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowReceipt(false)}
+                className="rounded-xl bg-emerald-700 hover:bg-emerald-800 py-2.5 text-xs font-bold text-white active:scale-95 transition cursor-pointer"
+              >
+                Đóng
+              </button>
+            </div>
           </div>
         </div>
       )}
