@@ -144,7 +144,7 @@ function StatusPill({ status, compact = false }: { status: Transaction['status']
   };
 
   return (
-    <span className={`inline-flex max-w-full items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold ${compact ? 'gap-1 px-1.5 py-0.5 text-[10px] leading-4' : ''} ${styles[status]}`}>
+    <span className={`inline-flex shrink-0 whitespace-nowrap items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold ${compact ? 'gap-1 px-2 py-0.5 text-[10px] leading-4' : ''} ${styles[status]}`}>
       <span className={`h-1.5 w-1.5 rounded-full ${dotStyles[status]}`} />
       {statusText[status]}
     </span>
@@ -335,22 +335,22 @@ export default function WalletRevenueView({ transactions, onProcessRefund }: Wal
 
   return (
     <main className="relative @container min-w-0 w-full flex-1 space-y-6 overflow-x-hidden bg-white p-4 pb-28 sm:p-6 lg:p-8">
-      <header className="flex min-w-0 flex-col gap-5 @6xl:flex-row @6xl:items-end @6xl:justify-between">
+      <header className="flex min-w-0 flex-col gap-4 @4xl:flex-row @4xl:items-end @4xl:justify-between">
         <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-1.5 text-xs font-semibold text-slate-500">
+          <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-semibold text-slate-500">
             <CalendarDays className="h-3.5 w-3.5 text-emerald-700" />
             {periodLabel} · {rangeLabel}
           </div>
-          <h1 className="mt-3 text-xl font-black tracking-tight text-slate-950 @6xl:text-2xl">
+          <h1 className="mt-1.5 text-lg font-black tracking-tight text-slate-950 @4xl:text-xl">
             Thống kê đặt sân & thanh toán
           </h1>
-          <p className="mt-2 max-w-2xl text-xs leading-5 text-slate-600">
+          <p className="mt-1 max-w-2xl text-[11px] leading-4 text-slate-500">
             Tổng hợp giao dịch đặt sân và khoản hoàn tiền theo ngày, tuần hoặc tháng đã chọn.
           </p>
         </div>
 
-        <div className="flex min-w-0 flex-col gap-3 @2xl:flex-row @2xl:items-center @6xl:shrink-0">
-          <div role="group" aria-label="Chọn kỳ thống kê" className="grid grid-cols-3 rounded-xl border border-slate-200 bg-white p-1 shadow-sm @2xl:min-w-[220px]">
+        <div className="flex min-w-0 flex-nowrap items-center gap-1.5 sm:gap-2 overflow-x-auto pb-1 sm:pb-0 @4xl:shrink-0">
+          <div role="group" aria-label="Chọn kỳ thống kê" className="inline-flex shrink-0 rounded-lg border border-slate-200 bg-slate-100/80 p-0.5 shadow-sm">
             {([
               ['day', 'Ngày'],
               ['week', 'Tuần'],
@@ -361,10 +361,10 @@ export default function WalletRevenueView({ transactions, onProcessRefund }: Wal
                 type="button"
                 aria-pressed={reportPeriod === value}
                 onClick={() => setReportPeriod(value)}
-                className={`min-h-10 rounded-lg px-2.5 text-xs font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-1 ${
+                className={`h-8 rounded-md px-2.5 sm:px-3 text-xs font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 ${
                   reportPeriod === value
                     ? 'bg-emerald-800 text-white shadow-sm'
-                    : 'text-slate-600 hover:bg-emerald-50 hover:text-emerald-800'
+                    : 'text-slate-600 hover:text-emerald-800'
                 }`}
               >
                 {label}
@@ -372,28 +372,26 @@ export default function WalletRevenueView({ transactions, onProcessRefund }: Wal
             ))}
           </div>
 
-          <div className="flex min-w-0 flex-1 items-center gap-2 @2xl:flex-none">
-            <label className="flex min-h-11 min-w-0 flex-1 items-center gap-2 rounded-xl border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-700 shadow-sm focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-100 @2xl:flex-none">
-              <CalendarDays className="h-3.5 w-3.5 shrink-0 text-emerald-700" />
-              <span className="sr-only">Chọn ngày neo cho kỳ thống kê</span>
-              <input
-                type="date"
-                value={selectedDate}
-                onChange={(event) => setSelectedDate(event.target.value)}
-                className="min-w-0 flex-1 bg-transparent outline-none"
-                aria-label="Chọn ngày neo cho kỳ thống kê"
-              />
-            </label>
+          <label className="flex h-8.5 shrink-0 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2 sm:px-2.5 text-xs font-medium text-slate-700 shadow-sm focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-100 w-[122px] sm:w-36">
+            <CalendarDays className="h-3.5 w-3.5 shrink-0 text-emerald-700" />
+            <span className="sr-only">Chọn ngày neo cho kỳ thống kê</span>
+            <input
+              type="date"
+              value={selectedDate}
+              onChange={(event) => setSelectedDate(event.target.value)}
+              className="min-w-0 flex-1 bg-transparent text-xs outline-none"
+              aria-label="Chọn ngày neo cho kỳ thống kê"
+            />
+          </label>
 
-            <button
-              type="button"
-              onClick={handleExport}
-              className="inline-flex min-h-11 shrink-0 items-center justify-center gap-1.5 rounded-xl border border-emerald-800 bg-emerald-800 px-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-emerald-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 @2xl:px-3"
-            >
-              <Download className="h-3.5 w-3.5" />
-              Xuất Excel
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={handleExport}
+            className="inline-flex h-8.5 shrink-0 items-center justify-center gap-1.5 rounded-lg border border-emerald-800 bg-emerald-800 px-2.5 sm:px-3 text-xs font-bold text-white shadow-sm transition hover:bg-emerald-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 whitespace-nowrap"
+          >
+            <Download className="h-3.5 w-3.5" />
+            Xuất Excel
+          </button>
         </div>
       </header>
 
@@ -431,34 +429,34 @@ export default function WalletRevenueView({ transactions, onProcessRefund }: Wal
         />
       </section>
 
-      <section className="grid min-w-0 gap-4 @6xl:grid-cols-[minmax(0,1.65fr)_minmax(300px,0.85fr)]">
-        <div className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-          <div className="flex flex-wrap items-start justify-between gap-3">
+      <section className="grid min-w-0 gap-3.5 @3xl:grid-cols-[minmax(0,1.55fr)_minmax(270px,0.85fr)]">
+        <div className="min-w-0 rounded-xl border border-slate-200 bg-white p-3.5 shadow-sm sm:p-4">
+          <div className="flex flex-wrap items-start justify-between gap-2">
             <div>
-              <h2 className="text-sm font-extrabold tracking-tight text-slate-900">Giá trị đặt sân theo ngày</h2>
-              <p className="mt-1 text-xs leading-5 text-slate-500">Tổng tiền từ các giao dịch đặt sân trong khoảng thời gian đã chọn.</p>
+              <h2 className="text-xs sm:text-sm font-extrabold tracking-tight text-slate-900">Giá trị đặt sân theo ngày</h2>
+              <p className="mt-0.5 text-[11px] leading-4 text-slate-500">Tổng tiền từ các giao dịch đặt sân trong khoảng thời gian đã chọn.</p>
             </div>
-            <span className="inline-flex items-center gap-2 text-xs font-semibold text-slate-600">
-              <span className="h-2.5 w-2.5 rounded-sm bg-emerald-700" />
+            <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-slate-600">
+              <span className="h-2 w-2 rounded-sm bg-emerald-700" />
               Tiền đặt sân
             </span>
           </div>
 
           {bookingTransactions.length === 0 ? (
-            <div className="mt-5 flex min-h-44 flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50/70 px-4 text-center">
-              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-slate-400 ring-1 ring-slate-200">
-                <CalendarDays className="h-5 w-5" />
+            <div className="mt-3 flex min-h-28 flex-col items-center justify-center rounded-lg border border-dashed border-slate-200 bg-slate-50/70 p-3 text-center">
+              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-slate-400 ring-1 ring-slate-200">
+                <CalendarDays className="h-4 w-4" />
               </span>
-              <p className="mt-3 text-sm font-bold text-slate-700">Chưa có giao dịch đặt sân</p>
-              <p className="mt-1 max-w-sm text-xs leading-5 text-slate-500">Chọn ngày khác hoặc đổi kỳ thống kê để xem dữ liệu giao dịch thực tế.</p>
+              <p className="mt-2 text-xs font-bold text-slate-700">Chưa có giao dịch đặt sân</p>
+              <p className="mt-0.5 max-w-sm text-[11px] leading-4 text-slate-500">Chọn ngày khác hoặc đổi kỳ thống kê để xem dữ liệu giao dịch thực tế.</p>
             </div>
           ) : (
             <div
               role="img"
               aria-label={`Biểu đồ giá trị đặt sân theo ngày, tổng ${formatCurrency(bookingAmount)}`}
-              className="mt-5 overflow-x-auto pb-2"
+              className="mt-3 overflow-x-auto pb-1"
             >
-              <div className={`flex h-48 min-w-0 items-end gap-1.5 border-b border-slate-200 px-1 sm:gap-2 ${chartData.length > 10 ? 'min-w-[900px]' : ''}`}>
+              <div className={`flex h-32 min-w-0 items-end gap-1.5 border-b border-slate-200 px-1 sm:gap-2 ${chartData.length > 10 ? 'min-w-[900px]' : ''}`}>
                 {chartData.map(({ date, amount }, index) => {
                   const barHeight = chartMax > 0 && amount > 0 ? Math.max(8, (amount / chartMax) * 100) : 2;
                   const showLabel = reportPeriod === 'month' || chartData.length < 10 || index === 0 || index === chartData.length - 1 || (index + 1) % 5 === 0;
@@ -467,16 +465,16 @@ export default function WalletRevenueView({ transactions, onProcessRefund }: Wal
                     : String(date.getDate());
 
                   return (
-                    <div key={dateKey(date)} className="flex h-full min-w-0 flex-1 flex-col items-center justify-end gap-2">
+                    <div key={dateKey(date)} className="flex h-full min-w-0 flex-1 flex-col items-center justify-end gap-1.5">
                       <span className="max-w-full truncate text-center text-[10px] font-semibold tabular-nums text-slate-500">
                         {chartData.length <= 10 && amount > 0
                           ? new Intl.NumberFormat('vi-VN', { notation: 'compact', maximumFractionDigits: 1 }).format(amount)
                           : ''}
                       </span>
-                      <div className="flex h-28 w-full items-end justify-center">
+                      <div className="flex h-20 w-full items-end justify-center">
                         <div
                           title={`${formatRangeDate(date)} · ${formatCurrency(amount)}`}
-                          className={`w-full max-w-12 rounded-t-md transition-colors ${amount > 0 ? 'bg-gradient-to-t from-emerald-800 to-emerald-500 hover:from-emerald-700 hover:to-emerald-400' : 'bg-slate-100'}`}
+                          className={`w-full max-w-9 rounded-t-sm transition-colors ${amount > 0 ? 'bg-gradient-to-t from-emerald-800 to-emerald-500 hover:from-emerald-700 hover:to-emerald-400' : 'bg-slate-100'}`}
                           style={{ height: `${barHeight}%` }}
                         />
                       </div>
@@ -490,66 +488,68 @@ export default function WalletRevenueView({ transactions, onProcessRefund }: Wal
             </div>
           )}
           {bookingTransactions.length > 0 && (
-            <p className="mt-2 text-right text-[11px] font-semibold text-slate-500">
+            <p className="mt-1.5 text-right text-[11px] font-semibold text-slate-500">
               Tổng cộng <span className="font-extrabold text-slate-800">{formatCurrency(bookingAmount)}</span>
             </p>
           )}
         </div>
 
         {pendingRefunds.length > 0 ? (
-          <aside className="flex min-w-0 flex-col rounded-2xl border border-amber-200 bg-[#fffaf0] p-4 shadow-sm sm:p-5">
-            <div className="flex items-start gap-3">
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-800">
-                <RotateCcw className="h-5 w-5" />
-              </span>
-              <div className="min-w-0">
-                <p className="text-xs font-extrabold uppercase tracking-wide text-amber-900">Cần đối soát hoàn tiền</p>
-                <p className="mt-2 text-2xl font-black tracking-tight text-slate-950">{formatCurrency(pendingRefundTotal)}</p>
-                <p className="mt-1 text-xs font-medium text-amber-900/80">{pendingRefunds.length} khoản hoàn đang chờ xử lý trong kỳ.</p>
+          <aside className="flex min-w-0 flex-col justify-between rounded-xl border border-amber-200 bg-[#fffaf0] p-3.5 shadow-sm sm:p-4">
+            <div>
+              <div className="flex items-start gap-2.5">
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-800">
+                  <RotateCcw className="h-4 w-4" />
+                </span>
+                <div className="min-w-0">
+                  <p className="text-[11px] font-extrabold uppercase tracking-wide text-amber-900">Cần đối soát hoàn tiền</p>
+                  <p className="mt-0.5 text-lg sm:text-xl font-black tracking-tight text-slate-950">{formatCurrency(pendingRefundTotal)}</p>
+                  <p className="mt-0.5 text-[11px] font-medium text-amber-900/80">{pendingRefunds.length} khoản hoàn đang chờ xử lý trong kỳ.</p>
+                </div>
               </div>
-            </div>
 
-            <div className="mt-5 rounded-xl border border-amber-200/80 bg-white/70 p-3">
-              <p className="text-xs font-bold text-slate-800">{pendingRefunds[0].customerName}</p>
-              <p className="mt-1 text-xs leading-5 text-slate-600">
-                {pendingRefunds[0].refundReason || 'Yêu cầu hoàn tiền cần được chủ sân đối soát.'}
-              </p>
+              <div className="mt-2.5 rounded-lg border border-amber-200/80 bg-white/80 p-2.5">
+                <p className="text-xs font-bold text-slate-800">{pendingRefunds[0].customerName}</p>
+                <p className="mt-0.5 text-[11px] leading-relaxed text-slate-600 line-clamp-2">
+                  {pendingRefunds[0].refundReason || 'Yêu cầu hoàn tiền cần được chủ sân đối soát.'}
+                </p>
+              </div>
             </div>
 
             <button
               type="button"
               onClick={() => openRefundDialog(pendingRefunds[0])}
-              className="mt-auto inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-emerald-800 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-emerald-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2"
+              className="mt-3 inline-flex min-h-9 sm:min-h-10 w-full items-center justify-center gap-1.5 rounded-lg bg-emerald-800 px-3 py-2 text-xs font-bold text-white transition hover:bg-emerald-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2"
             >
-              <QrCode className="h-4 w-4" />
+              <QrCode className="h-3.5 w-3.5" />
               Tiếp tục hoàn tiền
             </button>
           </aside>
         ) : (
-          <aside className="flex min-w-0 flex-col justify-center rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <div className="flex items-center gap-3">
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700">
-                <ShieldCheck className="h-5 w-5" />
+          <aside className="flex min-w-0 flex-col justify-center rounded-xl border border-slate-200 bg-white p-3.5 sm:p-4 shadow-sm">
+            <div className="flex items-center gap-2.5">
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700">
+                <ShieldCheck className="h-4 w-4" />
               </span>
               <div>
-                <h2 className="text-sm font-extrabold text-slate-900">Hoàn tiền đang chờ</h2>
-                <p className="mt-1 text-xs leading-5 text-slate-500">Không có giao dịch hoàn tiền cần xử lý trong kỳ này.</p>
+                <h2 className="text-xs sm:text-sm font-extrabold text-slate-900">Hoàn tiền đang chờ</h2>
+                <p className="mt-0.5 text-[11px] leading-4 text-slate-500">Không có giao dịch hoàn tiền cần xử lý trong kỳ này.</p>
               </div>
             </div>
           </aside>
         )}
       </section>
 
-      <section className="-mx-4 overflow-hidden border-y border-slate-200 bg-white shadow-sm sm:mx-0 sm:rounded-2xl sm:border">
-        <div className="flex flex-col gap-4 border-b border-slate-100 p-4 sm:p-5 @6xl:flex-row @6xl:items-center @6xl:justify-between">
+      <section className="-mx-4 overflow-hidden border-y border-slate-200 bg-white shadow-sm sm:mx-0 sm:rounded-xl sm:border">
+        <div className="flex flex-col gap-2.5 border-b border-slate-100 p-3 sm:p-4 @4xl:flex-row @4xl:items-center @4xl:justify-between">
           <div>
-            <h2 className="text-sm font-extrabold tracking-tight text-slate-900">Giao dịch trong kỳ</h2>
-            <p className="mt-1 text-xs text-slate-500">
+            <h2 className="text-xs sm:text-sm font-extrabold tracking-tight text-slate-900">Giao dịch trong kỳ</h2>
+            <p className="mt-0.5 text-[11px] text-slate-500">
               {filteredTransactions.length} / {periodTransactions.length} giao dịch · {rangeLabel}
             </p>
           </div>
-          <div className="flex min-w-0 flex-col gap-3 @4xl:flex-row @4xl:items-center">
-            <div role="group" aria-label="Lọc theo trạng thái" className="flex min-w-0 gap-1 overflow-x-auto rounded-xl bg-slate-100 p-1">
+          <div className="flex min-w-0 flex-nowrap items-center gap-1.5 sm:gap-2 overflow-x-auto scrollbar-none pb-0.5 sm:pb-0 shrink-0">
+            <div role="group" aria-label="Lọc theo trạng thái" className="inline-flex shrink-0 min-w-0 gap-0.5 rounded-lg bg-slate-100 p-0.5">
               {([
                 ['all', 'Tất cả'],
                 ['success', 'Đã thanh toán'],
@@ -561,7 +561,7 @@ export default function WalletRevenueView({ transactions, onProcessRefund }: Wal
                   type="button"
                   aria-pressed={statusFilter === value}
                   onClick={() => setStatusFilter(value)}
-                  className={`min-h-10 shrink-0 rounded-lg px-3 text-xs font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 ${
+                  className={`h-7 shrink-0 rounded-md px-1.5 sm:px-2.5 text-[10.5px] sm:text-[11px] font-bold whitespace-nowrap transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 ${
                     statusFilter === value ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
@@ -569,29 +569,29 @@ export default function WalletRevenueView({ transactions, onProcessRefund }: Wal
                 </button>
               ))}
             </div>
-            <label className="relative flex min-h-11 min-w-0 items-center">
+            <label className="relative flex h-7 shrink-0 items-center">
               <span className="sr-only">Lọc theo bộ môn</span>
               <select
                 value={sportFilter}
                 onChange={(event) => setSportFilter(event.target.value)}
                 aria-label="Lọc theo bộ môn"
-                className="min-h-11 w-full appearance-none rounded-xl border border-slate-200 bg-white py-2 pl-3 pr-9 text-sm font-semibold text-slate-700 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 @2xl:min-w-44"
+                className="h-7 w-[132px] sm:w-36 shrink-0 appearance-none rounded-lg border border-slate-200 bg-white py-0.5 pl-2.5 pr-6 text-[11px] font-semibold text-slate-700 outline-none focus:border-emerald-500"
               >
                 <option value="all">Tất cả bộ môn</option>
                 {sports.map((sport) => <option key={sport} value={sport}>{sport}</option>)}
               </select>
-              <ChevronDown className="pointer-events-none absolute right-3 h-4 w-4 text-slate-400" />
+              <ChevronDown className="pointer-events-none absolute right-1.5 h-3.5 w-3.5 text-slate-400" />
             </label>
           </div>
         </div>
 
         {filteredTransactions.length === 0 ? (
-          <div className="flex min-h-52 flex-col items-center justify-center px-5 py-10 text-center">
-            <span className="flex h-11 w-11 items-center justify-center rounded-full bg-slate-100 text-slate-400">
-              <ReceiptText className="h-5 w-5" />
+          <div className="flex min-h-36 flex-col items-center justify-center p-6 text-center">
+            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 text-slate-400">
+              <ReceiptText className="h-4 w-4" />
             </span>
-            <p className="mt-3 text-sm font-bold text-slate-700">Không có giao dịch phù hợp</p>
-            <p className="mt-1 max-w-md text-xs leading-5 text-slate-500">
+            <p className="mt-2 text-xs font-bold text-slate-700">Không có giao dịch phù hợp</p>
+            <p className="mt-0.5 max-w-md text-[11px] leading-4 text-slate-500">
               {periodTransactions.length === 0
                 ? 'Chưa có giao dịch hợp lệ trong khoảng thời gian đã chọn.'
                 : 'Thử thay đổi bộ lọc trạng thái hoặc bộ môn.'}
@@ -599,20 +599,20 @@ export default function WalletRevenueView({ transactions, onProcessRefund }: Wal
           </div>
         ) : (
           <div className="w-full min-w-0 overflow-x-auto">
-            <table className="w-full min-w-[560px] table-fixed border-collapse text-left @4xl:min-w-0">
+            <table className="w-full min-w-[560px] table-fixed border-collapse border border-slate-200 text-left @4xl:min-w-0">
               <thead>
                 <tr className="bg-slate-50/80 text-[11px] font-extrabold uppercase tracking-wide text-slate-500">
-                  <th scope="col" className="w-[24%] border border-slate-200 px-1.5 py-2 text-[10px] leading-4 @4xl:hidden">Giao dịch</th>
-                  <th scope="col" className="w-[23%] border border-slate-200 px-1.5 py-2 text-[10px] leading-4 @4xl:hidden">Khách</th>
-                  <th scope="col" className="w-[17%] border border-slate-200 px-1.5 py-2 text-[10px] leading-4 @4xl:hidden">Sân</th>
-                  <th scope="col" className="w-[24%] border border-slate-200 px-1.5 py-2 text-[10px] leading-4 @4xl:hidden">Tiền · xử lý</th>
-                  <th scope="col" className="w-[12%] border border-slate-200 px-1 py-2 text-center text-[10px] leading-4 @4xl:hidden">Chi tiết</th>
-                  <th scope="col" className="hidden w-[20%] border border-slate-200 px-3 py-3.5 @4xl:table-cell">Giao dịch</th>
-                  <th scope="col" className="hidden w-[19%] border border-slate-200 px-3 py-3.5 @4xl:table-cell">Khách hàng</th>
-                  <th scope="col" className="hidden w-[17%] border border-slate-200 px-3 py-3.5 @4xl:table-cell">Bộ môn & sân</th>
-                  <th scope="col" className="hidden w-[17%] border border-slate-200 px-3 py-3.5 text-right @4xl:table-cell">Số tiền</th>
-                  <th scope="col" className="hidden w-[17%] border border-slate-200 px-3 py-3.5 @4xl:table-cell">Trạng thái</th>
-                  <th scope="col" className="hidden w-[10%] border border-slate-200 px-3 py-3.5 text-right @4xl:table-cell">Thao tác</th>
+                  <th scope="col" className="w-[23%] border border-slate-200 px-2 py-2 text-[10px] leading-4 @4xl:hidden">Giao dịch</th>
+                  <th scope="col" className="w-[23%] border border-slate-200 px-2 py-2 text-[10px] leading-4 @4xl:hidden">Khách</th>
+                  <th scope="col" className="w-[17%] border border-slate-200 px-2 py-2 text-[10px] leading-4 @4xl:hidden">Sân</th>
+                  <th scope="col" className="w-[27%] border border-slate-200 px-2 py-2 text-[10px] leading-4 @4xl:hidden">Tiền · xử lý</th>
+                  <th scope="col" className="w-[10%] border border-slate-200 px-1 py-2 text-center text-[10px] leading-4 @4xl:hidden">Chi tiết</th>
+                  <th scope="col" className="hidden w-[20%] border border-slate-200 px-3 py-2.5 @4xl:table-cell">Giao dịch</th>
+                  <th scope="col" className="hidden w-[19%] border border-slate-200 px-3 py-2.5 @4xl:table-cell">Khách hàng</th>
+                  <th scope="col" className="hidden w-[17%] border border-slate-200 px-3 py-2.5 @4xl:table-cell">Bộ môn & sân</th>
+                  <th scope="col" className="hidden w-[17%] border border-slate-200 px-3 py-2.5 text-right @4xl:table-cell">Số tiền</th>
+                  <th scope="col" className="hidden w-[17%] border border-slate-200 px-3 py-2.5 @4xl:table-cell">Trạng thái</th>
+                  <th scope="col" className="hidden w-[10%] border border-slate-200 px-3 py-2.5 text-right @4xl:table-cell">Thao tác</th>
                 </tr>
               </thead>
               <tbody>
@@ -858,88 +858,94 @@ function TransactionRow({
   const { sport, court } = getCourtInfo(transaction.courtInfo);
   return (
     <tr className="transition hover:bg-slate-50/70">
-      <td className="border border-slate-200 px-1.5 py-2 align-top @4xl:hidden">
-        <button type="button" onClick={onView} className="block max-w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500">
-          <span className="block break-all text-[12px] font-extrabold leading-4 text-slate-800">{transaction.code}</span>
-          <span className="mt-1 block break-words text-[10px] leading-4 text-slate-500">{transaction.date}</span>
+      {/* Mobile / Narrow view */}
+      <td className="border border-slate-200 px-2 py-2 align-top @4xl:hidden">
+        <button type="button" onClick={onView} className="block max-w-full text-left focus-visible:outline-none">
+          <span className="block whitespace-nowrap text-[11px] font-extrabold leading-tight text-slate-800">{transaction.code}</span>
+          <span className="mt-0.5 block whitespace-nowrap text-[10px] leading-tight text-slate-500">{transaction.date}</span>
         </button>
-        <span className="mt-1 inline-flex max-w-full break-words rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold leading-4 text-slate-600">
+        <span className="mt-1 inline-flex whitespace-nowrap rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-600">
           {transactionTypeText[transaction.type]}
         </span>
       </td>
-      <td className="border border-slate-200 px-1.5 py-2 align-top @4xl:hidden">
-        <span className="block break-words text-[11px] font-bold leading-4 text-slate-800">{transaction.customerName}</span>
-        <span className="mt-1 block break-all text-[10px] leading-4 text-slate-500">{transaction.customerPhone}</span>
+      <td className="border border-slate-200 px-2 py-2 align-top @4xl:hidden">
+        <span className="block text-[11px] font-bold leading-tight text-slate-800">{transaction.customerName}</span>
+        <span className="mt-0.5 block whitespace-nowrap text-[10px] leading-tight text-slate-500">{transaction.customerPhone}</span>
       </td>
-      <td className="border border-slate-200 px-1.5 py-2 align-top @4xl:hidden">
-        <span className="block break-words text-[11px] font-bold leading-4 text-slate-800">{sport}</span>
-        <span className="mt-1 block break-words text-[10px] leading-4 text-slate-500">{court}</span>
+      <td className="border border-slate-200 px-2 py-2 align-top @4xl:hidden">
+        <span className="block text-[11px] font-bold leading-tight text-slate-800">{sport}</span>
+        <span className="mt-0.5 block text-[10px] leading-tight text-slate-500">{court}</span>
       </td>
-      <td className="border border-slate-200 px-1.5 py-2 align-top @4xl:hidden">
-        <span className="block break-words text-[11px] font-black leading-4 tabular-nums text-slate-900">{formatCurrency(transaction.amount)}</span>
-        <div className="mt-1"><StatusPill status={transaction.status} compact /></div>
-        <div className="mt-1 flex items-center gap-1">
-          {transaction.type === 'refund' && transaction.status === 'pending_refund' && (
+      <td className="border border-slate-200 px-2 py-2 align-top @4xl:hidden">
+        <span className="block whitespace-nowrap text-[11px] font-black leading-tight tabular-nums text-slate-900">{formatCurrency(transaction.amount)}</span>
+        <div className="mt-1">
+          <StatusPill status={transaction.status} compact />
+        </div>
+        {transaction.type === 'refund' && transaction.status === 'pending_refund' && (
+          <div className="mt-1.5">
             <button
               type="button"
               onClick={onRefund}
               aria-label={`Xử lý hoàn tiền ${transaction.code}`}
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-800 text-white transition hover:bg-emerald-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
+              className="inline-flex items-center gap-1 rounded bg-emerald-800 px-1.5 py-0.5 text-[10px] font-bold text-white transition hover:bg-emerald-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
             >
-              <RotateCcw className="h-4 w-4" />
+              <RotateCcw className="h-3 w-3" />
+              <span>Hoàn tiền</span>
             </button>
-          )}
-        </div>
+          </div>
+        )}
       </td>
       <td className="border border-slate-200 px-1 py-2 text-center align-top @4xl:hidden">
         <button
           type="button"
           onClick={onView}
           aria-label={`Xem chi tiết ${transaction.code}`}
-          className="inline-flex min-h-8 items-center justify-center gap-1 rounded-lg px-1 text-[10px] font-bold text-emerald-800 transition hover:bg-emerald-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
+          className="inline-flex min-h-7 items-center justify-center gap-1 rounded-md px-1 text-[10px] font-bold text-emerald-800 transition hover:bg-emerald-50 focus-visible:outline-none"
         >
-          <Eye className="h-4 w-4 shrink-0" />
+          <Eye className="h-3.5 w-3.5 shrink-0" />
           <span>Xem</span>
         </button>
       </td>
-      <td className="hidden border border-slate-200 px-3 py-4 align-top @4xl:table-cell">
-        <button type="button" onClick={onView} className="text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500">
-          <span className="block text-sm font-extrabold text-slate-800">{transaction.code}</span>
-          <span className="mt-1 block text-xs text-slate-500">{transaction.date}</span>
+
+      {/* Desktop view */}
+      <td className="hidden border border-slate-200 px-3 py-2.5 align-top @4xl:table-cell">
+        <button type="button" onClick={onView} className="text-left focus-visible:outline-none">
+          <span className="block text-xs font-extrabold text-slate-800">{transaction.code}</span>
+          <span className="mt-0.5 block text-[10px] text-slate-500">{transaction.date}</span>
         </button>
-        <span className="mt-1.5 inline-flex rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-600">
+        <span className="mt-1 inline-flex rounded bg-slate-100 px-1.5 py-0.5 text-[9px] font-bold text-slate-600">
           {transactionTypeText[transaction.type]}
         </span>
       </td>
-      <td className="hidden border border-slate-200 px-3 py-4 align-top @4xl:table-cell">
-        <span className="block text-sm font-bold text-slate-800">{transaction.customerName}</span>
-        <span className="mt-1 block text-xs text-slate-500">{transaction.customerPhone}</span>
+      <td className="hidden border border-slate-200 px-3 py-2.5 align-top @4xl:table-cell">
+        <span className="block text-xs font-bold text-slate-800">{transaction.customerName}</span>
+        <span className="mt-0.5 block text-[10px] text-slate-500">{transaction.customerPhone}</span>
       </td>
-      <td className="hidden border border-slate-200 px-3 py-4 align-top @4xl:table-cell">
-        <span className="block text-sm font-bold text-slate-800">{sport}</span>
-        <span className="mt-1 block text-xs text-slate-500">{court}</span>
+      <td className="hidden border border-slate-200 px-3 py-2.5 align-top @4xl:table-cell">
+        <span className="block text-xs font-bold text-slate-800">{sport}</span>
+        <span className="mt-0.5 block text-[10px] text-slate-500">{court}</span>
       </td>
-      <td className="hidden border border-slate-200 px-3 py-4 text-right align-top text-sm font-black tabular-nums text-slate-900 @4xl:table-cell">
+      <td className="hidden border border-slate-200 px-3 py-2.5 text-right align-top text-xs font-black tabular-nums text-slate-900 @4xl:table-cell">
         {formatCurrency(transaction.amount)}
       </td>
-      <td className="hidden border border-slate-200 px-3 py-4 align-top @4xl:table-cell"><StatusPill status={transaction.status} /></td>
-      <td className="hidden border border-slate-200 px-3 py-4 align-top @4xl:table-cell">
-        <div className="flex items-center justify-end gap-2">
+      <td className="hidden border border-slate-200 px-3 py-2.5 align-top @4xl:table-cell"><StatusPill status={transaction.status} compact /></td>
+      <td className="hidden border border-slate-200 px-3 py-2.5 align-top @4xl:table-cell">
+        <div className="flex items-center justify-end gap-1.5">
           <button
             type="button"
             onClick={onView}
             aria-label={`Xem chi tiết ${transaction.code}`}
-            className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
+            className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"
           >
-            <Eye className="h-4 w-4" />
+            <Eye className="h-3.5 w-3.5" />
           </button>
           {transaction.type === 'refund' && transaction.status === 'pending_refund' && (
             <button
               type="button"
               onClick={onRefund}
-              className="min-h-9 rounded-lg bg-emerald-800 px-3 text-xs font-bold text-white transition hover:bg-emerald-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
+              className="h-7 rounded-lg bg-emerald-800 px-2 text-[11px] font-bold text-white transition hover:bg-emerald-900"
             >
-              Hoàn tiền
+              Hoàn
             </button>
           )}
         </div>
