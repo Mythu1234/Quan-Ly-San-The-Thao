@@ -3,6 +3,7 @@ import type {
   CourtStatusItem,
   FacilityIncident,
 } from '../types/admin';
+import type { CheckoutRequest, CheckoutResult } from '../utils/checkoutSettlement';
 import {
   INITIAL_EQUIPMENT,
   INITIAL_COURT_STATUSES,
@@ -24,7 +25,22 @@ export interface FacilityDashboardStats {
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
+export class FacilitySaveError extends Error {}
+
 class FacilityApiService {
+  async getCheckoutReceipt(reference:string):Promise<CheckoutResult|undefined> {
+    const response=await fetch(`${API_BASE_URL}/checkout-settlements/${encodeURIComponent(reference)}`,{signal:AbortSignal.timeout(5000)});
+    if(!response.ok)return undefined;
+    const result=await response.json();
+    return result.success?{receipt:result.data,incidents:[],equipments:[]}:undefined;
+  }
+  async completeCheckout(request: CheckoutRequest): Promise<CheckoutResult> {
+    const response = await fetch(`${API_BASE_URL}/checkout-settlements`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(request) });
+    if (response.status === 404) throw new TypeError('Checkout service unavailable');
+    const result = await response.json();
+    if (!response.ok || !result.success) throw new FacilitySaveError(result.message || 'Chưa hoàn tất được trả sân.');
+    return result.data;
+  }
   /**
    * Load all facility datasets in parallel on initial mount
    */
@@ -99,7 +115,7 @@ class FacilityApiService {
     });
     const result = await res.json();
     if (!res.ok || !result.success) {
-      throw new Error(result.message || 'Lỗi khi thêm thiết bị');
+      throw new FacilitySaveError(result.message || 'Lỗi khi thêm thiết bị');
     }
     return result.data;
   }
@@ -210,6 +226,14 @@ class FacilityApiService {
     }
   }
 
+  async deleteIncident(id: string): Promise<FacilityIncident | undefined> {
+    const response = await fetch(`${API_BASE_URL}/incidents/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    if (response.status === 404) return undefined;
+    const result = await response.json();
+    if (!response.ok || !result.success) throw new FacilitySaveError(result.message || 'Không xóa được báo cáo sự cố.');
+    return result.data;
+  }
+
   async createIncident(incident: Partial<FacilityIncident> & { lockCourt?: boolean }): Promise<{ incident: FacilityIncident; courtLocked: boolean }> {
     const res = await fetch(`${API_BASE_URL}/incidents`, {
       method: 'POST',
@@ -251,11 +275,11 @@ class FacilityApiService {
     };
   }
 
-  async addTimelineLog(incidentId: string, title: string, description: string): Promise<FacilityIncident> {
+  async addTimelineLog(incidentId: string, title: string, description: string, images: string[] = []): Promise<FacilityIncident> {
     const res = await fetch(`${API_BASE_URL}/incidents/${incidentId}/timeline`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title, description }),
+      body: JSON.stringify({ title, description, images }),
     });
     const result = await res.json();
     if (!res.ok || !result.success) {

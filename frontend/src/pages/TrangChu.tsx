@@ -1,11 +1,16 @@
-import AdminDashboard from './AdminDashboard';
-import CustomerSchedule, { STANDARD_15_BOOKINGS } from '../components/CustomerSchedule';
+﻿import AdminDashboard from './AdminDashboard';
+import CustomerSchedule from '../components/CustomerSchedule';
+import useSharedBookings, { getSharedBookings } from '../hooks/useSharedBookings';
+import { calendarBookingDate, scheduleBookingsForDate } from '../utils/courtBookingWarnings';
 import QrCodeArtwork from '../components/QrCodeArtwork';
 import EmployeeDashboard from './employee/EmployeeDashboard';
 import VipCustomerDashboard from './VipCustomerDashboard';
 import { addBookingRequest } from '../types/bookingRequest';
 import { useState, useRef, useEffect, useMemo } from 'react';
-import { Search, MapPin, Phone, Clock, Play, Home, Calendar as CalendarIcon, X, Zap , User, Lock, Eye, EyeOff, Bell, Key, ArrowLeft, ArrowRight, ChevronLeft, ChevronRight, ChevronDown, Trophy, CheckCircle2, RefreshCw, MessageSquare, Copy, Check, AlertTriangle, ReceiptText, Printer } from 'lucide-react';
+import useVietnamToday from '../hooks/useVietnamToday';
+import type { IncidentReporter } from '../utils/incidentStorage';
+import useCourtAvailability, { isCourtLocked } from '../hooks/useCourtAvailability';
+import { Search, MapPin, Phone, Clock, Play, Home, Calendar as CalendarIcon, X, Zap , User, Lock, Eye, EyeOff, Bell, ArrowLeft, ArrowRight, ChevronLeft, ChevronRight, ChevronDown, Trophy, CheckCircle2, RefreshCw, MessageSquare, Copy, Check, AlertTriangle } from 'lucide-react';
 
 const parseTimeToMinutes = (t: string): number => {
   if (!t) return 0;
@@ -55,6 +60,9 @@ const VolleyballIcon = () => (
 
 
 export default function TrangChu() {
+  const [courtStatuses] = useCourtAvailability();
+  const [sharedBookings,setSharedBookings] = useSharedBookings();
+  const today = useVietnamToday();
   // Navigation tab state
   const [activeTab, setActiveTab] = useState<'booking' | 'lookup'>('booking');
 
@@ -84,6 +92,7 @@ export default function TrangChu() {
   const [showLogin, setShowLogin] = useState<boolean>(false);
   const [showPassword, setShowPassword] = useState<boolean>(false);
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState<boolean>(false);
+  const [currentUser, setCurrentUser] = useState<IncidentReporter | null>(null);
   const [isEmployeeLoggedIn, setIsEmployeeLoggedIn] = useState<boolean>(false);
   const [isVipLoggedIn, setIsVipLoggedIn] = useState<boolean>(false);
   const [username, setUsername] = useState<string>('');
@@ -296,7 +305,7 @@ export default function TrangChu() {
   const [bookingOtp, setBookingOtp] = useState<string>('123456');
   const [popup, setPopup] = useState<any>(null);
   const showAlert = (title: string, message: string) => setPopup({ type: 'alert', title, message });
-  const [orderCode] = useState<string>('CX-88291');
+  const [orderCode,setOrderCode] = useState<string>('');
 
   // Lookup Search State
   const [lookupQuery, setLookupQuery] = useState<string>('');
@@ -368,7 +377,7 @@ export default function TrangChu() {
 
     // If starting on :30 or if 60 mins would conflict, default duration to 30 mins
     const startMins = parseTimeToMinutes(time);
-    const hasConflictWith60 = STANDARD_15_BOOKINGS.some((b) => {
+    const hasConflictWith60 = scheduleBookings.some((b) => {
       const isSameCourt = b.courtName === courtName || b.courtCode === courtName || courtName.includes(b.courtCode);
       if (!isSameCourt) return false;
       const bStart = b.startH * 60 + b.startM;
@@ -388,7 +397,7 @@ export default function TrangChu() {
         const short = `${match[1].padStart(2, '0')}/${match[2].padStart(2, '0')}`;
         const found = availableDates.find((item) => item.date === short);
         if (found) {
-          setSelectedDate(`${found.label} (${found.date})`);
+          setSelectedDate(`${found.label} (${found.fullDate})`);
         } else {
           setSelectedDate(dateStr);
         }
@@ -412,7 +421,7 @@ export default function TrangChu() {
       description: 'Mặt thảm BWF tiêu chuẩn 4.5mm chống trượt, hệ thống đèn chiếu sáng chống chói Lux LED 1000+, trần cao 11m.',
       specs: ['MẶT THẢM BWF', 'CHỐNG CHÓI', 'CHUẨN 4.5MM'],
       pricePerHour: 120000,
-      priceLabel: '120.000đ / GIỜ',
+      priceLabel: '120.000 VND / GIỜ',
       image: '/images/badminton.jpg',
       icon: ShuttlecockIcon,
       courts: ['Sân CL-01', 'Sân CL-02', 'Sân CL-03', 'Sân CL-04', 'Sân CL-05'],
@@ -426,7 +435,7 @@ export default function TrangChu() {
       description: 'Sân bóng đá cỏ nhân tạo đạt chuẩn thi đấu mini 5 - 7 người, hệ thống đèn LED chuyên nghiệp, bóng thi đấu đạt chuẩn.',
       specs: ['SÂN 5 - 7 NGƯỜI', 'ĐÈN LUX 1000', 'CỎ NHÂN TẠO'],
       pricePerHour: 200000,
-      priceLabel: '200.000đ / GIỜ',
+      priceLabel: '200.000 VND / GIỜ',
       image: '/images/hero_arena.jpg',
       icon: FootballIcon,
       courts: ['Sân BD-01', 'Sân BD-02', 'Sân BD-03', 'Sân BD-04'],
@@ -440,7 +449,7 @@ export default function TrangChu() {
       description: 'Sân bóng chuyền trong nhà mái che cao 12m, thảm thi đấu Taraflex xịn, trụ và lưới căng chuẩn FIVB thi đấu.',
       specs: ['THẢM TARAFLEX', 'MÁI CHE 12M', 'ĐÈN LUX 1000'],
       pricePerHour: 150000,
-      priceLabel: '150.000đ / GIỜ',
+      priceLabel: '150.000 VND / GIỜ',
       image: '/images/volleyball.jpg',
       icon: VolleyballIcon,
       courts: ['Sân BC-01', 'Sân BC-02', 'Sân BC-03', 'Sân BC-04', 'Sân BC-05'],
@@ -568,10 +577,10 @@ export default function TrangChu() {
 
   const daysOfWeekVi = ['Chủ Nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
 
-  // Dynamically generate 21 consecutive days from base date (29/10/2026)
+  // Generate the next 21 days from the current Vietnam date.
   const availableDates = useMemo(() => {
     const list = [];
-    const base = new Date(2026, 9, 29); // 29/10/2026
+    const base = today;
     for (let i = 0; i < 21; i++) {
       const d = new Date(base);
       d.setDate(base.getDate() + i);
@@ -583,13 +592,14 @@ export default function TrangChu() {
       list.push({
         label,
         date: shortDate,
+        fullDate: `${shortDate}/${d.getFullYear()}`,
       });
     }
     return list;
-  }, []);
+  }, [today]);
 
   const scheduleDateObj = useMemo(() => {
-    if (!selectedDate) return new Date(2026, 9, 29);
+    if (!selectedDate) return today;
     const fullMatch = selectedDate.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
     if (fullMatch) {
       return new Date(parseInt(fullMatch[3], 10), parseInt(fullMatch[2], 10) - 1, parseInt(fullMatch[1], 10));
@@ -598,16 +608,31 @@ export default function TrangChu() {
     if (match) {
       const day = parseInt(match[1], 10);
       const month = parseInt(match[2], 10) - 1;
-      const year = month < 9 ? 2027 : 2026;
+      const year = today.getFullYear() + (month < today.getMonth() ? 1 : 0);
       return new Date(year, month, day);
     }
-    return new Date(2026, 9, 29);
-  }, [selectedDate]);
+    return today;
+  }, [selectedDate, today]);
+  const scheduleBookings=useMemo(()=>scheduleBookingsForDate(sharedBookings,scheduleDateObj),[sharedBookings,scheduleDateObj]);
+
+  useEffect(() => {
+    if (selectedDate && scheduleDateObj.getTime() < today.getTime()) {
+      setSelectedDate('');
+      setSelectedCourt('');
+      setSelectedStartTime('');
+    } else if (selectedDate) {
+      const matchingDate = availableDates.find((item) => selectedDate.includes(item.fullDate));
+      if (matchingDate) {
+        const value = `${matchingDate.label} (${matchingDate.fullDate})`;
+        if (selectedDate !== value) setSelectedDate(value);
+      }
+    }
+  }, [today, selectedDate, scheduleDateObj, availableDates]);
 
 
   // --- INTERACTIVE MONTHLY CALENDAR DROPDOWN ---
   const [isDatePickerOpen, setIsDatePickerOpen] = useState<boolean>(false);
-  const [calendarMonth, setCalendarMonth] = useState<Date>(() => new Date(2026, 9, 1)); // Oct 2026
+  const [calendarMonth, setCalendarMonth] = useState<Date>(() => new Date(today.getFullYear(), today.getMonth(), 1));
 
   useEffect(() => {
     if (isDatePickerOpen) {
@@ -616,7 +641,7 @@ export default function TrangChu() {
   }, [isDatePickerOpen, scheduleDateObj]);
 
   const handlePrevMonth = () => {
-    const todayBase = new Date(2026, 9, 1);
+    const todayBase = new Date(today.getFullYear(), today.getMonth(), 1);
     const prev = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() - 1, 1);
     if (prev.getTime() < todayBase.getTime()) {
       showAlert('Thông báo', 'Không thể xem lịch cho các tháng trước tháng hiện tại!');
@@ -685,8 +710,7 @@ export default function TrangChu() {
   }, [calendarMonth]);
 
   const handleSelectCalendarDay = (targetDate: Date) => {
-    const baseToday = new Date(2026, 9, 29); // 29/10/2026
-    baseToday.setHours(0, 0, 0, 0);
+    const baseToday = today;
     const target = new Date(targetDate);
     target.setHours(0, 0, 0, 0);
 
@@ -700,14 +724,16 @@ export default function TrangChu() {
     const day = target.getDate();
     const dow = target.getDay();
 
-    const isToday = y === 2026 && m === 10 && day === 29;
-    const isTomorrow = y === 2026 && m === 10 && day === 30;
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const isToday = target.getTime() === today.getTime();
+    const isTomorrow = target.getTime() === tomorrow.getTime();
 
     const dayStr = day.toString().padStart(2, '0');
     const monthStr = m.toString().padStart(2, '0');
     const label = isToday ? 'Hôm nay' : isTomorrow ? 'Ngày mai' : daysOfWeekVi[dow];
 
-    setSelectedDate(`${label} (${dayStr}/${monthStr})`);
+    setSelectedDate(`${label} (${dayStr}/${monthStr}/${y})`);
     setIsDatePickerOpen(false);
   };
 
@@ -732,11 +758,11 @@ export default function TrangChu() {
   };
 
   useEffect(() => {
-    if (selectedCourt && currentSport && !currentSport.courts.includes(selectedCourt)) {
+    if (selectedCourt && (isCourtLocked(selectedCourt) || (currentSport && !currentSport.courts.includes(selectedCourt)))) {
       setSelectedCourt('');
       setSelectedStartTime('');
     }
-  }, [selectedSportId, currentSport, selectedCourt]);
+  }, [selectedSportId, currentSport, selectedCourt, courtStatuses]);
 
   const availableDurations = getAvailableDurations(selectedStartTime);
 
@@ -788,7 +814,7 @@ export default function TrangChu() {
     const reqStart = parseTimeToMinutes(selectedStartTime);
     const reqEnd = reqStart + selectedDuration;
 
-    return STANDARD_15_BOOKINGS.find((b) => {
+    return scheduleBookings.find((b) => {
       const isSameCourt = 
         b.courtName === selectedCourt || 
         b.courtCode === selectedCourt || 
@@ -801,7 +827,7 @@ export default function TrangChu() {
       // Overlap condition: Math.max(start1, start2) < Math.min(end1, end2)
       return Math.max(reqStart, bStart) < Math.min(reqEnd, bEnd);
     });
-  }, [selectedCourt, selectedStartTime, selectedDuration]);
+  }, [selectedCourt, selectedStartTime, selectedDuration, scheduleBookings]);
 
   // Price Calculation
   const durationHours = selectedDuration / 60;
@@ -811,6 +837,10 @@ export default function TrangChu() {
 
   const handleBookingSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (isCourtLocked(selectedCourt)) {
+      showAlert('Sân đang khóa', 'Vui lòng chọn sân khác để đặt lịch.');
+      return;
+    }
     if (!selectedDate) {
       showAlert('Chưa chọn ngày', 'Vui lòng chọn ngày thi đấu ở Bước 2!');
       return;
@@ -839,6 +869,7 @@ export default function TrangChu() {
       return;
     }
     const newOtp = Math.floor(100000 + Math.random() * 900000).toString();
+    setOrderCode(`CX-${Date.now().toString(36).toUpperCase()}-${crypto.randomUUID().slice(0,4).toUpperCase()}`);
     setBookingOtp(newOtp);
     setOtpAction('booking');
     setShowBookingPopup(false);
@@ -866,15 +897,25 @@ export default function TrangChu() {
     }
   };
 
-  // Giả định tự động hoàn tất thanh toán sau 4 giây khi khách quét mã VietQR
-  useEffect(() => {
-    if (!showPayment) return;
-    const timer = setTimeout(() => {
-      setShowPayment(false);
-      setIsSubmitted(true);
-    }, 4000);
-    return () => clearTimeout(timer);
-  }, [showPayment]);
+  const simulatePaymentSuccess = () => {
+    if (!selectedCourt || isCourtLocked(selectedCourt)) {
+      showAlert('Sân đang khóa', 'Không thể xác nhận đặt sân. Vui lòng chọn sân khác.');
+      return;
+    }
+    if(!currentSport||!selectedSportId||!selectedStartTime)return;
+    if(conflictBooking){showAlert('Khung giờ đã có người đặt','Vui lòng chọn sân hoặc khung giờ khác.');return;}
+    const bookingDate=calendarBookingDate(scheduleDateObj);
+    if(!getSharedBookings().some(booking=>booking.code===orderCode&&booking.bookingDate===bookingDate)) {
+      const start=parseTimeToMinutes(selectedStartTime);
+      const end=start+selectedDuration;
+      setSharedBookings(previous=>[...previous,{code:orderCode,bookingDate,customerName:customerName.trim(),phone:customerPhone.trim(),
+        court:selectedCourt,courtCode:selectedCourt.replace(/^Sân\s+/i,''),sport:currentSport.name,sportId:selectedSportId,
+        time:`${selectedStartTime} - ${selectedEndTime}`,startH:Math.floor(start/60),startM:start%60,endH:Math.floor(end/60),endM:end%60,
+        paymentStatus:'Đã thanh toán đủ qua VietQR',total:`${totalPrice.toLocaleString('vi-VN')} VND`,paidAmount:`${totalPrice.toLocaleString('vi-VN')} VND`,remaining:'0 VND',status:'Đã đặt'}]);
+    }
+    setShowPayment(false);
+    setIsSubmitted(true);
+  };
 
   const handleLookupSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -894,7 +935,7 @@ export default function TrangChu() {
         court: 'Sân Bóng Đá 1',
         date: '28/09/2026',
         time: '18:00 - 19:30 (1.5 giờ)',
-        total: '450.000đ',
+        total: '450.000 VND',
         status: 'ĐÃ XÁC NHẬN',
         paymentStatus: 'Đã thanh toán qua VietQR',
         hoursUntilStart: 12,
@@ -924,11 +965,11 @@ export default function TrangChu() {
   };
 
   if (isAdminLoggedIn) {
-    return <AdminDashboard onLogout={() => setIsAdminLoggedIn(false)} />;
+    return currentUser && <AdminDashboard currentUser={currentUser} onLogout={() => { setIsAdminLoggedIn(false); setCurrentUser(null); }} />;
   }
 
   if (isEmployeeLoggedIn) {
-    return <EmployeeDashboard onLogout={() => setIsEmployeeLoggedIn(false)} />;
+    return currentUser && <EmployeeDashboard currentUser={currentUser} onLogout={() => { setIsEmployeeLoggedIn(false); setCurrentUser(null); }} />;
   }
 
   if (isVipLoggedIn) {
@@ -986,14 +1027,14 @@ export default function TrangChu() {
         <section ref={introRef} className="scroll-mt-16 space-y-4">
           
           {/* Top Tagline Badge */}
-          <div className="inline-flex items-center gap-2 rounded-full border border-emerald-300 bg-emerald-50 px-3.5 py-1 text-[11px] font-extrabold uppercase tracking-widest text-emerald-700 shadow-xs">
+          <div className="inline-flex items-center gap-2 rounded-full border border-emerald-300 bg-emerald-50 px-3.5 py-1 text-[10px] font-bold uppercase tracking-wide text-emerald-700 shadow-xs">
             <span className="inline-block h-2 w-2 rounded-full bg-emerald-500 animate-ping"></span>
             THẾ HỆ SÂN ĐẤU MỚI
           </div>
 
           {/* Hero Headlines */}
           <div>
-            <h1 className="text-3xl font-black leading-tight tracking-tight text-slate-900">
+            <h1 className="text-[26px] font-extrabold leading-tight tracking-tight text-slate-900">
               BỨT PHÁ GIỚI HẠN <br />
               <span className="bg-gradient-to-r from-emerald-600 to-teal-500 bg-clip-text text-transparent">
                 THƯỢNG TRỊ MỌI MẶT SÂN
@@ -1009,14 +1050,14 @@ export default function TrangChu() {
             <button
               type="button"
               onClick={() => scrollToBooking()}
-              className="flex items-center justify-center gap-2 rounded-xl bg-emerald-500 px-4 py-3.5 text-xs font-black uppercase tracking-wider text-white shadow-lg shadow-emerald-500/25 transition active:scale-95 hover:bg-emerald-600 cursor-pointer"
+              className="flex items-center justify-center gap-2 rounded-xl bg-emerald-500 px-4 py-3.5 text-xs font-bold uppercase tracking-wide text-white shadow-lg shadow-emerald-500/25 transition active:scale-95 hover:bg-emerald-600 cursor-pointer"
             >
               <Zap className='w-4 h-4' /> ĐẶT SÂN NGAY
             </button>
             <button
               type="button"
               onClick={scrollToFacility}
-              className="flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-3.5 text-xs font-black uppercase tracking-wider text-slate-800 shadow-xs transition active:scale-95 hover:bg-slate-50 cursor-pointer"
+              className="flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-3.5 text-xs font-bold uppercase tracking-wide text-slate-800 shadow-xs transition active:scale-95 hover:bg-slate-50 cursor-pointer"
             >
               <Play className='w-4 h-4 fill-current' /> XEM VIDEO
             </button>
@@ -1031,7 +1072,7 @@ export default function TrangChu() {
             />
             <div className="absolute inset-0 bg-gradient-to-t from-slate-950/70 via-transparent to-transparent"></div>
             <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between">
-              <span className="rounded-md bg-emerald-500/90 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-white backdrop-blur-md shadow">
+              <span className="rounded-md bg-emerald-500/90 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-white backdrop-blur-md shadow">
                 CHUẨN THI ĐẤU BWF & FIVB
               </span>
               <span className="text-[10px] font-bold text-white shadow">1000 Lux LED</span>
@@ -1046,8 +1087,8 @@ export default function TrangChu() {
               ['1000', 'LUX LED'],
             ].map(([val, lbl]) => (
               <div key={lbl} className="rounded-2xl border border-slate-200 bg-white p-3 text-center shadow-xs">
-                <p className="text-xl font-black text-emerald-600">{val}</p>
-                <p className="mt-0.5 text-[9px] font-extrabold uppercase tracking-wider text-slate-500">{lbl}</p>
+                <p className="text-lg font-bold text-emerald-600">{val}</p>
+                <p className="mt-0.5 text-[9px] font-extrabold uppercase tracking-wide text-slate-500">{lbl}</p>
               </div>
             ))}
           </div>
@@ -1060,10 +1101,10 @@ export default function TrangChu() {
         <section ref={facilityRef} id="facility-section" className="scroll-mt-16 space-y-4 pt-4 border-t border-slate-200">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-[10px] font-extrabold uppercase tracking-widest text-emerald-600">
+              <p className="text-[10px] font-bold uppercase tracking-wide text-emerald-600">
                 ● MẶT BẰNG & TRANG THIẾT BỊ
               </p>
-              <h2 className="mt-0.5 text-xl font-black text-slate-900">TỔ HỢP 3 MÔN CHUẨN ĐẤU</h2>
+              <h2 className="mt-0.5 text-lg leading-snug font-bold text-slate-900">TỔ HỢP 3 MÔN CHUẨN ĐẤU</h2>
             </div>
             <button
               type="button"
@@ -1088,23 +1129,23 @@ export default function TrangChu() {
                     className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-slate-950/60 via-transparent to-transparent"></div>
-                  <span className="absolute top-3 left-3 rounded-full bg-emerald-500 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-white shadow">
+                  <span className="absolute top-3 left-3 rounded-full bg-emerald-500 px-3 py-1 text-[10px] font-bold uppercase tracking-wide text-white shadow">
                     {sport.badge}
                   </span>
-                  <span className="absolute top-3 right-3 rounded-full bg-slate-900/70 backdrop-blur px-2.5 py-1 text-[9px] font-bold tracking-wider text-white">
+                  <span className="absolute top-3 right-3 rounded-full bg-slate-900/70 backdrop-blur px-2.5 py-1 text-[9px] font-bold tracking-wide text-white">
                     {sport.tagline}
                   </span>
                 </div>
 
                 <div className="p-4 space-y-3">
                   <div>
-                    <h3 className="text-base font-black text-slate-900">{sport.title}</h3>
+                    <h3 className="text-sm font-bold text-slate-900">{sport.title}</h3>
                     <p className="mt-1 text-xs leading-4 text-slate-600">{sport.description}</p>
                   </div>
 
                   <div className="flex flex-wrap gap-1.5">
                     {sport.specs.map((spec) => (
-                      <span key={spec} className="rounded bg-slate-100 border border-slate-200 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-slate-600">
+                      <span key={spec} className="rounded bg-slate-100 border border-slate-200 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-slate-600">
                         {spec}
                       </span>
                     ))}
@@ -1113,13 +1154,13 @@ export default function TrangChu() {
                   <div className="flex items-center justify-between border-t border-slate-100 pt-3">
                     <div>
                       <p className="text-[10px] font-bold text-slate-400 uppercase">Giá từ</p>
-                      <p className="text-sm font-black text-emerald-600">{sport.priceLabel}</p>
+                      <p className="text-[13px] font-bold text-emerald-600">{sport.priceLabel}</p>
                     </div>
 
                     <button
                       type="button"
                       onClick={() => scrollToBooking(sport.id as any)}
-                      className="rounded-xl bg-emerald-500 px-3.5 py-2 text-xs font-black uppercase tracking-wider text-white shadow-sm transition hover:bg-emerald-600 active:scale-95 cursor-pointer"
+                      className="rounded-xl bg-emerald-500 px-3.5 py-2 text-xs font-bold uppercase tracking-wide text-white shadow-sm transition hover:bg-emerald-600 active:scale-95 cursor-pointer"
                     >
                       Đặt ngay →
                     </button>
@@ -1136,13 +1177,13 @@ export default function TrangChu() {
         {/* ======================================================== */}
         <section ref={bookingRef} className="scroll-mt-16 space-y-5 pt-4 border-t border-slate-200">
           <div>
-            <p className="text-[10px] font-extrabold uppercase tracking-widest text-emerald-600">
+            <p className="text-[10px] font-bold uppercase tracking-wide text-emerald-600">
               ● ĐẶT SÂN & LỊCH TRỐNG REAL-TIME
             </p>
-            <h2 className="mt-0.5 text-xl font-black text-slate-900">
+            <h2 className="mt-0.5 text-lg leading-snug font-bold text-slate-900">
               HỆ THỐNG ĐẶT SÂN NHANH, THANH TOÁN TỰ ĐỘNG
             </h2>
-            <p className="mt-1 text-xs text-slate-600">
+            <p className="mt-1 text-xs leading-5 text-slate-600">
               Chọn môn thể thao, ngày thi đấu và thời gian để giữ lịch thi đấu ngay.
             </p>
           </div>
@@ -1150,18 +1191,15 @@ export default function TrangChu() {
           {/* ⚡ BƯỚC 1: CHỌN MÔN ĐẶT SÂN */}
           {/* ⚡ BƯỚC 1: CHỌN MÔN THỂ THAO & NIÊM YẾT GIÁ */}
           <div id="step-1-sport-section" className="rounded-2xl border border-slate-200 bg-white p-4 space-y-3 shadow-xs scroll-mt-20">
-            {/* Header: 1 CHỌN MÔN ĐẶT SÂN & NIÊM YẾT CHÍNH THỨC */}
-            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+            {/* Header: Chọn môn đặt sân */}
+            <div className="flex items-center justify-between gap-3 pb-2 border-b border-slate-100">
               <div className="flex items-center gap-2">
-                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500 text-xs font-black text-white shrink-0">1</span>
-                <h3 className="text-sm font-black uppercase tracking-wider text-slate-900">
+                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500 text-xs font-bold text-white shrink-0">1</span>
+                <h3 className="text-[13px] leading-snug font-bold uppercase tracking-wide text-slate-900">
                   CHỌN MÔN ĐẶT SÂN
                 </h3>
               </div>
               <div className="flex items-center gap-1.5 shrink-0">
-                <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-emerald-800 border border-emerald-200">
-                  NIÊM YẾT CHÍNH THỨC
-                </span>
                 <span className="rounded-lg bg-slate-100 px-2.5 py-0.5 text-[10px] font-bold text-slate-600 border border-slate-200">
                   05:00 – 23:00
                 </span>
@@ -1197,10 +1235,10 @@ export default function TrangChu() {
                   </div>
                   <div>
                     <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="text-xs font-black text-slate-900">Cầu Lông</span>
+                      <span className="text-xs font-bold text-slate-900">Cầu Lông</span>
                       <span className="text-[10px] font-bold text-slate-500 bg-white px-1.5 py-0.5 rounded border border-slate-200">5 sân</span>
                       {selectedSportId === 'badminton' && (
-                        <span className="rounded-full bg-emerald-600 px-2 py-0.5 text-[9px] font-black text-white flex items-center gap-0.5">
+                        <span className="rounded-full bg-emerald-600 px-2 py-0.5 text-[9px] font-bold text-white flex items-center gap-0.5">
                           <Check className="w-2.5 h-2.5" /> ĐÃ CHỌN
                         </span>
                       )}
@@ -1208,7 +1246,7 @@ export default function TrangChu() {
                   </div>
                 </div>
                 <div className="text-right shrink-0">
-                  <div className="text-sm font-black text-emerald-600">120.000đ</div>
+                  <div className="text-[13px] font-bold text-emerald-600">120.000 VND</div>
                   <div className="text-[10px] font-semibold text-slate-400">/ giờ / sân</div>
                 </div>
               </div>
@@ -1233,10 +1271,10 @@ export default function TrangChu() {
                   </div>
                   <div>
                     <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="text-xs font-black text-slate-900">Bóng Chuyền</span>
+                      <span className="text-xs font-bold text-slate-900">Bóng Chuyền</span>
                       <span className="text-[10px] font-bold text-slate-500 bg-white px-1.5 py-0.5 rounded border border-slate-200">5 sân</span>
                       {selectedSportId === 'volleyball' && (
-                        <span className="rounded-full bg-emerald-600 px-2 py-0.5 text-[9px] font-black text-white flex items-center gap-0.5">
+                        <span className="rounded-full bg-emerald-600 px-2 py-0.5 text-[9px] font-bold text-white flex items-center gap-0.5">
                           <Check className="w-2.5 h-2.5" /> ĐÃ CHỌN
                         </span>
                       )}
@@ -1244,7 +1282,7 @@ export default function TrangChu() {
                   </div>
                 </div>
                 <div className="text-right shrink-0">
-                  <div className="text-sm font-black text-emerald-600">150.000đ</div>
+                  <div className="text-[13px] font-bold text-emerald-600">150.000 VND</div>
                   <div className="text-[10px] font-semibold text-slate-400">/ giờ / sân</div>
                 </div>
               </div>
@@ -1269,10 +1307,10 @@ export default function TrangChu() {
                   </div>
                   <div>
                     <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="text-xs font-black text-slate-900">Bóng Đá Mini</span>
+                      <span className="text-xs font-bold text-slate-900">Bóng Đá Mini</span>
                       <span className="text-[10px] font-bold text-slate-500 bg-white px-1.5 py-0.5 rounded border border-slate-200">4 sân</span>
                       {selectedSportId === 'football' && (
-                        <span className="rounded-full bg-emerald-600 px-2 py-0.5 text-[9px] font-black text-white flex items-center gap-0.5">
+                        <span className="rounded-full bg-emerald-600 px-2 py-0.5 text-[9px] font-bold text-white flex items-center gap-0.5">
                           <Check className="w-2.5 h-2.5" /> ĐÃ CHỌN
                         </span>
                       )}
@@ -1280,7 +1318,7 @@ export default function TrangChu() {
                   </div>
                 </div>
                 <div className="text-right shrink-0">
-                  <div className="text-sm font-black text-emerald-600">200.000đ</div>
+                  <div className="text-[13px] font-bold text-emerald-600">200.000 VND</div>
                   <div className="text-[10px] font-semibold text-slate-400">/ giờ / sân</div>
                 </div>
               </div>
@@ -1304,10 +1342,10 @@ export default function TrangChu() {
           >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <span className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-black text-white ${
+                <span className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold text-white ${
                   dateError ? 'bg-rose-500 animate-pulse' : 'bg-emerald-500'
                 }`}>2</span>
-                <h3 className={`text-sm font-black uppercase tracking-wider ${
+                <h3 className={`text-[13px] leading-snug font-bold uppercase tracking-wide ${
                   dateError ? 'text-rose-600' : 'text-slate-900'
                 }`}>CHỌN NGÀY THI ĐẤU</h3>
               </div>
@@ -1318,8 +1356,8 @@ export default function TrangChu() {
                 onClick={() => setIsDatePickerOpen(!isDatePickerOpen)}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border transition active:scale-95 shadow-2xs cursor-pointer ${
                   isDatePickerOpen
-                    ? 'border-emerald-600 bg-emerald-600 text-white font-black'
-                    : 'border-emerald-300 bg-emerald-50 text-emerald-800 text-xs font-black hover:bg-emerald-100'
+                    ? 'border-emerald-600 bg-emerald-600 text-white font-bold'
+                    : 'border-emerald-300 bg-emerald-50 text-emerald-800 text-xs font-bold hover:bg-emerald-100'
                 }`}
                 title="Bấm để xổ lịch chọn ngày"
               >
@@ -1331,7 +1369,7 @@ export default function TrangChu() {
 
             {/* Red Warning Banner when customer clicks schedule without picking a date first */}
             {dateError && (
-              <div className="rounded-xl border border-rose-300 bg-rose-50 p-2.5 text-xs font-black text-rose-700 flex items-center gap-2 animate-bounce">
+              <div className="rounded-xl border border-rose-300 bg-rose-50 p-2.5 text-xs font-bold text-rose-700 flex items-center gap-2 animate-bounce">
                 <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
                 <span>{dateError}</span>
               </div>
@@ -1352,7 +1390,7 @@ export default function TrangChu() {
                   </button>
 
                   <div className="text-center">
-                    <span className="text-xs font-black uppercase text-slate-900 tracking-wider">
+                    <span className="text-xs font-bold uppercase text-slate-900 tracking-wide">
                       Tháng {calendarMonth.getMonth() + 1}, {calendarMonth.getFullYear()}
                     </span>
                   </div>
@@ -1382,13 +1420,13 @@ export default function TrangChu() {
                 <div className="grid grid-cols-7 gap-1 text-xs">
                   {calendarDays.map((item, idx) => {
                     const itemTime = new Date(item.dateObj.getFullYear(), item.dateObj.getMonth(), item.dateObj.getDate()).getTime();
-                    const baseTime = new Date(2026, 9, 29).getTime(); // 29/10/2026
+                    const baseTime = today.getTime();
                     const isPast = itemTime < baseTime;
                     const isSelected = Boolean(selectedDate) && 
                                        scheduleDateObj.getFullYear() === item.dateObj.getFullYear() &&
                                        scheduleDateObj.getMonth() === item.dateObj.getMonth() &&
                                        scheduleDateObj.getDate() === item.dateObj.getDate();
-                    const isToday = item.dateObj.getFullYear() === 2026 && item.dateObj.getMonth() === 9 && item.dateObj.getDate() === 29;
+                    const isToday = itemTime === baseTime;
 
                     return (
                       <button
@@ -1400,8 +1438,8 @@ export default function TrangChu() {
                           'h-9 w-full rounded-xl flex flex-col items-center justify-center font-bold transition text-xs relative',
                           !item.isCurrentMonth ? 'text-slate-300' : 'text-slate-800',
                           isPast ? 'opacity-30 cursor-not-allowed bg-slate-50' : 'cursor-pointer hover:bg-emerald-50 hover:text-emerald-800 active:scale-95',
-                          isSelected ? 'bg-emerald-600 text-white font-black hover:bg-emerald-700 shadow-sm shadow-emerald-600/30 ring-2 ring-emerald-300' : '',
-                          isToday && !isSelected ? 'border border-emerald-500 text-emerald-700 font-black' : ''
+                          isSelected ? 'bg-emerald-600 text-white font-bold hover:bg-emerald-700 shadow-sm shadow-emerald-600/30 ring-2 ring-emerald-300' : '',
+                          isToday && !isSelected ? 'border border-emerald-500 text-emerald-700 font-bold' : ''
                         ].filter(Boolean).join(' ')}
                       >
                         <span>{item.dayNumber}</span>
@@ -1418,13 +1456,13 @@ export default function TrangChu() {
                   <button
                     type="button"
                     onClick={() => {
-                      setSelectedDate('Hôm nay (29/10)');
+                      handleSelectCalendarDay(today);
                       setDateError(null);
                       setIsDatePickerOpen(false);
                     }}
                     className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 font-bold hover:bg-slate-200 transition cursor-pointer text-[11px]"
                   >
-                    Hôm nay (29/10)
+                    Hôm nay ({today.getDate().toString().padStart(2, '0')}/{(today.getMonth() + 1).toString().padStart(2, '0')})
                   </button>
 
                   <button
@@ -1441,18 +1479,18 @@ export default function TrangChu() {
             {/* Quick Date Pills: 21 Days Horizon */}
             <div className="flex gap-2 overflow-x-auto pb-1.5 pt-0.5 no-scrollbar">
               {/* If user picked a custom date that's not in the 21 days */}
-              {selectedDate && !availableDates.some((item) => `${item.label} (${item.date})` === selectedDate) && (
+              {selectedDate && !availableDates.some((item) => `${item.label} (${item.fullDate})` === selectedDate) && (
                 <button
                   type="button"
-                  className="flex-shrink-0 flex flex-col items-center justify-center rounded-xl px-4 py-2.5 border-2 border-emerald-600 bg-emerald-500 text-white font-black shadow-md shadow-emerald-500/25 ring-2 ring-emerald-300/50"
+                  className="flex-shrink-0 flex flex-col items-center justify-center rounded-xl px-4 py-2.5 border-2 border-emerald-600 bg-emerald-500 text-white font-bold shadow-md shadow-emerald-500/25 ring-2 ring-emerald-300/50"
                 >
-                  <span className="text-[10px] font-bold uppercase tracking-wider opacity-90">⭐ Đã chọn</span>
-                  <span className="text-xs font-black mt-0.5">{selectedDate}</span>
+                  <span className="text-[10px] font-bold uppercase tracking-wide opacity-90">⭐ Đã chọn</span>
+                  <span className="text-xs font-bold mt-0.5">{selectedDate}</span>
                 </button>
               )}
 
               {availableDates.map((item) => {
-                const fullDateStr = `${item.label} (${item.date})`;
+                const fullDateStr = `${item.label} (${item.fullDate})`;
                 const isSelected = Boolean(selectedDate) && selectedDate === fullDateStr;
 
                 return (
@@ -1466,14 +1504,14 @@ export default function TrangChu() {
                     className={[
                       'flex-shrink-0 flex flex-col items-center justify-center rounded-xl px-4 py-2.5 border transition active:scale-95 cursor-pointer',
                       isSelected
-                        ? 'border-emerald-500 bg-emerald-500 text-white font-black shadow-md shadow-emerald-500/20'
+                        ? 'border-emerald-500 bg-emerald-500 text-white font-bold shadow-md shadow-emerald-500/20'
                         : 'border-slate-200 bg-slate-50 text-slate-700 hover:border-slate-300 hover:bg-slate-100',
                     ].join(' ')}
                   >
                     <span className={`text-[10px] uppercase font-bold ${isSelected ? 'text-emerald-100' : 'text-slate-500'}`}>
                       {item.label}
                     </span>
-                    <span className="text-xs font-black mt-0.5">{item.date}</span>
+                    <span className="text-xs font-bold mt-0.5">{item.date}</span>
                   </button>
                 );
               })}
@@ -1484,8 +1522,8 @@ export default function TrangChu() {
           <div id="booking-schedule-section" className="rounded-2xl border border-slate-200 bg-white p-4 space-y-3.5 shadow-xs scroll-mt-20">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500 text-xs font-black text-white">3</span>
-                <h3 className="text-sm font-black uppercase tracking-wider text-slate-900">LỊCH SÂN TRỰC QUAN REAL-TIME</h3>
+                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500 text-xs font-bold text-white">3</span>
+                <h3 className="text-[13px] leading-snug font-bold uppercase tracking-wide text-slate-900">LỊCH SÂN TRỰC QUAN REAL-TIME</h3>
               </div>
             </div>
 
@@ -1509,12 +1547,12 @@ export default function TrangChu() {
             {selectedCourt && selectedStartTime && currentSport ? (
               <div className="flex items-center justify-between rounded-xl bg-emerald-50 p-3.5 border border-emerald-200 animate-in fade-in slide-in-from-top-1 duration-200">
                 <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-lg bg-emerald-500 text-white flex items-center justify-center font-black shrink-0">
+                  <div className="w-8 h-8 rounded-lg bg-emerald-500 text-white flex items-center justify-center font-bold shrink-0">
                     <CheckCircle2 className="w-5 h-5" />
                   </div>
                   <div>
                     <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="text-xs font-black text-emerald-950 uppercase">{selectedCourt}</span>
+                      <span className="text-xs font-bold text-emerald-950 uppercase">{selectedCourt}</span>
                       <span className="text-[10px] font-extrabold text-emerald-800 bg-emerald-100 px-1.5 py-0.5 rounded">
                         {selectedStartTime} - {getEndTime(selectedStartTime, selectedDuration)}
                       </span>
@@ -1528,7 +1566,7 @@ export default function TrangChu() {
                 <button
                   type="button"
                   onClick={() => setShowBookingPopup(true)}
-                  className="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black px-3.5 py-2 active:scale-95 transition cursor-pointer shadow-xs shrink-0 flex items-center gap-1"
+                  className="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3.5 py-2 active:scale-95 transition cursor-pointer shadow-xs shrink-0 flex items-center gap-1"
                 >
                   Mở màn hình đặt sân <ArrowRight className="w-3.5 h-3.5" />
                 </button>
@@ -1547,11 +1585,11 @@ export default function TrangChu() {
         {/* ======================================================== */}
         <section className="rounded-2xl border border-slate-200 bg-white p-4 space-y-3 shadow-xs">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700 text-xl font-black">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700 text-xl font-bold">
               <Home className='w-5 h-5' />
             </div>
             <div>
-              <h3 className="text-sm font-black text-slate-900">NHÀ THI ĐẤU ĐA NĂNG COURTX</h3>
+              <h3 className="text-sm font-bold text-slate-900">NHÀ THI ĐẤU ĐA NĂNG COURTX</h3>
               <p className="text-[10px] text-slate-500">Hệ thống sân tiêu chuẩn thi đấu quốc tế</p>
             </div>
           </div>
@@ -1676,17 +1714,17 @@ export default function TrangChu() {
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   <button type="button" onClick={() => { setHasSearched(true); setLookupResult({
-                      code: '#CX-11111', sport: 'Bóng Đá', court: 'Sân Bóng Đá 1', name: 'Nguyễn Văn An', phone: '0912345678', date: '26/09/2026', time: '14:00 - 15:30', total: '450.000đ', status: 'ĐÃ XÁC NHẬN', hoursUntilStart: 12, sportId: 'football'
+                      code: '#CX-11111', sport: 'Bóng Đá', court: 'Sân Bóng Đá 1', name: 'Nguyễn Văn An', phone: '0912345678', date: '26/09/2026', time: '14:00 - 15:30', total: '450.000 VND', status: 'ĐÃ XÁC NHẬN', hoursUntilStart: 12, sportId: 'football'
                   }); }} className="rounded-xl bg-slate-100 p-2 text-center font-bold text-slate-700 active:scale-95 hover:bg-slate-200">
                     Vé sắp đá (&lt; 24h)
                   </button>
                   <button type="button" onClick={() => { setHasSearched(true); setLookupResult({
-                      code: '#CX-99999', sport: 'Cầu Lông', court: 'Sân Cầu Lông 2', name: 'Nguyễn Văn An', phone: '0912345678', date: '30/09/2026', time: '09:00 - 10:30', total: '180.000đ', status: 'ĐÃ XÁC NHẬN', hoursUntilStart: 48, sportId: 'badminton'
+                      code: '#CX-99999', sport: 'Cầu Lông', court: 'Sân Cầu Lông 2', name: 'Nguyễn Văn An', phone: '0912345678', date: '30/09/2026', time: '09:00 - 10:30', total: '180.000 VND', status: 'ĐÃ XÁC NHẬN', hoursUntilStart: 48, sportId: 'badminton'
                   }); }} className="rounded-xl bg-slate-100 p-2 text-center font-bold text-slate-700 active:scale-95 hover:bg-slate-200">
                     Vé tuần sau (&gt; 24h)
                   </button>
                   <button type="button" onClick={() => { setHasSearched(true); setLookupResult({
-                      code: '#CX-77777', sport: 'Bóng Chuyền', court: 'Sân Bóng Chuyền 1', name: 'Nguyễn Văn An', phone: '0912345678', date: '20/09/2026', time: '08:00 - 09:30', total: '300.000đ', status: 'ĐÃ HỦY', paymentStatus: 'ĐÃ HOÀN TIỀN', hoursUntilStart: -24, sportId: 'volleyball'
+                      code: '#CX-77777', sport: 'Bóng Chuyền', court: 'Sân Bóng Chuyền 1', name: 'Nguyễn Văn An', phone: '0912345678', date: '20/09/2026', time: '08:00 - 09:30', total: '300.000 VND', status: 'ĐÃ HỦY', paymentStatus: 'ĐÃ HOÀN TIỀN', hoursUntilStart: -24, sportId: 'volleyball'
                   }); }} className="col-span-2 rounded-xl bg-red-50 border border-red-100 p-2 text-center font-bold text-red-600 active:scale-95 hover:bg-red-100">
                     Vé mẫu Đã Hủy & Hoàn Tiền
                   </button>
@@ -2166,27 +2204,61 @@ export default function TrangChu() {
           <div className="p-5 flex-1 flex flex-col max-w-md mx-auto w-full">
             {loginView === 'login' ? (
               <>
-                <h2 className="text-3xl font-black text-slate-900 uppercase tracking-tight">
+                <h2 className="text-[22px] leading-tight font-extrabold text-slate-900 uppercase tracking-tight sm:text-2xl">
                   ĐĂNG NHẬP HỆ THỐNG
                 </h2>
                 
-                {/* Banner */}
-                <div className="mt-5 flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
-                  <div className="flex h-10 w-12 items-center justify-center rounded-xl bg-slate-900 text-white flex-shrink-0">
-                    <Key className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <p className="text-xs font-bold text-slate-800">Cổng đăng nhập hệ thống</p>
-                    <p className="text-[11px] text-slate-500">Đăng nhập bằng Tên tài khoản hoặc Số điện thoại</p>
-                  </div>
-                </div>
-
                 {/* Form Card */}
-                <div className="mt-4 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+                <form
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    const rawUser = username.trim().toLowerCase();
+                    const phoneClean = username.trim().replace(/\s+/g, '');
+                    // Match key or phone in accountCredentials
+                    const targetKey = Object.keys(accountCredentials).find(
+                      (k) =>
+                        k.toLowerCase() === rawUser ||
+                        accountCredentials[k].phone.replace(/\s+/g, '') === phoneClean
+                    );
+                    const targetAcc = targetKey ? accountCredentials[targetKey] : null;
+
+                    // Match admin
+                    if (
+                      (rawUser === 'admin' && (passwordInput === 'admin' || (targetAcc && passwordInput === targetAcc.password))) ||
+                      (targetAcc && targetAcc.role === 'admin' && passwordInput === targetAcc.password)
+                    ) {
+                      setIsAdminLoggedIn(true);
+                      setCurrentUser({ name: targetAcc?.name || accountCredentials.admin.name, phone: targetAcc?.phone || accountCredentials.admin.phone, role: 'Chủ sân' });
+                      setShowLogin(false);
+                      setUsername('');
+                      setPasswordInput('');
+                    } else if (
+                      (rawUser === 'nhanvien' && (passwordInput === 'nhanvien' || (targetAcc && passwordInput === targetAcc.password))) ||
+                      (targetAcc && targetAcc.role === 'employee' && passwordInput === targetAcc.password)
+                    ) {
+                      setIsEmployeeLoggedIn(true);
+                      setCurrentUser({ name: targetAcc?.name || accountCredentials.nhanvien.name, phone: targetAcc?.phone || accountCredentials.nhanvien.phone, role: 'Nhân viên' });
+                      setShowLogin(false);
+                      setUsername('');
+                      setPasswordInput('');
+                    } else if (
+                      ((rawUser === 'vip' || rawUser === 'khachvip') && (passwordInput === 'vip' || passwordInput === '123456' || (targetAcc && passwordInput === targetAcc.password))) ||
+                      (targetAcc && targetAcc.role === 'vip' && passwordInput === targetAcc.password)
+                    ) {
+                      setIsVipLoggedIn(true);
+                      setShowLogin(false);
+                      setUsername('');
+                      setPasswordInput('');
+                    } else {
+                      showAlert('Sai thông tin đăng nhập', 'Tên tài khoản / số điện thoại hoặc mật khẩu không chính xác!\n\nNếu bạn vừa nhận mật khẩu mới qua SMS, hãy nhập số điện thoại và mật khẩu vừa nhận để đăng nhập.\nHoặc nhấn "Quên mật khẩu?" để hệ thống gửi lại mã OTP.');
+                    }
+                  }}
+                  className="mt-4 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm"
+                >
                   <div className="space-y-4">
                     {/* Username or Phone */}
                     <div>
-                      <label className="mb-1.5 block text-xs font-black text-slate-700 uppercase tracking-wider">
+                      <label className="mb-2 block text-[11px] font-bold text-slate-700 uppercase tracking-wide">
                         Tài khoản hoặc Số điện thoại <span className="text-red-500">*</span>
                       </label>
                       <div className="relative">
@@ -2198,14 +2270,14 @@ export default function TrangChu() {
                           placeholder="Nhập số điện thoại hoặc tên tài khoản" 
                           value={username}
                           onChange={(e) => setUsername(e.target.value)}
-                          className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-3.5 pl-12 pr-4 text-sm font-bold text-slate-900 placeholder-slate-400 outline-none focus:border-emerald-500 focus:bg-white transition"
+                          className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-3.5 pl-12 pr-4 text-[13px] font-medium text-slate-900 placeholder-slate-400 outline-none focus:border-emerald-600 focus:bg-white transition"
                         />
                       </div>
                     </div>
 
                     {/* Password */}
                     <div>
-                      <label className="mb-1.5 block text-xs font-black text-slate-700 uppercase tracking-wider">
+                      <label className="mb-2 block text-[11px] font-bold text-slate-700 uppercase tracking-wide">
                         Mật khẩu <span className="text-red-500">*</span>
                       </label>
                       <div className="relative">
@@ -2217,7 +2289,7 @@ export default function TrangChu() {
                           placeholder="••••••••" 
                           value={passwordInput}
                           onChange={(e) => setPasswordInput(e.target.value)}
-                          className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-3.5 pl-12 pr-12 text-sm font-bold text-slate-900 placeholder-slate-400 outline-none focus:border-emerald-500 focus:bg-white transition tracking-widest"
+                          className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-3.5 pl-12 pr-12 text-[13px] font-medium text-slate-900 placeholder-slate-400 outline-none focus:border-emerald-600 focus:bg-white transition tracking-widest"
                         />
                         <button 
                           type="button" 
@@ -2246,7 +2318,7 @@ export default function TrangChu() {
                           setForgotError(null);
                           setForgotAccountInput(username || '');
                         }}
-                        className="text-xs font-black text-emerald-600 hover:text-emerald-700 hover:underline transition cursor-pointer"
+                        className="text-xs font-semibold text-emerald-600 hover:text-emerald-700 hover:underline transition cursor-pointer"
                       >
                         Quên mật khẩu?
                       </button>
@@ -2254,53 +2326,13 @@ export default function TrangChu() {
 
                     {/* Submit Button */}
                     <button 
-                      type="button" 
-                      onClick={() => {
-                        const rawUser = username.trim().toLowerCase();
-                        const phoneClean = username.trim().replace(/\s+/g, '');
-                        // Match key or phone in accountCredentials
-                        const targetKey = Object.keys(accountCredentials).find(
-                          (k) =>
-                            k.toLowerCase() === rawUser ||
-                            accountCredentials[k].phone.replace(/\s+/g, '') === phoneClean
-                        );
-                        const targetAcc = targetKey ? accountCredentials[targetKey] : null;
-
-                        // Match admin
-                        if (
-                          (rawUser === 'admin' && (passwordInput === 'admin' || (targetAcc && passwordInput === targetAcc.password))) ||
-                          (targetAcc && targetAcc.role === 'admin' && passwordInput === targetAcc.password)
-                        ) {
-                          setIsAdminLoggedIn(true);
-                          setShowLogin(false);
-                          setUsername('');
-                          setPasswordInput('');
-                        } else if (
-                          (rawUser === 'nhanvien' && (passwordInput === 'nhanvien' || (targetAcc && passwordInput === targetAcc.password))) ||
-                          (targetAcc && targetAcc.role === 'employee' && passwordInput === targetAcc.password)
-                        ) {
-                          setIsEmployeeLoggedIn(true);
-                          setShowLogin(false);
-                          setUsername('');
-                          setPasswordInput('');
-                        } else if (
-                          ((rawUser === 'vip' || rawUser === 'khachvip') && (passwordInput === 'vip' || passwordInput === '123456' || (targetAcc && passwordInput === targetAcc.password))) ||
-                          (targetAcc && targetAcc.role === 'vip' && passwordInput === targetAcc.password)
-                        ) {
-                          setIsVipLoggedIn(true);
-                          setShowLogin(false);
-                          setUsername('');
-                          setPasswordInput('');
-                        } else {
-                          showAlert('Sai thông tin đăng nhập', 'Tên tài khoản / số điện thoại hoặc mật khẩu không chính xác!\n\nNếu bạn vừa nhận mật khẩu mới qua SMS, hãy nhập số điện thoại và mật khẩu vừa nhận để đăng nhập.\nHoặc nhấn "Quên mật khẩu?" để hệ thống gửi lại mã OTP.');
-                        }
-                      }}
-                      className="mt-4 w-full flex items-center justify-center gap-2 rounded-2xl bg-emerald-500 py-4 text-sm font-black uppercase tracking-widest text-white shadow-lg shadow-emerald-500/30 transition hover:bg-emerald-600 active:scale-95 cursor-pointer"
+                      type="submit"
+                      className="mt-4 h-12 w-full flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 text-[13px] font-bold uppercase tracking-wide text-white shadow-sm transition hover:bg-emerald-700 active:scale-[0.99] cursor-pointer"
                     >
                       ĐĂNG NHẬP HỆ THỐNG <Zap className="w-4 h-4 fill-current" />
                     </button>
                   </div>
-                </div>
+                </form>
               </>
             ) : (
               /* 🟣 FORGOT PASSWORD WORKFLOW */

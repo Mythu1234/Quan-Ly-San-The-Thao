@@ -1,31 +1,35 @@
 import { useMemo, useRef, useState, useEffect } from 'react';
 import { 
   AlertTriangle, ArrowLeft, BadgeCheck, Ban, Calendar, CalendarCheck, CalendarClock, 
+  CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, CircleX, ClipboardList, 
+  Clock3, Cloud, CreditCard, Info, LayoutGrid, MapPin, Phone,
+  QrCode, ReceiptText, Send, ShieldCheck, Undo2, UserRound, X, Zap 
   Check, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, CircleX, ClipboardList, 
   Clock3, Cloud, CreditCard, FileText, Info, LayoutGrid, MapPin, Phone, 
   Printer, QrCode, ReceiptText, Send, ShieldCheck, Undo2, UserRound, X, Zap 
 } from 'lucide-react';
 import QrCodeArtwork from '../components/QrCodeArtwork';
+import CheckoutSettlementView from '../components/admin/CheckoutSettlementView';
+import type { FacilityEquipment, FacilityIncident } from '../types/admin';
+import type { IncidentReporter } from '../utils/incidentStorage';
+import type { CheckoutRequest, CheckoutResult } from '../utils/checkoutSettlement';
+import useCourtAvailability, { isCourtLocked } from '../hooks/useCourtAvailability';
 
-export type BookingDetail = {
-  code: string;
-  customerName: string;
-  phone: string;
-  court: string;
-  courtCode?: string;
-  sport: string;
-  sportId?: 'badminton' | 'volleyball' | 'football';
-  time: string;
-  startH?: number;
-  startM?: number;
-  endH?: number;
-  endM?: number;
-  paymentStatus: string;
-  total: string;
-  paidAmount: string;
-  remaining: string;
-  status: string;
+// Calendar values use Vietnam wall time, independently of the browser time zone.
+const getVietnamTime = (instant = new Date()) => {
+  const vietnam = new Date(instant.getTime() + 7 * 60 * 60 * 1000);
+  return new Date(vietnam.getUTCFullYear(), vietnam.getUTCMonth(), vietnam.getUTCDate(),
+    vietnam.getUTCHours(), vietnam.getUTCMinutes(), vietnam.getUTCSeconds());
 };
+
+const isSameDay = (a: Date, b: Date) =>
+  a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+
+import useSharedBookings from '../hooks/useSharedBookings';
+import { calendarBookingDate } from '../utils/courtBookingWarnings';
+import type { BookingDetail } from '../types/schedule';
+export type { BookingDetail } from '../types/schedule';
+export { INITIAL_ADMIN_BOOKINGS } from '../types/schedule';
 
 export interface AdminCourtItem {
   id: string;
@@ -59,267 +63,17 @@ export const STANDARD_ADMIN_COURTS: AdminCourtItem[] = [
   { id: 'SAN_BD_04', code: 'BD-04', name: 'Sân BD-04', sportId: 'football', sportName: 'Bóng Đá Mini', pricePerHour: 200000, priceLabel: '200k/h' },
 ];
 
-export const INITIAL_ADMIN_BOOKINGS: BookingDetail[] = [
-  // Cầu lông
-  {
-    code: 'BK-8491',
-    customerName: 'Tuấn Hưng',
-    phone: '0903.882.112',
-    court: 'Sân CL-01',
-    courtCode: 'CL-01',
-    sport: 'Cầu lông',
-    sportId: 'badminton',
-    startH: 6,
-    startM: 0,
-    endH: 7,
-    endM: 30,
-    time: '06:00 - 07:30',
-    paymentStatus: 'Đã thanh toán đủ qua VietQR',
-    total: '180.000 đ',
-    paidAmount: '180.000 đ',
-    remaining: '0 đ',
-    status: 'Đang sử dụng',
-  },
-  {
-    code: 'BK-9023',
-    customerName: 'Quang Thắng',
-    phone: '0912.441.902',
-    court: 'Sân CL-05',
-    courtCode: 'CL-05',
-    sport: 'Cầu lông',
-    sportId: 'badminton',
-    startH: 7,
-    startM: 0,
-    endH: 8,
-    endM: 30,
-    time: '07:00 - 08:30',
-    paymentStatus: 'Đã thanh toán đủ qua VietQR',
-    total: '210.000 đ',
-    paidAmount: '210.000 đ',
-    remaining: '0 đ',
-    status: 'Đã đặt',
-  },
-  {
-    code: 'BK-6184',
-    customerName: 'Ngọc Mai',
-    phone: '0908.224.118',
-    court: 'Sân CL-02',
-    courtCode: 'CL-02',
-    sport: 'Cầu lông',
-    sportId: 'badminton',
-    startH: 8,
-    startM: 0,
-    endH: 9,
-    endM: 30,
-    time: '08:00 - 09:30',
-    paymentStatus: 'Đã thanh toán đủ qua VietQR',
-    total: '180.000 đ',
-    paidAmount: '180.000 đ',
-    remaining: '0 đ',
-    status: 'Đã đặt',
-  },
-  {
-    code: 'BK-7740',
-    customerName: 'Minh Trí',
-    phone: '0912.440.526',
-    court: 'Sân CL-03',
-    courtCode: 'CL-03',
-    sport: 'Cầu lông',
-    sportId: 'badminton',
-    startH: 14,
-    startM: 0,
-    endH: 15,
-    endM: 30,
-    time: '14:00 - 15:30',
-    paymentStatus: 'Đã thanh toán đủ qua VietQR',
-    total: '210.000 đ',
-    paidAmount: '210.000 đ',
-    remaining: '0 đ',
-    status: 'Đã đặt',
-  },
-  {
-    code: 'BK-5521',
-    customerName: 'Thành Long',
-    phone: '0938.991.223',
-    court: 'Sân CL-04',
-    courtCode: 'CL-04',
-    sport: 'Cầu lông',
-    sportId: 'badminton',
-    startH: 19,
-    startM: 0,
-    endH: 21,
-    endM: 0,
-    time: '19:00 - 21:00',
-    paymentStatus: 'Đã thanh toán đủ qua VietQR',
-    total: '240.000 đ',
-    paidAmount: '240.000 đ',
-    remaining: '0 đ',
-    status: 'Đã đặt',
-  },
-
-  // Bóng chuyền
-  {
-    code: 'BK-BC01',
-    customerName: 'CLB Vigor Volley',
-    phone: '0944.332.991',
-    court: 'Sân BC-01',
-    courtCode: 'BC-01',
-    sport: 'Bóng chuyền',
-    sportId: 'volleyball',
-    startH: 8,
-    startM: 0,
-    endH: 10,
-    endM: 0,
-    time: '08:00 - 10:00',
-    paymentStatus: 'Đã thanh toán đủ qua VietQR',
-    total: '300.000 đ',
-    paidAmount: '300.000 đ',
-    remaining: '0 đ',
-    status: 'Đã đặt',
-  },
-  {
-    code: 'BK-BC02',
-    customerName: 'Hồng Quân',
-    phone: '0978.552.114',
-    court: 'Sân BC-02',
-    courtCode: 'BC-02',
-    sport: 'Bóng chuyền',
-    sportId: 'volleyball',
-    startH: 15,
-    startM: 0,
-    endH: 17,
-    endM: 0,
-    time: '15:00 - 17:00',
-    paymentStatus: 'Đã thanh toán đủ qua VietQR',
-    total: '300.000 đ',
-    paidAmount: '300.000 đ',
-    remaining: '0 đ',
-    status: 'Đã đặt',
-  },
-  {
-    code: 'BK-BC03',
-    customerName: 'Đội Trẻ Quận 7',
-    phone: '0901.884.221',
-    court: 'Sân BC-03',
-    courtCode: 'BC-03',
-    sport: 'Bóng chuyền',
-    sportId: 'volleyball',
-    startH: 18,
-    startM: 0,
-    endH: 20,
-    endM: 0,
-    time: '18:00 - 20:00',
-    paymentStatus: 'Đã thanh toán đủ qua VietQR',
-    total: '300.000 đ',
-    paidAmount: '300.000 đ',
-    remaining: '0 đ',
-    status: 'Đã đặt',
-  },
-  {
-    code: 'BK-BC05',
-    customerName: 'Hoàng Nam',
-    phone: '0907.331.882',
-    court: 'Sân BC-05',
-    courtCode: 'BC-05',
-    sport: 'Bóng chuyền',
-    sportId: 'volleyball',
-    startH: 19,
-    startM: 0,
-    endH: 21,
-    endM: 0,
-    time: '19:00 - 21:00',
-    paymentStatus: 'Đã thanh toán đủ qua VietQR',
-    total: '300.000 đ',
-    paidAmount: '300.000 đ',
-    remaining: '0 đ',
-    status: 'Đã đặt',
-  },
-
-  // Bóng đá mini
-  {
-    code: 'BK-BD01',
-    customerName: 'Văn Hoàng',
-    phone: '0981.332.909',
-    court: 'Sân BD-01',
-    courtCode: 'BD-01',
-    sport: 'Bóng đá mini',
-    sportId: 'football',
-    startH: 6,
-    startM: 0,
-    endH: 7,
-    endM: 30,
-    time: '06:00 - 07:30',
-    paymentStatus: 'Đã thanh toán đủ qua VietQR',
-    total: '300.000 đ',
-    paidAmount: '300.000 đ',
-    remaining: '0 đ',
-    status: 'Đã đặt',
-  },
-  {
-    code: 'BK-BD02',
-    customerName: 'Bảo Long FC',
-    phone: '0933.118.822',
-    court: 'Sân BD-02',
-    courtCode: 'BD-02',
-    sport: 'Bóng đá mini',
-    sportId: 'football',
-    startH: 18,
-    startM: 0,
-    endH: 20,
-    endM: 0,
-    time: '18:00 - 20:00',
-    paymentStatus: 'Đã thanh toán đủ qua VietQR',
-    total: '400.000 đ',
-    paidAmount: '400.000 đ',
-    remaining: '0 đ',
-    status: 'Đã đặt',
-  },
-  {
-    code: 'BK-BD03',
-    customerName: 'Huy Khánh',
-    phone: '0909.112.443',
-    court: 'Sân BD-03',
-    courtCode: 'BD-03',
-    sport: 'Bóng đá mini',
-    sportId: 'football',
-    startH: 19,
-    startM: 0,
-    endH: 21,
-    endM: 0,
-    time: '19:00 - 21:00',
-    paymentStatus: 'Đã thanh toán đủ qua VietQR',
-    total: '400.000 đ',
-    paidAmount: '400.000 đ',
-    remaining: '0 đ',
-    status: 'Đã đặt',
-  },
-  {
-    code: 'BK-BD04',
-    customerName: 'Anh Em FC',
-    phone: '0918.554.331',
-    court: 'Sân BD-04',
-    courtCode: 'BD-04',
-    sport: 'Bóng đá mini',
-    sportId: 'football',
-    startH: 17,
-    startM: 30,
-    endH: 19,
-    endM: 0,
-    time: '17:30 - 19:00',
-    paymentStatus: 'Đã thanh toán đủ qua VietQR',
-    total: '300.000 đ',
-    paidAmount: '300.000 đ',
-    remaining: '0 đ',
-    status: 'Đã đặt',
-  },
-];
-
 type AdminSchedulePageProps = {
   onCheckoutModeChange?: (isCheckoutMode: boolean) => void;
-  onBookingCheckout?: (court: string, time?: string) => void;
+  equipments: FacilityEquipment[];
+  incidents: FacilityIncident[];
+  currentUser: IncidentReporter;
+  onCompleteCheckout: (request: CheckoutRequest) => Promise<CheckoutResult>;
+  courtStatuses?: { code?: string; isLocked: boolean }[];
 };
 
-export default function AdminSchedulePage({ onCheckoutModeChange, onBookingCheckout }: AdminSchedulePageProps) {
+export default function AdminSchedulePage({ onCheckoutModeChange, equipments, incidents, currentUser, onCompleteCheckout, courtStatuses = [] }: AdminSchedulePageProps) {
+  const [sharedCourtStatuses] = useCourtAvailability();
   const timelineScrollRef = useRef<HTMLDivElement>(null);
   const [selectedBooking, setSelectedBooking] = useState<BookingDetail | null>(null);
   const [checkinBooking, setCheckinBooking] = useState<BookingDetail | null>(null);
@@ -333,15 +87,44 @@ export default function AdminSchedulePage({ onCheckoutModeChange, onBookingCheck
   const [cancelReviewBackTarget, setCancelReviewBackTarget] = useState<'timeline' | 'pendingList'>('timeline');
   const [cancelReason, setCancelReason] = useState('Khách bận đột xuất công tác liên tỉnh, gọi báo xin hủy ca tối nay.');
 
-  // Date & Calendar State (Default to today: 30/10/2026)
-  const [selectedDate, setSelectedDate] = useState<Date>(() => new Date(2026, 9, 30));
+  const [currentTime, setCurrentTime] = useState(getVietnamTime);
+  const previousTodayRef = useRef(currentTime);
+  const [selectedDate, setSelectedDate] = useState<Date>(() =>
+    new Date(currentTime.getFullYear(), currentTime.getMonth(), currentTime.getDate()));
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
-  const [calendarMonth, setCalendarMonth] = useState<Date>(() => new Date(2026, 9, 1));
+  const [calendarMonth, setCalendarMonth] = useState<Date>(() =>
+    new Date(currentTime.getFullYear(), currentTime.getMonth(), 1));
   const [intervalMode, setIntervalMode] = useState<30 | 60>(60);
   const [courtView, setCourtView] = useState<'all' | 'badminton' | 'volleyball' | 'football'>('all');
 
+  useEffect(() => {
+    const updateClock = () => {
+      const next = getVietnamTime();
+      const previous = previousTodayRef.current;
+      if (!isSameDay(previous, next)) {
+        setSelectedDate((selected) => isSameDay(selected, previous)
+          ? new Date(next.getFullYear(), next.getMonth(), next.getDate()) : selected);
+        setCalendarMonth((month) => month.getFullYear() === previous.getFullYear() && month.getMonth() === previous.getMonth()
+          ? new Date(next.getFullYear(), next.getMonth(), 1) : month);
+      }
+      previousTodayRef.current = next;
+      setCurrentTime(next);
+    };
+    const handleVisibility = () => { if (!document.hidden) updateClock(); };
+    const timer = window.setInterval(updateClock, 1000);
+    window.addEventListener('focus', updateClock);
+    document.addEventListener('visibilitychange', handleVisibility);
+    updateClock();
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener('focus', updateClock);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, []);
+
   // Active Admin Bookings State
-  const [adminBookings, setAdminBookings] = useState<BookingDetail[]>(() => INITIAL_ADMIN_BOOKINGS);
+  const [allBookings, setAdminBookings] = useSharedBookings();
+  const adminBookings = allBookings.filter(booking => booking.bookingDate === calendarBookingDate(selectedDate));
 
   // Booking Modal State (Đặt sân tại quầy trực tiếp trên lịch)
   const [bookingCourt, setBookingCourt] = useState<AdminCourtItem | null>(null);
@@ -371,12 +154,12 @@ export default function AdminSchedulePage({ onCheckoutModeChange, onBookingCheck
   const slotWidth = intervalMode === 30 ? 52 : 68;
   const rowHeight = 60;
 
-  // Operating timeline times: 05:00 to 22:00
+  // Slots cover the full operating day from 05:00 through 23:00.
   const timelineTimes = useMemo(() => {
     const result: string[] = [];
     for (let h = startHour; h <= endHour; h++) {
       result.push(`${h.toString().padStart(2, '0')}:00`);
-      if (intervalMode === 30 && h < endHour) {
+      if (intervalMode === 30) {
         result.push(`${h.toString().padStart(2, '0')}:30`);
       }
     }
@@ -385,9 +168,9 @@ export default function AdminSchedulePage({ onCheckoutModeChange, onBookingCheck
 
   // Filtered Courts
   const displayedCourts = useMemo(() => {
-    if (courtView === 'all') return STANDARD_ADMIN_COURTS;
-    return STANDARD_ADMIN_COURTS.filter((c) => c.sportId === courtView);
-  }, [courtView]);
+    const base = courtView === 'all' ? STANDARD_ADMIN_COURTS : STANDARD_ADMIN_COURTS.filter((c) => c.sportId === courtView);
+    return base.filter(c => !isCourtLocked(c.code));
+  }, [courtView, courtStatuses, sharedCourtStatuses]);
 
   // Group displayed courts by Sport for clear visual separation
   const sportGroups = useMemo(() => {
@@ -402,34 +185,36 @@ export default function AdminSchedulePage({ onCheckoutModeChange, onBookingCheck
         id: 'badminton',
         name: 'Cầu Lông',
         icon: '🏸',
-        priceText: '120.000 đ/h',
+        priceText: '120.000 VND/h',
         courts: displayedCourts.filter((c) => c.sportId === 'badminton'),
       },
       {
         id: 'volleyball',
         name: 'Bóng Chuyền',
         icon: '🏐',
-        priceText: '150.000 đ/h',
+        priceText: '150.000 VND/h',
         courts: displayedCourts.filter((c) => c.sportId === 'volleyball'),
       },
       {
         id: 'football',
         name: 'Bóng Đá Mini',
         icon: '⚽',
-        priceText: '200.000 đ/h',
+        priceText: '200.000 VND/h',
         courts: displayedCourts.filter((c) => c.sportId === 'football'),
       },
     ];
     return sports.filter((g) => g.courts.length > 0);
   }, [displayedCourts]);
 
-  // Auto scroll to 08:00
+  // Position today's timeline near the current Vietnam time when opening or changing views.
   useEffect(() => {
     if (timelineScrollRef.current) {
-      const offset = (8 - startHour) * (intervalMode === 30 ? slotWidth * 2 : slotWidth);
+      const now = getVietnamTime();
+      const minutes = isSameDay(selectedDate, now) ? now.getHours() * 60 + now.getMinutes() : startHour * 60;
+      const offset = ((minutes - startHour * 60) / intervalMode) * slotWidth;
       timelineScrollRef.current.scrollLeft = Math.max(0, offset - 20);
     }
-  }, [intervalMode, slotWidth]);
+  }, [intervalMode, slotWidth, selectedDate]);
 
   // Calendar logic
   const handlePrevDay = () => {
@@ -445,7 +230,7 @@ export default function AdminSchedulePage({ onCheckoutModeChange, onBookingCheck
   };
 
   const isToday = (d: Date) => {
-    return d.getDate() === 30 && d.getMonth() === 9 && d.getFullYear() === 2026;
+    return isSameDay(d, currentTime);
   };
 
   const daysOfWeekVi = ['Chủ Nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
@@ -602,6 +387,7 @@ export default function AdminSchedulePage({ onCheckoutModeChange, onBookingCheck
   };
 
   const handleOpenBookingModal = (court: AdminCourtItem, time: string, duration: number = 60) => {
+    if (isCourtLocked(court.code)) return;
     setBookingCourt(court);
     setBookingStartTime(time);
     setBookingDuration(duration);
@@ -637,6 +423,10 @@ export default function AdminSchedulePage({ onCheckoutModeChange, onBookingCheck
   const handleAdminBookingSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!bookingCourt) return;
+    if (isCourtLocked(bookingCourt.code)) {
+      window.alert('Sân đang bị khóa, vui lòng chọn sân khác.');
+      return;
+    }
 
     if (!validateBookingForm()) {
       return;
@@ -652,6 +442,7 @@ export default function AdminSchedulePage({ onCheckoutModeChange, onBookingCheck
     const totalAmount = Math.round(bookingCourt.pricePerHour * durHours);
 
     const pendingBooking: BookingDetail = {
+      bookingDate: calendarBookingDate(selectedDate),
       code: `BK-${Math.floor(1000 + Math.random() * 9000)}`,
       customerName: bookingCustomerName.trim(),
       phone: bookingCustomerPhone.trim(),
@@ -665,9 +456,9 @@ export default function AdminSchedulePage({ onCheckoutModeChange, onBookingCheck
       endM: endMin % 60,
       time: `${bookingStartTime} - ${bookingEndTime}`,
       paymentStatus: 'Đã thanh toán đủ qua VietQR',
-      total: `${totalAmount.toLocaleString('vi-VN')} đ`,
-      paidAmount: `${totalAmount.toLocaleString('vi-VN')} đ`,
-      remaining: '0 đ',
+      total: `${totalAmount.toLocaleString('vi-VN')} VND`,
+      paidAmount: `${totalAmount.toLocaleString('vi-VN')} VND`,
+      remaining: '0 VND',
       status: 'Đã đặt',
     };
 
@@ -675,19 +466,17 @@ export default function AdminSchedulePage({ onCheckoutModeChange, onBookingCheck
     setShowPaymentModal(true);
   };
 
-  // Giả định tự động hoàn tất thanh toán sau 4 giây khi khách quét mã VietQR (đồng bộ với màn hình khách hàng)
-  useEffect(() => {
-    if (!showPaymentModal || !pendingBookingData) return;
-    const timer = setTimeout(() => {
-      setAdminBookings((prev) => [...prev, pendingBookingData]);
-      setPaymentSuccessBooking(pendingBookingData);
-      setShowPaymentModal(false);
-      setBookingCourt(null);
-    }, 4000);
-    return () => clearTimeout(timer);
-  }, [showPaymentModal, pendingBookingData]);
-
-
+  const handleConfirmPaymentSuccess = () => {
+    if (!pendingBookingData) return;
+    if (isCourtLocked(pendingBookingData.courtCode || pendingBookingData.court)) {
+      window.alert('Sân đang bị khóa, không thể xác nhận đặt sân.');
+      return;
+    }
+    setAdminBookings((prev) => [...prev, pendingBookingData]);
+    setPaymentSuccessBooking(pendingBookingData);
+    setShowPaymentModal(false);
+    setBookingCourt(null);
+  };
 
   const handleCancelPayment = () => {
     setShowPaymentModal(false);
@@ -708,12 +497,6 @@ export default function AdminSchedulePage({ onCheckoutModeChange, onBookingCheck
     onCheckoutModeChange?.(true);
   };
 
-  const getStatusBadgeClass = (status: string) => {
-    if (status === 'Đang sử dụng') return 'bg-emerald-100 text-emerald-700 ring-1 ring-emerald-200';
-    if (status === 'Chờ duyệt hủy') return 'bg-orange-50 text-orange-700 ring-1 ring-orange-300';
-    return 'bg-blue-50 text-blue-700 ring-1 ring-blue-300';
-  };
-
   const pendingCancelRequests: BookingDetail[] = [
     {
       code: 'BK-6184',
@@ -723,9 +506,9 @@ export default function AdminSchedulePage({ onCheckoutModeChange, onBookingCheck
       sport: 'Cầu lông',
       time: '11:30 - 13:00',
       paymentStatus: 'Đã thanh toán đủ qua VietQR',
-      total: '180.000 đ',
-      paidAmount: '180.000 đ',
-      remaining: '0 đ',
+      total: '180.000 VND',
+      paidAmount: '180.000 VND',
+      remaining: '0 VND',
       status: 'Chờ duyệt hủy',
     },
     {
@@ -736,9 +519,9 @@ export default function AdminSchedulePage({ onCheckoutModeChange, onBookingCheck
       sport: 'Cầu lông',
       time: '14:00 - 15:30',
       paymentStatus: 'Đã thanh toán đủ qua VietQR',
-      total: '210.000 đ',
-      paidAmount: '210.000 đ',
-      remaining: '0 đ',
+      total: '210.000 VND',
+      paidAmount: '210.000 VND',
+      remaining: '0 VND',
       status: 'Chờ duyệt hủy',
     },
     {
@@ -749,9 +532,9 @@ export default function AdminSchedulePage({ onCheckoutModeChange, onBookingCheck
       sport: 'Cầu lông',
       time: '07:00 - 08:30',
       paymentStatus: 'Đã thanh toán đủ qua VietQR',
-      total: '210.000 đ',
-      paidAmount: '210.000 đ',
-      remaining: '0 đ',
+      total: '210.000 VND',
+      paidAmount: '210.000 VND',
+      remaining: '0 VND',
       status: 'Chờ duyệt hủy',
     },
   ];
@@ -760,139 +543,146 @@ export default function AdminSchedulePage({ onCheckoutModeChange, onBookingCheck
     const courtNumber = checkinBooking.court.match(/\d+/)?.[0]?.padStart(2, '0') ?? '01';
 
     return (
-      <div className="flex-1 min-h-0 overflow-y-auto bg-[#f8f6ff] px-3 py-3">
+      <div className="flex-1 min-h-0 overflow-y-auto bg-white px-3 py-3">
+        {/* Back button */}
         <button
           type="button"
           onClick={() => {
             setCheckinBooking(null);
             onCheckoutModeChange?.(false);
           }}
-          className="mb-3 flex items-center gap-1.5 rounded-lg bg-white px-3 py-2 text-[11px] font-black text-slate-700 shadow-sm ring-1 ring-slate-200 active:scale-95"
+          className="mb-3 flex items-center gap-1.5 rounded-lg bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-500 shadow-sm ring-1 ring-slate-200 transition-colors hover:text-slate-700 active:scale-95"
         >
           <ArrowLeft className="h-3.5 w-3.5" />
           Quay lại lịch sân
         </button>
 
-        <div className="mb-4">
-          <div className="mb-2 flex justify-end">
-            <span className="rounded-full bg-blue-50 px-2.5 py-1 text-[10px] font-black uppercase text-blue-700 shadow-sm ring-1 ring-blue-300">
+        {/* Header */}
+        <div className="mb-3">
+          <p className="mb-0.5 text-[11px] font-bold uppercase tracking-wide text-slate-700">Chi tiết lượt đặt</p>
+          <div className="flex items-center gap-2">
+            <h2 className="text-[17px] font-black tracking-tight text-slate-900">#{checkinBooking.code}</h2>
+            <span className="rounded-full bg-white px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-emerald-800 ring-1 ring-black/15">
               Đã đặt chỗ
-            </span>
-          </div>
-          <div className="flex items-center justify-between gap-3">
-            <h2 className="min-w-0 text-[17px] font-black uppercase tracking-tight text-slate-950">Chi tiết lượt đặt</h2>
-            <span className="rounded-full bg-slate-200 px-2.5 py-1 text-[10px] font-black text-slate-600">
-              Mã đặt: #{checkinBooking.code}
             </span>
           </div>
         </div>
 
-        <section className="mb-4 flex items-center gap-3 rounded-2xl bg-indigo-100 p-4 shadow-sm ring-1 ring-indigo-100">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-blue-600 text-white">
-            <Clock3 className="h-6 w-6" />
+        {/* Countdown banner */}
+        <section className="mb-2 flex items-center gap-2.5 rounded-xl bg-white p-3 ring-1 ring-black/15">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-emerald-800 ring-1 ring-black/15">
+            <Clock3 className="h-4 w-4" />
           </div>
           <div className="min-w-0 flex-1">
-            <h3 className="text-[15px] font-black text-slate-950">Bắt đầu sau 35 phút nữa</h3>
-            <p className="mt-0.5 text-[11px] font-medium text-slate-600">Sẵn sàng nhận khách lúc 17:50</p>
+            <p className="text-[12px] font-black text-slate-800">Bắt đầu sau <span className="text-emerald-800">35 phút nữa</span></p>
+            <p className="text-[10px] font-medium text-slate-400">Sẵn sàng nhận khách lúc 17:50</p>
           </div>
-          <ChevronRight className="h-5 w-5 shrink-0 text-blue-700" />
+          <ChevronRight className="h-3.5 w-3.5 shrink-0 text-slate-300" />
         </section>
 
-        <section className="mb-4 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-100">
-          <div className="mb-4 flex items-center justify-between gap-2">
-            <h3 className="flex items-center gap-1.5 text-[11px] font-black uppercase tracking-wide text-slate-600">
-              <UserRound className="h-4 w-4" />
-              Thông tin khách hàng
-            </h3>
-            <span className="rounded-full bg-indigo-100 px-2.5 py-1 text-[9px] font-black text-slate-700">Standard Member</span>
+        {/* Customer info */}
+        <section className="mb-2 rounded-xl bg-white p-3 ring-1 ring-black/15">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-emerald-800">
+              <UserRound className="h-3 w-3" />
+              Khách hàng
+            </div>
+            <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold text-slate-600 ring-1 ring-black/15">Standard Member</span>
           </div>
-          <div className="flex items-center gap-4">
-            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-[24px] font-black text-emerald-700">
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white text-[17px] font-black text-emerald-800 ring-1 ring-black/15">
               {checkinBooking.customerName.trim().charAt(0)}
             </div>
             <div className="min-w-0 flex-1">
-              <h4 className="truncate text-[15px] font-black text-slate-950">{checkinBooking.customerName}</h4>
-              <p className="mt-1 text-[13px] font-semibold tracking-[0.08em] text-slate-600">{checkinBooking.phone}</p>
+              <p className="truncate text-[14px] font-black text-slate-900">{checkinBooking.customerName}</p>
+              <p className="mt-0.5 flex items-center gap-1 text-[11px] font-medium tracking-[0.06em] text-slate-500">
+                <Phone className="h-3 w-3 shrink-0" />
+                {checkinBooking.phone}
+              </p>
             </div>
-            <button type="button" className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-emerald-300 text-emerald-950 active:scale-95">
-              <Phone className="h-5 w-5 fill-current" />
-            </button>
           </div>
-          <p className="mt-4 flex items-center gap-1.5 text-[11px] font-medium text-slate-600">
-            <Clock3 className="h-4 w-4 text-amber-700" />
-            Lịch sử: Đã chơi 14 trận • Không có vi phạm hủy muộn
-          </p>
+          <div className="mt-2 flex items-center gap-1.5 rounded-lg bg-white px-2 py-1.5 ring-1 ring-black/15">
+            <Clock3 className="h-3 w-3 shrink-0 text-emerald-800" />
+            <p className="text-[10px] font-medium text-slate-500">Đã chơi 14 trận • Không có vi phạm hủy muộn</p>
+          </div>
         </section>
 
-        <section className="mb-4 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-100">
-          <div className="mb-3 flex items-center justify-between gap-2">
-            <h3 className="flex items-center gap-1.5 text-[11px] font-black uppercase tracking-wide text-slate-600">
-              <MapPin className="h-4 w-4" />
-              Sân đấu & Thời gian
-            </h3>
-            <span className="rounded-full bg-emerald-200 px-2.5 py-1 text-[9px] font-black text-emerald-900">{checkinBooking.sport} Trong Nhà</span>
+        {/* Court & Time */}
+        <section className="mb-2 rounded-xl bg-white p-3 ring-1 ring-black/15">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-emerald-800">
+              <MapPin className="h-3 w-3" />
+              Sân & Thời gian
+            </div>
+            <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold text-emerald-800 ring-1 ring-black/15">{checkinBooking.sport}</span>
           </div>
-          <div className="mb-3 flex items-center gap-3 rounded-xl bg-indigo-100 p-3">
-            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-emerald-700 text-[18px] font-black text-white">
+          <div className="mb-2 flex items-center gap-2.5 rounded-lg bg-white p-2.5 ring-1 ring-black/15">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-700 text-[14px] font-black text-white">
               S{courtNumber}
             </div>
             <div className="min-w-0">
-              <h4 className="text-[16px] font-black uppercase text-slate-950">{checkinBooking.court} <span className="text-emerald-700">•</span></h4>
-              <p className="mt-0.5 text-[11px] font-medium text-slate-600">Khu A tiêu chuẩn thảm Yonex • Tiêu chuẩn</p>
+              <p className="text-[13px] font-black text-slate-900">
+                SÂN CL-{courtNumber} <span className="text-emerald-500">•</span>
+              </p>
+              <p className="text-[10px] font-medium text-slate-400">Khu A • Thảm Yonex tiêu chuẩn</p>
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="rounded-xl bg-indigo-50 p-3">
-              <p className="text-[10px] font-black uppercase text-slate-600">Ngày thi đấu</p>
-              <p className="mt-1 text-[15px] font-black text-slate-950">Hôm nay</p>
-              <p className="text-[12px] font-medium text-slate-600">15/10/2026</p>
+          <div className="grid grid-cols-2 gap-2">
+            <div className="rounded-lg bg-white p-2.5 ring-1 ring-black/15">
+              <p className="text-[10px] font-bold uppercase tracking-wide text-slate-700">Ngày thi đấu</p>
+              <p className="mt-1 text-[13px] font-black text-slate-900">{isToday(selectedDate) ? 'Hôm nay' : daysOfWeekVi[selectedDate.getDay()]}</p>
+              <p className="text-[10px] font-medium text-slate-400">{selectedDate.toLocaleDateString('vi-VN')}</p>
             </div>
-            <div className="rounded-xl bg-indigo-50 p-3">
-              <p className="text-[10px] font-black uppercase text-slate-600">Khung giờ chơi</p>
-              <p className="mt-1 text-[15px] font-black text-blue-700">{checkinBooking.time}</p>
-              <p className="text-[12px] font-medium text-slate-600">Tổng thời lượng: 90 phút</p>
+            <div className="rounded-lg bg-white p-2.5 ring-1 ring-black/15">
+              <p className="text-[10px] font-bold uppercase tracking-wide text-slate-700">Khung giờ</p>
+              <p className="mt-1 text-[13px] font-black text-slate-900">{checkinBooking.time}</p>
+              <p className="text-[10px] font-medium text-slate-400">90 phút</p>
             </div>
           </div>
         </section>
 
-        <section className="mb-4 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-100">
-          <div className="mb-4 flex items-center justify-between gap-2">
-            <h3 className="flex items-center gap-1.5 text-[11px] font-black uppercase tracking-wide text-slate-600">
-              <CreditCard className="h-4 w-4" />
+        {/* Finance */}
+        <section className="mb-3 rounded-xl bg-white p-3 ring-1 ring-black/15">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-emerald-800">
+              <CreditCard className="h-3 w-3" />
               Tài chính & Thanh toán
-            </h3>
-            <span className="rounded-full bg-indigo-100 px-2.5 py-1 text-[9px] font-black uppercase tracking-wide text-slate-700">VietQR • 100%</span>
+            </div>
+            <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold text-emerald-800 ring-1 ring-black/15">VietQR • 100%</span>
           </div>
-          <div className="space-y-3">
+          <div className="space-y-2">
             <div className="flex items-start justify-between gap-3">
-              <span className="text-[13px] font-medium leading-snug text-slate-700">Tổng giá tiền sân (90 phút • 120.000 đ/h)</span>
-              <span className="shrink-0 text-[15px] font-black text-slate-950">{checkinBooking.total}</span>
+              <span className="text-[11px] font-medium leading-snug text-slate-500">Tổng tiền sân (90 phút • 120.000 VND/h)</span>
+              <span className="shrink-0 text-[13px] font-black text-slate-900">{checkinBooking.total}</span>
             </div>
             <div className="flex items-center justify-between gap-3">
-              <span className="flex items-center gap-1.5 text-[13px] font-medium text-slate-700">
-                <span className="h-3 w-3 rounded-full bg-emerald-700" />
-                Đã thanh toán 100% qua VietQR
+              <span className="flex items-center gap-1.5 text-[11px] font-medium text-slate-500">
+                <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                Đã thanh toán qua VietQR
               </span>
-              <span className="text-[15px] font-black text-emerald-700">-{checkinBooking.paidAmount}</span>
+              <span className="text-[13px] font-black text-emerald-800">-{checkinBooking.paidAmount}</span>
             </div>
-            <div className="flex items-center justify-between gap-3 border-t border-indigo-100 pt-3">
-              <span className="text-[14px] font-black text-slate-950">Khoản cần thu tại quầy:</span>
-              <span className="text-[15px] font-black text-red-700">{checkinBooking.remaining}</span>
+            <div className="flex items-center justify-between gap-3 rounded-lg bg-white px-2.5 py-2 ring-1 ring-black/15">
+              <span className="text-[12px] font-black text-slate-700">Khoản cần thu tại quầy</span>
+              <span className="text-[14px] font-black text-slate-900">{checkinBooking.remaining}</span>
             </div>
           </div>
         </section>
 
-        <div className="mb-5 grid grid-cols-2 gap-3">
+        {/* Action buttons */}
+        <div className="mb-4 grid grid-cols-2 gap-2">
           <button
             type="button"
             onClick={() => {
+              setAdminBookings(previous => previous.map(booking => booking.code === checkinBooking.code
+                && booking.bookingDate === calendarBookingDate(selectedDate) ? {...booking,status:'Đang sử dụng'} : booking));
               setCheckinBooking(null);
               onCheckoutModeChange?.(false);
             }}
-            className="flex h-12 min-w-0 items-center justify-center gap-2 rounded-xl bg-emerald-700 px-3 text-[14px] font-black text-white shadow-sm active:scale-[0.99]"
+            className="flex h-10 min-w-0 items-center justify-center gap-1.5 rounded-xl bg-emerald-700 px-3 text-[11px] font-black text-white shadow-sm transition hover:bg-emerald-800 active:scale-[0.98]"
           >
-            <CheckCircle2 className="h-5 w-5 shrink-0" />
-            <span className="truncate">Check-in Sân</span>
+            <CheckCircle2 className="h-4 w-4 shrink-0" />
+            <span className="truncate">Check-In Sân</span>
           </button>
           <button
             type="button"
@@ -901,9 +691,9 @@ export default function AdminSchedulePage({ onCheckoutModeChange, onBookingCheck
               setCheckinBooking(null);
               onCheckoutModeChange?.(true);
             }}
-            className="flex h-12 min-w-0 items-center justify-center gap-2 rounded-xl border border-red-200 bg-red-50 px-3 text-[14px] font-black text-red-700 shadow-sm active:scale-[0.99]"
+            className="flex h-10 min-w-0 items-center justify-center gap-1.5 rounded-xl bg-red-50 px-3 text-[11px] font-black text-red-700 ring-1 ring-red-200 transition hover:bg-red-100 active:scale-[0.98]"
           >
-            <CircleX className="h-5 w-5 shrink-0" />
+            <CircleX className="h-4 w-4 shrink-0" />
             <span className="truncate">Hủy đặt sân</span>
           </button>
         </div>
@@ -1561,6 +1351,8 @@ export default function AdminSchedulePage({ onCheckoutModeChange, onBookingCheck
             <button
               type="button"
               onClick={() => {
+                setAdminBookings(previous => previous.map(booking => booking.code === cancelReviewBooking.code
+                  && booking.bookingDate === calendarBookingDate(selectedDate) ? {...booking,status:'Đã hủy'} : booking));
                 setCancelApprovedBooking(cancelReviewBooking);
                 setCancelReviewBooking(null);
                 onCheckoutModeChange?.(true);
@@ -1732,183 +1524,14 @@ export default function AdminSchedulePage({ onCheckoutModeChange, onBookingCheck
   }
 
   if (checkoutBooking) {
-    const additionalCharges = 45_000;
-    const bookingBalance = Number(checkoutBooking.remaining.replace(/\D/g, ''));
-    const amountDue = `${(bookingBalance + additionalCharges).toLocaleString('vi-VN')} đ`;
-    const actualTotal = Number(checkoutBooking.total.replace(/\D/g, '')) + additionalCharges;
-
-    return (
-      <div className="flex-1 min-h-0 overflow-y-auto bg-slate-50 px-3 py-3">
-        <button
-          type="button"
-          onClick={() => {
-            setCheckoutBooking(null);
-            onCheckoutModeChange?.(false);
-          }}
-          className="mb-3 flex items-center gap-1.5 rounded-lg bg-white px-3 py-2 text-[11px] font-black text-slate-700 shadow-sm ring-1 ring-slate-200 active:scale-95"
-        >
-          <ArrowLeft className="h-3.5 w-3.5" />
-          Quay lại lịch sân
-        </button>
-
-        <div className="mb-3 flex items-center justify-between">
-          <div className="min-w-0">
-            <div className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wide text-slate-500">
-              <FileText className="h-3.5 w-3.5 text-emerald-700" />
-              <span>{checkoutBooking.court}</span>
-            </div>
-            <h2 className="mt-1 text-xl font-black uppercase tracking-tight text-slate-950">Quyết toán check-out</h2>
-          </div>
-          <span className="shrink-0 rounded-full bg-slate-200 px-2.5 py-1 text-[10px] font-black text-slate-600">
-            Mã đặt: {checkoutBooking.code}
-          </span>
-        </div>
-
-        <section className="mb-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex items-start gap-3 min-w-0">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100">
-                <UserRound className="h-6 w-6" />
-              </div>
-              <div className="min-w-0">
-                <h3 className="truncate text-[17px] font-black text-slate-950">{checkoutBooking.customerName}</h3>
-                <span className="mt-1 inline-flex rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-black text-amber-700 ring-1 ring-amber-100">
-                  Hội viên VIP
-                </span>
-                <p className="mt-1 text-[12px] font-semibold text-slate-500">{checkoutBooking.phone} • Mã: KH-0482</p>
-              </div>
-            </div>
-            <button type="button" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-600 active:scale-95">
-              <Phone className="h-4 w-4" />
-            </button>
-          </div>
-          <div className="mt-4 grid grid-cols-3 gap-2 border-t border-slate-100 pt-3">
-            <div className="rounded-lg bg-slate-100 px-2 py-2 text-center text-[10px] font-bold text-slate-500">Khách thân thiết</div>
-            <div className="rounded-lg bg-slate-100 px-2 py-2 text-center text-[10px] font-bold text-slate-500">12 lượt đặt/tháng</div>
-            <div className="rounded-lg bg-orange-100 px-2 py-2 text-center text-[10px] font-black text-orange-700">Đang sử dụng</div>
-          </div>
-        </section>
-
-        <section className="mb-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="mb-3 flex items-center justify-between">
-            <h3 className="flex items-center gap-1.5 text-[14px] font-black text-slate-900">
-              <Clock3 className="h-4 w-4 text-emerald-700" />
-              Thời gian sử dụng thực tế
-            </h3>
-            <span className="text-[11px] font-bold text-slate-500">Thứ 7, 24/10/2026</span>
-          </div>
-          <div className="grid grid-cols-3 gap-2">
-            <div className="rounded-lg bg-slate-100 p-3">
-              <p className="text-[10px] font-bold text-slate-500">Check-in thực</p>
-              <p className="mt-1 text-lg font-black text-slate-950">08:02</p>
-              <p className="text-[10px] font-semibold text-slate-500">Sớm 8 phút</p>
-            </div>
-            <div className="rounded-lg bg-slate-100 p-3">
-              <p className="text-[10px] font-bold text-slate-500">Hạn lịch đặt</p>
-              <p className="mt-1 text-lg font-black text-slate-950">09:30</p>
-              <p className="text-[10px] font-semibold text-slate-500">Tổng: 90 phút</p>
-            </div>
-            <div className="rounded-lg bg-emerald-100 p-3">
-              <p className="text-[10px] font-bold text-emerald-700">Check-out hiện tại</p>
-              <p className="mt-1 text-lg font-black text-emerald-800">09:38</p>
-              <p className="text-[10px] font-black text-emerald-700">+8 phút lố</p>
-            </div>
-          </div>
-          <div className="mt-3 rounded-lg bg-emerald-50 p-3 text-[12px] leading-relaxed text-slate-600">
-            <p className="font-black text-emerald-700">Trong 10 phút nhắc nhở ân hạn (09:30 - 09:40) - Không tính phụ phí thêm giờ</p>
-            <p className="mt-1">Chỉ sau mốc 10 phút ân hạn mới áp dụng phụ phí theo cấu hình hệ thống.</p>
-          </div>
-        </section>
-
-        <section className="mb-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <h3 className="mb-3 flex items-center gap-1.5 text-[14px] font-black text-slate-900">
-            <FileText className="h-4 w-4 text-blue-600" />
-            Bảng kê chi tiết thanh toán & quyết toán
-          </h3>
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-[13px] font-semibold text-slate-600">Tiền sân theo hợp đồng đặt (1.5h)</span>
-              <span className="text-[15px] font-black text-slate-950">{checkoutBooking.total}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-[13px] font-semibold text-slate-600">Đã thanh toán đủ qua VietQR</span>
-              <span className="text-[15px] font-black text-emerald-700">-{checkoutBooking.paidAmount}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-[13px] font-semibold text-slate-600">Phụ phí thêm giờ</span>
-              <span className="text-[15px] font-black text-slate-600">0đ</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-[13px] font-semibold text-slate-600">Khoản phát sinh đã ghi nhận</span>
-              <span className="text-[15px] font-black text-slate-950">+{additionalCharges.toLocaleString('vi-VN')}đ</span>
-            </div>
-            <div className="border-t border-slate-100 pt-3">
-              <div className="flex items-center justify-between">
-                <span className="text-[13px] font-semibold text-slate-500">Tổng giá trị thực tế tiêu dùng</span>
-                <span className="text-[15px] font-black text-slate-950">{actualTotal.toLocaleString('vi-VN')}đ</span>
-              </div>
-              <div className="mt-3 flex items-center justify-between gap-3 rounded-xl bg-indigo-100 px-4 py-3">
-                <div className="min-w-0">
-                  <p className="text-[11px] font-black uppercase text-slate-700">Số tiền còn phải thu</p>
-                  <p className="text-[10px] font-black text-orange-700">Cần thu đủ trước khi bàn giao sân</p>
-                </div>
-                <p className="shrink-0 text-3xl font-black text-emerald-800">{amountDue}</p>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section className="mb-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="mb-3 flex items-center justify-between">
-            <h3 className="flex items-center gap-1.5 text-[14px] font-black text-slate-900">
-              <AlertTriangle className="h-4 w-4 text-amber-700" />
-              Ghi nhận sự cố & thiết bị phát sinh
-            </h3>
-            <button type="button" className="text-[11px] font-black text-emerald-700">Thêm ghi chú</button>
-          </div>
-          <label className="text-[11px] font-bold text-slate-600">Mô tả tình trạng hiện trường trả sân:</label>
-          <textarea
-            className="mt-2 h-20 w-full resize-none rounded-lg border border-slate-100 bg-slate-100 p-3 text-[13px] outline-none"
-            placeholder="Ví dụ: Hỏng lưới, gãy cán vợt thuê, mượn bóng chưa trả..."
-          />
-          <p className="mt-2 rounded-lg bg-indigo-50 p-2 text-[11px] font-semibold leading-relaxed text-slate-600">
-            Không tự động tính tiền đền bù nếu chưa có mức được cấp thẩm quyền phê duyệt.
-          </p>
-        </section>
-
-        <section className="mb-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <h3 className="mb-3 text-[14px] font-black text-slate-900">Hình thức thu tiền</h3>
-          <div className="grid grid-cols-1 gap-2">
-            <button type="button" className="rounded-xl bg-indigo-100 px-2 py-4 text-[12px] font-black text-emerald-700">
-              <QrCode className="mx-auto mb-1 h-5 w-5" />
-              Chuyển khoản 100% qua VietQR của sân
-            </button>
-          </div>
-          <div className="mt-3 flex items-center gap-3 rounded-xl bg-slate-100 p-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-white">
-              <QrCode className="h-7 w-7 text-slate-800" />
-            </div>
-            <div>
-              <p className="text-[13px] font-black text-slate-900">Mã VietQR Động</p>
-              <p className="text-[12px] font-semibold text-slate-500">Nội dung: CK {checkoutBooking.code.replace('BK-', '')} {amountDue.replace(/\D/g, '')}K</p>
-            </div>
-          </div>
-        </section>
-
-        <button
-          type="button"
-          onClick={() => {
-            onBookingCheckout?.(checkoutBooking.court, checkoutBooking.time);
-            setCheckoutBooking(null);
-            onCheckoutModeChange?.(false);
-          }}
-          className="mb-4 flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-emerald-700 text-[14px] font-black text-white shadow-lg active:scale-[0.99] cursor-pointer"
-        >
-          <CheckCircle2 className="h-5 w-5" />
-          Xác nhận thu {amountDue} & Hoàn tất Check-out (Thu hồi thiết bị về kho)
-        </button>
-      </div>
-    );
+    return <CheckoutSettlementView key={checkoutBooking.code} booking={checkoutBooking} date={selectedDate}
+      equipments={equipments} incidents={incidents} currentUser={currentUser} onComplete={onCompleteCheckout}
+      onBack={() => { setCheckoutBooking(null); onCheckoutModeChange?.(false); }}
+      onFinished={() => {
+        setAdminBookings(previous => previous.map(booking => booking.code === checkoutBooking.code
+          && booking.bookingDate === calendarBookingDate(selectedDate) ? { ...booking, status:'Đã kết thúc' } : booking));
+        setCheckoutBooking(null); onCheckoutModeChange?.(false);
+      }} />;
   }
 
   return (
@@ -2023,12 +1646,14 @@ export default function AdminSchedulePage({ onCheckoutModeChange, onBookingCheck
                 <button
                   type="button"
                   onClick={() => {
-                    setSelectedDate(new Date(2026, 9, 30));
+                    const today = getVietnamTime();
+                    setSelectedDate(new Date(today.getFullYear(), today.getMonth(), today.getDate()));
+                    setCalendarMonth(new Date(today.getFullYear(), today.getMonth(), 1));
                     setIsDatePickerOpen(false);
                   }}
                   className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 font-bold hover:bg-slate-200 transition cursor-pointer text-[11px]"
                 >
-                  Hôm nay (30/10)
+                  Hôm nay ({currentTime.getDate().toString().padStart(2, '0')}/{(currentTime.getMonth() + 1).toString().padStart(2, '0')})
                 </button>
 
                 <button
@@ -2377,27 +2002,27 @@ export default function AdminSchedulePage({ onCheckoutModeChange, onBookingCheck
             onClick={() => setSelectedBooking(null)}
           />
           <section className="max-h-[86vh] overflow-y-auto rounded-t-2xl border-t border-slate-200 bg-white shadow-2xl">
-            <div className="flex justify-center pt-3 pb-1">
+            <div className="flex justify-center pt-2 pb-0">
               <button
                 type="button"
                 aria-label="Mở chi tiết lượt đặt đầy đủ"
                 onClick={() => openCheckinDetail(selectedBooking)}
                 className="rounded-full px-4 py-1 active:scale-95"
               >
-                <span className="block h-1.5 w-10 rounded-full bg-slate-300" />
+                <span className="block h-1 w-8 rounded-full bg-slate-200" />
               </button>
             </div>
 
-            <div className="flex items-center justify-between border-b border-slate-100 px-4 pb-3 pt-2">
+            <div className="flex items-center justify-between border-b border-slate-100 px-4 pb-2 pt-1">
               <div className="flex items-center gap-2.5">
-                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-50 text-amber-700 ring-1 ring-amber-100">
+                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-white text-emerald-800 ring-1 ring-black/15">
                   <UserRound className="h-4 w-4" />
                 </div>
                 <div>
-                  <p className="text-[9px] font-bold uppercase tracking-wide text-slate-500">Mã đặt: {selectedBooking.code}</p>
+                  <p className="text-[10px] font-bold uppercase tracking-wide text-slate-700">Mã đặt: {selectedBooking.code}</p>
                   <div className="flex items-center gap-2">
-                    <h2 className="text-[15px] font-black text-slate-950">Chi tiết lượt đặt sân</h2>
-                    <span className={`rounded-full px-2 py-0.5 text-[9px] font-black ${getStatusBadgeClass(selectedBooking.status)}`}>
+                    <h2 className="text-[15px] font-bold text-slate-900">Chi tiết lượt đặt sân</h2>
+                    <span className="rounded-full bg-white px-2 py-0.5 text-[9px] font-bold text-emerald-800 ring-1 ring-black/15">
                       {selectedBooking.status}
                     </span>
                   </div>
@@ -2413,55 +2038,58 @@ export default function AdminSchedulePage({ onCheckoutModeChange, onBookingCheck
               </button>
             </div>
 
-            <div className="space-y-3 bg-slate-50 px-3 py-3">
-              <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
-                <div className="grid grid-cols-2 gap-x-5 gap-y-3">
+            <div className="space-y-2 bg-white px-3 py-2.5">
+              {/* Info grid */}
+              <div className="rounded-xl border border-black/15 bg-white p-3">
+                <div className="grid grid-cols-2 gap-x-5 gap-y-4">
                   <div>
-                    <p className="text-[10px] font-semibold text-slate-500">Khách hàng</p>
-                    <p className="mt-0.5 text-[13px] font-black text-slate-900">{selectedBooking.customerName}</p>
+                    <p className="text-[10px] font-semibold text-slate-600">Khách hàng</p>
+                    <p className="mt-1 text-[14px] font-bold leading-snug text-slate-900">{selectedBooking.customerName}</p>
                   </div>
                   <div>
-                    <p className="text-[10px] font-semibold text-slate-500">Số điện thoại</p>
-                    <p className="mt-0.5 text-[13px] font-black text-emerald-700">{selectedBooking.phone}</p>
+                    <p className="text-[10px] font-semibold text-slate-600">Số điện thoại</p>
+                    <p className="mt-1 text-[13px] font-bold leading-snug text-slate-900">{selectedBooking.phone}</p>
                   </div>
                   <div>
-                    <p className="text-[10px] font-semibold text-slate-500">Sân & Bộ môn</p>
-                    <p className="mt-0.5 text-[13px] font-black text-slate-900">{selectedBooking.court}</p>
-                    <p className="text-[10px] font-semibold text-slate-500">{selectedBooking.sport}</p>
+                    <p className="text-[10px] font-semibold text-slate-600">Sân & Bộ môn</p>
+                    <p className="mt-1 text-[13px] font-bold leading-snug text-slate-900">{selectedBooking.court}</p>
+                    <p className="text-[10px] font-medium text-slate-600">{selectedBooking.sport}</p>
                   </div>
                   <div>
-                    <p className="text-[10px] font-semibold text-slate-500">Khung thời gian</p>
-                    <p className="mt-0.5 text-[13px] font-black text-slate-900">{selectedBooking.time}</p>
+                    <p className="text-[10px] font-semibold text-slate-600">Khung thời gian</p>
+                    <p className="mt-1 text-[13px] font-bold leading-snug text-slate-900">{selectedBooking.time}</p>
                   </div>
                   <div>
-                    <p className="text-[10px] font-semibold text-slate-500">Trạng thái thanh toán</p>
-                    <p className="mt-0.5 text-[12px] font-black text-emerald-700">{selectedBooking.paymentStatus}</p>
+                    <p className="text-[10px] font-semibold text-slate-600">Trạng thái thanh toán</p>
+                    <p className="mt-1 text-[11px] font-semibold leading-relaxed text-emerald-800">{selectedBooking.paymentStatus}</p>
                   </div>
                   <div>
-                    <p className="text-[10px] font-semibold text-slate-500">Tổng số tiền</p>
-                    <p className="mt-0.5 text-[13px] font-black text-emerald-700">{selectedBooking.total}</p>
+                    <p className="text-[10px] font-semibold text-slate-600">Tổng tiền</p>
+                    <p className="mt-1 text-[14px] font-bold leading-snug text-slate-900">{selectedBooking.total}</p>
                   </div>
                 </div>
               </div>
 
-              <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
-                <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                  <span className="text-[11px] font-bold text-slate-500">Đã thanh toán qua VietQR</span>
-                  <span className="text-[13px] font-black text-emerald-700">{selectedBooking.paidAmount}</span>
+              {/* Payment summary */}
+              <div className="rounded-xl border border-black/15 bg-white px-3 py-2">
+                <div className="flex items-center justify-between gap-3 border-b border-black/10 pb-2">
+                  <span className="text-[10px] font-medium text-slate-600">Đã thanh toán qua VietQR</span>
+                  <span className="text-[12px] font-bold text-emerald-800">{selectedBooking.paidAmount}</span>
                 </div>
-                <div className="flex items-center justify-between pt-2">
-                  <span className="text-[11px] font-bold text-red-500">Còn lại cần thu khi nhận sân</span>
-                  <span className="text-[13px] font-black text-red-600">{selectedBooking.remaining}</span>
+                <div className="flex items-center justify-between gap-3 pt-2">
+                  <span className="text-[11px] font-semibold text-slate-700">Còn lại cần thu khi nhận sân</span>
+                  <span className="text-[14px] font-bold text-slate-900">{selectedBooking.remaining}</span>
                 </div>
               </div>
 
+              {/* Action buttons */}
               <div className="space-y-2">
                 {selectedBooking.status === 'Đã đặt' && (
                   <div className="grid grid-cols-2 gap-2">
                     <button
                       type="button"
                       onClick={() => openCheckinDetail(selectedBooking)}
-                      className="flex h-10 items-center justify-center gap-1.5 rounded bg-emerald-700 px-2 text-[11px] font-black text-white shadow-sm transition active:scale-[0.99]"
+                      className="flex h-10 items-center justify-center gap-1.5 rounded-xl bg-emerald-700 px-2 text-[11px] font-bold text-white shadow-sm transition hover:bg-emerald-800 active:scale-[0.99]"
                     >
                       <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
                       <span className="truncate">Check-in sân</span>
@@ -2473,7 +2101,7 @@ export default function AdminSchedulePage({ onCheckoutModeChange, onBookingCheck
                         setSelectedBooking(null);
                         onCheckoutModeChange?.(true);
                       }}
-                      className="flex h-10 items-center justify-center gap-1.5 rounded border border-red-100 bg-white px-2 text-[11px] font-black text-red-600 shadow-sm transition active:scale-[0.99]"
+                      className="flex h-10 items-center justify-center gap-1.5 rounded-xl bg-red-50 px-2 text-[11px] font-bold text-red-700 ring-1 ring-red-200 transition hover:bg-red-100 active:scale-[0.99]"
                     >
                       <Ban className="h-3.5 w-3.5 shrink-0" />
                       <span className="truncate">Hủy đặt sân</span>
@@ -2490,10 +2118,10 @@ export default function AdminSchedulePage({ onCheckoutModeChange, onBookingCheck
                         setSelectedBooking(null);
                         onCheckoutModeChange?.(true);
                       }}
-                      className="flex h-10 items-center justify-center gap-1.5 rounded border border-slate-200 bg-white text-[11px] font-black text-slate-800 shadow-sm transition active:scale-[0.99]"
+                      className="flex h-10 items-center justify-center gap-1.5 rounded-xl bg-emerald-700 px-2 text-[11px] font-bold text-white shadow-sm transition hover:bg-emerald-800 active:scale-[0.99]"
                     >
-                      <Undo2 className="h-3.5 w-3.5" />
-                      Kết thúc / Trả sân
+                      <Undo2 className="h-3.5 w-3.5 shrink-0" />
+                      <span className="truncate">Kết thúc / Trả sân</span>
                     </button>
                     <button
                       type="button"
@@ -2502,23 +2130,23 @@ export default function AdminSchedulePage({ onCheckoutModeChange, onBookingCheck
                         setSelectedBooking(null);
                         onCheckoutModeChange?.(true);
                       }}
-                      className="flex h-10 items-center justify-center gap-1.5 rounded border border-red-100 bg-white text-[11px] font-black text-red-600 shadow-sm transition active:scale-[0.99]"
+                      className="flex h-10 items-center justify-center gap-1.5 rounded-xl bg-red-50 px-2 text-[11px] font-bold text-red-700 ring-1 ring-red-200 transition hover:bg-red-100 active:scale-[0.99]"
                     >
-                      <Ban className="h-3.5 w-3.5" />
-                      Hủy đặt sân
+                      <Ban className="h-3.5 w-3.5 shrink-0" />
+                      <span className="truncate">Hủy đặt sân</span>
                     </button>
                   </div>
                 )}
 
                 {selectedBooking.status === 'Đã hủy' && (
-                  <div className="rounded-lg border border-slate-200 bg-slate-100 px-3 py-2 text-[11px] font-bold leading-relaxed text-slate-600">
+                  <div className="rounded-lg bg-slate-100 px-3 py-2 text-[10px] font-medium text-slate-500">
                     Lượt đặt đã hủy. Không còn thao tác sân khả dụng.
                   </div>
                 )}
               </div>
 
               {(selectedBooking.status === 'Đã đặt' || selectedBooking.status === 'Đang sử dụng') && (
-                <div className="flex items-start gap-1.5 px-1 text-[9px] italic leading-relaxed text-slate-400">
+                <div className="flex items-start gap-1.5 px-0.5 text-[10px] leading-relaxed text-slate-600">
                   <Phone className="mt-0.5 h-3 w-3 shrink-0" />
                   <p>Lưu ý: Thao tác hủy thủ công sẽ gửi tin nhắn SMS xác nhận tự động hoàn tiền/cấn trừ cho khách.</p>
                 </div>
