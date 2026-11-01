@@ -118,7 +118,7 @@ export default function AddStaffView({ onBack, onSaveEmployee }: AddStaffViewPro
   };
 
   return (
-    <div className="flex-1 space-y-4 p-4 pb-28 animate-in fade-in duration-200">
+    <div className="flex-1 space-y-3 p-3 pb-20 animate-in fade-in duration-200">
       {/* 🟢 Top Badge & Navigation */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
@@ -149,7 +149,7 @@ export default function AddStaffView({ onBack, onSaveEmployee }: AddStaffViewPro
 
       {/* 🟢 Main Title */}
       <div>
-        <h1 className="text-2xl font-black tracking-tight text-slate-900 leading-tight">
+        <h1 className="text-xl font-extrabold tracking-tight text-slate-900 leading-tight">
           THÊM NHÂN VIÊN <span className="text-emerald-600">MỚI</span>
         </h1>
         <p className="mt-1 text-xs text-slate-500 leading-relaxed font-medium">
@@ -183,9 +183,9 @@ export default function AddStaffView({ onBack, onSaveEmployee }: AddStaffViewPro
       )}
 
       {/* 🟢 Form Container */}
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleSubmit} className="space-y-3">
         {/* SECTION 1: THÔNG TIN NHÂN SỰ */}
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-2xs space-y-3.5">
+        <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-2xs space-y-3">
           <div className="flex items-center gap-2 text-slate-800 font-black text-xs uppercase tracking-wider">
             <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700">
               <User className="w-3.5 h-3.5" />
@@ -253,7 +253,7 @@ export default function AddStaffView({ onBack, onSaveEmployee }: AddStaffViewPro
         </div>
 
         {/* SECTION 2: TÀI KHOẢN & BẢO MẬT */}
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-2xs space-y-3.5">
+        <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-2xs space-y-3">
           <div className="flex items-center gap-2 text-slate-800 font-black text-xs uppercase tracking-wider">
             <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700">
               <Lock className="w-3.5 h-3.5" />
@@ -310,7 +310,7 @@ export default function AddStaffView({ onBack, onSaveEmployee }: AddStaffViewPro
         </div>
 
         {/* SECTION 3: TRẠNG THÁI TÀI KHOẢN */}
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-2xs space-y-3">
+        <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-2xs space-y-3">
           <div className="flex items-center gap-2 text-slate-800 font-black text-xs uppercase tracking-wider">
             <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700">
               <SlidersHorizontal className="w-3.5 h-3.5" />
@@ -372,7 +372,7 @@ export default function AddStaffView({ onBack, onSaveEmployee }: AddStaffViewPro
         {/* Submit Button */}
         <button
           type="submit"
-          className="w-full flex items-center justify-center gap-2 rounded-2xl bg-emerald-500 hover:bg-emerald-600 py-4 text-xs font-black uppercase tracking-wider text-white shadow-lg shadow-emerald-500/25 transition active:scale-95 cursor-pointer"
+          className="h-10 w-full flex items-center justify-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 px-3 text-xs font-bold uppercase tracking-wide text-white shadow-sm transition active:scale-[0.99] cursor-pointer"
         >
           <UserPlus className="w-4 h-4 stroke-[2.2]" />
           <span>+ THÊM NHÂN VIÊN</span>
