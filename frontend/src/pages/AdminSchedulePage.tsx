@@ -1,12 +1,10 @@
 import { useMemo, useRef, useState, useEffect } from 'react';
-import { 
-  AlertTriangle, ArrowLeft, BadgeCheck, Ban, Calendar, CalendarCheck, CalendarClock, 
-  CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, CircleX, ClipboardList, 
-  Clock3, Cloud, CreditCard, Info, LayoutGrid, MapPin, Phone,
-  QrCode, ReceiptText, Send, ShieldCheck, Undo2, UserRound, X, Zap 
-  Check, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, CircleX, ClipboardList, 
-  Clock3, Cloud, CreditCard, FileText, Info, LayoutGrid, MapPin, Phone, 
-  Printer, QrCode, ReceiptText, Send, ShieldCheck, Undo2, UserRound, X, Zap 
+import {
+  AlertTriangle, ArrowLeft, BadgeCheck, Ban, Calendar, CalendarCheck,
+  CalendarClock, Check, CheckCircle2, ChevronDown, ChevronLeft,
+  ChevronRight, CircleX, ClipboardList, Clock3, Cloud, CreditCard,
+  FileText, Info, LayoutGrid, MapPin, Phone, Printer, QrCode,
+  ReceiptText, Send, ShieldCheck, Undo2, UserRound, X, Zap
 } from 'lucide-react';
 import QrCodeArtwork from '../components/QrCodeArtwork';
 import CheckoutSettlementView from '../components/admin/CheckoutSettlementView';
