@@ -1,20 +1,14 @@
 import { CourtStatusItem } from '../types/facility.js';
 
 export const INITIAL_COURTS: CourtStatusItem[] = [
-  { id: 'SAN-01', courtNumber: 1, name: 'Sân 01 (Tiêu chuẩn A)', isLocked: false },
-  { id: 'SAN-02', courtNumber: 2, name: 'Sân 02 (Tiêu chuẩn A)', isLocked: false },
-  {
-    id: 'SAN-03',
-    courtNumber: 3,
-    name: 'Sân 03 (Trong nhà VIP)',
-    isLocked: true,
-    lockReason: 'Sửa thảm & đèn',
-    lockedAt: '14:20 Hôm nay',
-    lockedBy: 'Nguyễn Văn An',
-  },
-  { id: 'SAN-04', courtNumber: 4, name: 'Sân 04 (Tiêu chuẩn B)', isLocked: false },
-  { id: 'SAN-05', courtNumber: 5, name: 'Sân 05 (Tiêu chuẩn B)', isLocked: false },
-  { id: 'SAN-06', courtNumber: 6, name: 'Sân 06 (Tiêu chuẩn B)', isLocked: false },
-  { id: 'SAN-07', courtNumber: 7, name: 'Sân 07 (Tiêu chuẩn A)', isLocked: false },
-  { id: 'SAN-08', courtNumber: 8, name: 'Sân 08 (Tiêu chuẩn A)', isLocked: false },
+  ...(['CL', 'BC', 'BD'] as const).flatMap((prefix) =>
+    Array.from({ length: prefix === 'BD' ? 4 : 5 }, (_, index) => {
+      const code = `${prefix}-${String(index + 1).padStart(2, '0')}`;
+      return {
+        id: `SAN-${code}`, code, courtNumber: index + 1, name: `Sân ${code}`,
+        sportId: prefix === 'CL' ? 'badminton' as const : prefix === 'BC' ? 'volleyball' as const : 'football' as const,
+        isLocked: code === 'CL-03',
+        ...(code === 'CL-03' ? { lockReason: 'Hư lưới' } : {}),
+      };
+    })),
 ];

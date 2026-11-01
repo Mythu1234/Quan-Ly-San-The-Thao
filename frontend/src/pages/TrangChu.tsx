@@ -10,7 +10,7 @@ import { useState, useRef, useEffect, useMemo } from 'react';
 import useVietnamToday from '../hooks/useVietnamToday';
 import type { IncidentReporter } from '../utils/incidentStorage';
 import useCourtAvailability, { isCourtLocked } from '../hooks/useCourtAvailability';
-import { Search, MapPin, Phone, Clock, Play, Home, Calendar as CalendarIcon, X, Zap , User, Lock, Eye, EyeOff, Bell, ArrowLeft, ArrowRight, ChevronLeft, ChevronRight, ChevronDown, Trophy, CheckCircle2, RefreshCw, MessageSquare, Copy, Check, AlertTriangle } from 'lucide-react';
+import { Search, MapPin, Phone, Clock, Play, Home, Calendar as CalendarIcon, X, Zap , User, Lock, Eye, EyeOff, Bell, ArrowLeft, ArrowRight, ChevronLeft, ChevronRight, ChevronDown, Trophy, CheckCircle2, RefreshCw, MessageSquare, Copy, Check, AlertTriangle, ReceiptText, Printer } from 'lucide-react';
 
 const parseTimeToMinutes = (t: string): number => {
   if (!t) return 0;
@@ -2926,7 +2926,7 @@ export default function TrangChu() {
                    <span className="h-2 w-2 bg-white rounded-full"></span>
                  </span>
                </div>
-               <p className="text-xs font-bold text-emerald-700">Đang chờ hệ thống ghi nhận thanh toán...</p>
+               <button type="button" onClick={simulatePaymentSuccess} className="rounded-xl bg-emerald-700 px-4 py-3 text-sm font-bold text-white">Mô phỏng thanh toán thành công</button>
             </div>
 
             <div className="w-full mt-6">

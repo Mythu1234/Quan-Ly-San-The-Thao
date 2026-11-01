@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { facilityService } from '../services/facilityService.js';
+import { completeCheckout, getCheckoutReceipt } from '../services/checkoutService.js';
 import {
   CreateEquipmentDTO,
   UpdateEquipmentDTO,
@@ -7,6 +8,17 @@ import {
 } from '../types/facility.js';
 
 export class FacilityController {
+  public async getCheckoutReceipt(req:Request,res:Response):Promise<void> {
+    try {
+      const receipt=getCheckoutReceipt(String(req.params.reference));
+      if(!receipt){res.status(404).json({success:false});return;}
+      res.json({success:true,data:receipt});
+    } catch { res.status(500).json({success:false,message:'Chưa đọc được quyết toán trả sân.'}); }
+  }
+  public async completeCheckout(req: Request, res: Response): Promise<void> {
+    try { res.json({ success: true, data: completeCheckout(req.body) }); }
+    catch (error: any) { res.status(400).json({ success: false, message:error.message || 'Không hoàn tất được trả sân.' }); }
+  }
   // ==========================================
   // DASHBOARD KPI (UC-06)
   // ==========================================
@@ -293,6 +305,15 @@ export class FacilityController {
     }
   }
 
+  public async deleteIncident(req: Request, res: Response): Promise<void> {
+    try {
+      const deleted = facilityService.deleteIncident(String(req.params.id));
+      res.json({ success: true, data: deleted });
+    } catch (error: any) {
+      res.status(404).json({ success: false, message: error.message || 'Không xóa được báo cáo sự cố.' });
+    }
+  }
+
   public async updateIncidentStatus(req: Request, res: Response): Promise<void> {
     try {
       const id = String(req.params.id);
@@ -332,14 +353,18 @@ export class FacilityController {
   public async addIncidentTimelineLog(req: Request, res: Response): Promise<void> {
     try {
       const id = String(req.params.id);
-      const { title, description } = req.body;
+      const { title, description, images } = req.body;
+      if (images !== undefined && (!Array.isArray(images) || images.some((image: unknown) => typeof image !== 'string'))) {
+        res.status(400).json({ success: false, message: 'Ảnh nhật ký không hợp lệ' });
+        return;
+      }
 
       if (!title || !title.trim()) {
         res.status(400).json({ success: false, message: 'Vui lòng nhập tiêu đề nhật ký tiến độ' });
         return;
       }
 
-      const updated = facilityService.addTimelineLog(id, title, description || '');
+      const updated = facilityService.addTimelineLog(id, title, description || '', images || []);
       res.status(200).json({
         success: true,
         message: 'Đã thêm nhật ký tiến độ sự cố thành công!',

@@ -25,6 +25,8 @@ router.delete('/equipments/:id', (req, res) => facilityController.deleteEquipmen
 router.patch('/equipments/:code/relocate', (req, res) => facilityController.relocateEquipment(req, res));
 router.patch('/equipments/:code/return-warehouse', (req, res) => facilityController.returnToWarehouse(req, res));
 router.post('/equipments/checkout-court', (req, res) => facilityController.checkoutCourtEquipments(req, res));
+router.post('/checkout-settlements', (req, res) => facilityController.completeCheckout(req, res));
+router.get('/checkout-settlements/:reference', (req, res) => facilityController.getCheckoutReceipt(req, res));
 
 // ==========================================
 // 4. INCIDENT REPORTING & AUDIT (UC-03, UC-05)
@@ -32,6 +34,7 @@ router.post('/equipments/checkout-court', (req, res) => facilityController.check
 router.get('/incidents', (req, res) => facilityController.getIncidents(req, res));
 router.get('/incidents/:id', (req, res) => facilityController.getIncidentById(req, res));
 router.post('/incidents', (req, res) => facilityController.createIncident(req, res));
+router.delete('/incidents/:id', (req, res) => facilityController.deleteIncident(req, res));
 router.patch('/incidents/:id/status', (req, res) => facilityController.updateIncidentStatus(req, res));
 router.post('/incidents/:id/timeline', (req, res) => facilityController.addIncidentTimelineLog(req, res));
 

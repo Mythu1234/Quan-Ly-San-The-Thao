@@ -10,6 +10,7 @@ import {
 import { INITIAL_EQUIPMENT } from '../data/initialEquipment.js';
 import { INITIAL_COURTS } from '../data/initialCourts.js';
 import { INITIAL_INCIDENTS } from '../data/initialIncidents.js';
+import type { CheckoutResult } from '../types/checkout.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -18,6 +19,7 @@ const DATA_DIR = path.resolve(__dirname, '../../data');
 const EQUIPMENTS_FILE = path.join(DATA_DIR, 'equipments.json');
 const COURTS_FILE = path.join(DATA_DIR, 'courts.json');
 const INCIDENTS_FILE = path.join(DATA_DIR, 'incidents.json');
+const CHECKOUTS_FILE = path.join(DATA_DIR, 'checkouts.json');
 
 export class FacilityRepository {
   private equipments: FacilityEquipment[] = [];
@@ -50,6 +52,12 @@ export class FacilityRepository {
       if (fs.existsSync(COURTS_FILE)) {
         const raw = fs.readFileSync(COURTS_FILE, 'utf-8');
         this.courts = JSON.parse(raw);
+        // Preserve legacy records referenced by incident history, and add missing standard courts.
+        const missing = INITIAL_COURTS.filter(c => !this.courts.some(existing => existing.id === c.id));
+        if (missing.length) {
+          this.courts.push(...missing);
+          this.persistCourts();
+        }
       } else {
         this.courts = [...INITIAL_COURTS];
         this.persistCourts();
@@ -64,6 +72,7 @@ export class FacilityRepository {
         this.persistIncidents();
       }
 
+      this.recoverCheckout();
       this.isLoaded = true;
     } catch (err) {
       console.error('FacilityRepository ensureLoaded error:', err);
@@ -80,6 +89,51 @@ export class FacilityRepository {
     } catch (err) {
       console.error('persistEquipments error:', err);
     }
+  }
+
+  private readCheckoutLedger(): { receipts: CheckoutResult[]; pending?: CheckoutResult } {
+    return fs.existsSync(CHECKOUTS_FILE) ? JSON.parse(fs.readFileSync(CHECKOUTS_FILE, 'utf8')) : { receipts: [] };
+  }
+
+  private writeCheckoutLedger(ledger: { receipts: CheckoutResult[]; pending?: CheckoutResult }):void {
+    const temporary = `${CHECKOUTS_FILE}.tmp`;
+    fs.writeFileSync(temporary,JSON.stringify(ledger,null,2),'utf8');
+    fs.renameSync(temporary,CHECKOUTS_FILE);
+  }
+
+  private recoverCheckout(): void {
+    const ledger = this.readCheckoutLedger();
+    if (!ledger.pending) return;
+    const result = ledger.pending;
+    const incidentMap = new Map(this.incidents.map(incident => [incident.id, incident]));
+    result.incidents.forEach(incident => incidentMap.set(incident.id, incident));
+    this.incidents = [...incidentMap.values()];
+    const equipmentMap = new Map(result.equipments.map(equipment => [equipment.code, equipment]));
+    this.equipments = this.equipments.map(equipment => equipmentMap.get(equipment.code) || equipment);
+    fs.writeFileSync(INCIDENTS_FILE, JSON.stringify(this.incidents, null, 2), 'utf8');
+    fs.writeFileSync(EQUIPMENTS_FILE, JSON.stringify(this.equipments, null, 2), 'utf8');
+    ledger.receipts = [...ledger.receipts.filter(item => item.receipt.reference !== result.receipt.reference), result];
+    delete ledger.pending;
+    this.writeCheckoutLedger(ledger);
+  }
+
+  public getCheckout(reference: string): CheckoutResult | undefined {
+    this.ensureLoaded();
+    this.recoverCheckout();
+    return this.readCheckoutLedger().receipts.find(item => item.receipt.reference === reference);
+  }
+
+  public commitCheckout(result: CheckoutResult): CheckoutResult {
+    this.ensureLoaded();
+    this.recoverCheckout();
+    const ledger = this.readCheckoutLedger();
+    const existing = ledger.receipts.find(item => item.receipt.reference === result.receipt.reference);
+    if (existing) return existing;
+    // Write the recovery record before changing incident/equipment files.
+    ledger.pending = result;
+    this.writeCheckoutLedger(ledger);
+    this.recoverCheckout();
+    return result;
   }
 
   private persistCourts(): void {
@@ -248,6 +302,16 @@ export class FacilityRepository {
     this.incidents.unshift(incident);
     this.persistIncidents();
     return { ...incident };
+  }
+
+  public deleteIncident(id: string): FacilityIncident | null {
+    this.ensureLoaded();
+    const index = this.incidents.findIndex(incident => incident.id.toLowerCase() === id.toLowerCase());
+    if (index < 0) return null;
+    const now = new Date().toISOString();
+    this.incidents[index] = { ...this.incidents[index], deletedAt: now, updatedAt: now };
+    this.persistIncidents();
+    return { ...this.incidents[index] };
   }
 
   public updateIncidentStatus(

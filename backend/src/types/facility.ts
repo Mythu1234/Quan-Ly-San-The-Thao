@@ -14,9 +14,12 @@ export interface FacilityEquipment {
   statusLabel: string;      // Sẵn sàng, Đang sử dụng, Bảo trì, Hỏng
   healthRate: string;       // Mới 95%, Tốt, Cần bảo trì ngay...
   purchaseDate: string;     // Ngày nhập
+  purchasePrice?: number;
+  compensationPrice?: number;
   warrantyExpire: string;   // Hạn bảo hành
   supplier?: string;        // Hãng / Nhà cung cấp bảo hành
   supplierPhone?: string;   // Hotline bảo hành
+  warrantyAddress?: string;
   serialNumber?: string;    // Số Seri / Model
   lastMaintenance?: string; // Ngày bảo dưỡng gần nhất
   notes?: string;
@@ -35,9 +38,12 @@ export interface CreateEquipmentDTO {
   currentLocation: string;
   healthRate?: string;
   purchaseDate?: string;
+  purchasePrice?: number;
+  compensationPrice?: number;
   warrantyExpire?: string;
   supplier?: string;
   supplierPhone?: string;
+  warrantyAddress?: string;
   serialNumber?: string;
   notes?: string;
   code?: string;
@@ -53,9 +59,12 @@ export interface UpdateEquipmentDTO {
   statusLabel?: string;
   healthRate?: string;
   purchaseDate?: string;
+  purchasePrice?: number;
+  compensationPrice?: number;
   warrantyExpire?: string;
   supplier?: string;
   supplierPhone?: string;
+  warrantyAddress?: string;
   serialNumber?: string;
   lastMaintenance?: string;
   notes?: string;
@@ -66,6 +75,8 @@ export interface UpdateEquipmentDTO {
 }
 
 export interface CourtStatusItem {
+  code?: string;
+  sportId?: 'badminton' | 'volleyball' | 'football';
   id: string;               // SAN-01 .. SAN-08
   courtNumber: number;      // 1 .. 8
   name: string;             // Sân 01 (Tiêu chuẩn A)...
@@ -88,6 +99,7 @@ export interface IncidentDamageItem {
 }
 
 export interface IncidentTimelineLog {
+  images?: string[];
   id: string;
   time: string;
   title: string;
@@ -96,6 +108,16 @@ export interface IncidentTimelineLog {
 }
 
 export interface FacilityIncident {
+  bookingCode?: string;
+  bookingDate?: string;
+  checkoutReference?: string;
+  liability?: 'DO_KHACH_LAM_HONG' | 'BAO_HANH_SAN_VAN_DONG';
+  compensationAmount?: number;
+  compensationPaymentStatus?: 'pending' | 'paid' | 'not_required';
+  compensationPaidAt?: string;
+  deletedAt?: string;
+  compensationItemId?: string;
+  compensationPrice?: number;
   id: string;               // SC-8921 / SC-2024-8921
   courtId?: string;
   courtName: string;
@@ -124,6 +146,11 @@ export interface FacilityIncident {
 }
 
 export interface CreateIncidentDTO {
+  bookingCode?: string;
+  bookingDate?: string;
+  liability?: 'DO_KHACH_LAM_HONG' | 'BAO_HANH_SAN_VAN_DONG';
+  compensationItemId?: string;
+  compensationPrice?: number;
   courtId?: string;
   courtName: string;
   courtZone?: string;

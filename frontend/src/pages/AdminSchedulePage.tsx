@@ -3,7 +3,7 @@ import {
   AlertTriangle, ArrowLeft, BadgeCheck, Ban, Calendar, CalendarCheck,
   CalendarClock, Check, CheckCircle2, ChevronDown, ChevronLeft,
   ChevronRight, CircleX, ClipboardList, Clock3, Cloud, CreditCard,
-  FileText, Info, LayoutGrid, MapPin, Phone, Printer, QrCode,
+  Info, LayoutGrid, MapPin, Phone, Printer,
   ReceiptText, Send, ShieldCheck, Undo2, UserRound, X, Zap
 } from 'lucide-react';
 import QrCodeArtwork from '../components/QrCodeArtwork';
@@ -2464,7 +2464,7 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
                   <span className="h-2 w-2 bg-white rounded-full"></span>
                 </span>
               </div>
-              <p className="text-xs font-bold text-emerald-700">Đang chờ hệ thống ghi nhận thanh toán...</p>
+              <button type="button" onClick={handleConfirmPaymentSuccess} className="rounded-xl bg-emerald-700 px-4 py-3 text-sm font-bold text-white">Xác nhận đã nhận thanh toán VietQR</button>
             </div>
 
             <div className="w-full mt-6">

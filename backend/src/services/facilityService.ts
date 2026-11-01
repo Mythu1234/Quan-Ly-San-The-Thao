@@ -25,7 +25,7 @@ export class FacilityService {
   public getDashboardStats(): FacilityDashboardStats {
     const equipments = facilityRepository.getAllEquipments();
     const courts = facilityRepository.getAllCourts();
-    const incidents = facilityRepository.getAllIncidents();
+    const incidents = facilityRepository.getAllIncidents().filter(incident => !incident.deletedAt);
 
     const readyEquipments = equipments.filter((e) => e.status === 'san_sang').length;
     const inUseEquipments = equipments.filter((e) => e.status === 'dang_su_dung').length;
@@ -103,6 +103,11 @@ export class FacilityService {
   }
 
   public createEquipment(dto: CreateEquipmentDTO): FacilityEquipment {
+    for (const value of [dto.purchasePrice, dto.compensationPrice]) {
+      if (value !== undefined && (!Number.isSafeInteger(value) || value < 0)) {
+        throw new Error('Giá thiết bị phải là số nguyên không âm!');
+      }
+    }
     if (!dto.name || !dto.name.trim()) {
       throw new Error('Tên trang thiết bị không được để trống!');
     }
@@ -120,9 +125,6 @@ export class FacilityService {
     const dateFormatted = `${now.getDate().toString().padStart(2, '0')}/${(now.getMonth() + 1)
       .toString()
       .padStart(2, '0')}/${now.getFullYear()}`;
-    const warrantyDate = `${now.getDate().toString().padStart(2, '0')}/${(now.getMonth() + 1)
-      .toString()
-      .padStart(2, '0')}/${now.getFullYear() + 2}`;
 
     const isWarehouse = dto.currentLocation.toLowerCase().includes('kho');
     const status = isWarehouse ? 'san_sang' : 'dang_su_dung';
@@ -139,10 +141,13 @@ export class FacilityService {
       status,
       statusLabel,
       healthRate: dto.healthRate || 'Mới 100%',
-      purchaseDate: dto.purchaseDate || dateFormatted,
-      warrantyExpire: dto.warrantyExpire || warrantyDate,
+      purchaseDate: dto.purchaseDate ?? dateFormatted,
+      purchasePrice: dto.purchasePrice,
+      compensationPrice: dto.compensationPrice,
+      warrantyExpire: dto.warrantyExpire?.trim() || '',
       supplier: dto.supplier?.trim() || undefined,
       supplierPhone: dto.supplierPhone?.trim() || undefined,
+      warrantyAddress: dto.warrantyAddress?.trim() || undefined,
       serialNumber: dto.serialNumber?.trim() || undefined,
       notes: dto.notes?.trim() || undefined,
       createdAt: now.toISOString(),
@@ -153,6 +158,11 @@ export class FacilityService {
   }
 
   public updateEquipment(idOrCode: string, dto: UpdateEquipmentDTO): FacilityEquipment {
+    for (const value of [dto.purchasePrice, dto.compensationPrice]) {
+      if (value !== undefined && (!Number.isSafeInteger(value) || value < 0)) {
+        throw new Error('Giá thiết bị phải là số nguyên không âm!');
+      }
+    }
     const existing = this.getEquipment(idOrCode);
 
     const updates: Partial<FacilityEquipment> = {};
@@ -166,11 +176,15 @@ export class FacilityService {
     if (dto.status !== undefined) updates.status = dto.status;
     if (dto.statusLabel !== undefined) updates.statusLabel = dto.statusLabel;
     if (dto.healthRate !== undefined) updates.healthRate = dto.healthRate;
+    if (dto.purchaseDate !== undefined) updates.purchaseDate = dto.purchaseDate;
+    if (dto.purchasePrice !== undefined) updates.purchasePrice = dto.purchasePrice;
+    if (dto.compensationPrice !== undefined) updates.compensationPrice = dto.compensationPrice;
     if (dto.notes !== undefined) updates.notes = dto.notes;
     if (dto.lastMaintenance !== undefined) updates.lastMaintenance = dto.lastMaintenance;
     if (dto.warrantyExpire !== undefined) updates.warrantyExpire = dto.warrantyExpire;
     if (dto.supplier !== undefined) updates.supplier = dto.supplier;
     if (dto.supplierPhone !== undefined) updates.supplierPhone = dto.supplierPhone;
+    if (dto.warrantyAddress !== undefined) updates.warrantyAddress = dto.warrantyAddress.trim();
     if (dto.serialNumber !== undefined) updates.serialNumber = dto.serialNumber;
 
     if (dto.assignedBookingCode !== undefined) updates.assignedBookingCode = dto.assignedBookingCode;
@@ -315,6 +329,12 @@ export class FacilityService {
     return incident;
   }
 
+  public deleteIncident(id: string): FacilityIncident {
+    const deleted = facilityRepository.deleteIncident(id);
+    if (!deleted) throw new Error('Không tìm thấy báo cáo sự cố.');
+    return deleted;
+  }
+
   public createIncident(dto: CreateIncidentDTO): { incident: FacilityIncident; courtLocked: boolean } {
     if (!dto.title || !dto.title.trim()) {
       throw new Error('Vui lòng nhập tiêu đề sự cố!');
@@ -337,36 +357,16 @@ export class FacilityService {
       thap: 'Thấp',
     };
 
-    // Auto-lock court if requested or if severity is "khan_cap" (UC-03 BR1)
-    const shouldLockCourt = dto.lockCourt === true || dto.severity === 'khan_cap';
-
     const initialTimelineLogs = [
       {
-        id: `TL-${Date.now()}-1`,
+        id: `REPORT-${nextId}`,
         time: timeStr,
-        title: 'Ghi nhận biên bản sự cố',
-        description: `${dto.reporterName || 'Nhân viên'} lập biên bản sự cố hiện trường: ${dto.title}.`,
-        active: !shouldLockCourt,
+        title: dto.title.trim(),
+        description: dto.description?.trim() || '',
+        images: dto.images?.length ? dto.images : dto.imageUrl ? [dto.imageUrl] : [],
+        active: true,
       },
     ];
-
-    if (shouldLockCourt && dto.courtId) {
-      initialTimelineLogs.unshift({
-        id: `TL-${Date.now()}-2`,
-        time: timeStr,
-        title: 'Kích hoạt Master Lock khóa sân tự động',
-        description: `Hệ thống tự động kích hoạt chế độ bảo trì Master Lock đóng ${dto.courtName} trên lịch trực tuyến.`,
-        active: true,
-      });
-
-      // Execute court lock
-      facilityRepository.updateCourtLock(
-        dto.courtId,
-        true,
-        `Sự cố ${severityLabels[dto.severity]}: ${dto.title}`,
-        dto.reporterName || 'Admin'
-      );
-    }
 
     const damageItems = dto.damageItems && dto.damageItems.length > 0
       ? dto.damageItems
@@ -386,14 +386,17 @@ export class FacilityService {
       : [];
 
     const newIncident: FacilityIncident = {
+      bookingCode:dto.bookingCode?.trim(), bookingDate:dto.bookingDate, liability:dto.liability,
+      compensationPaymentStatus:'pending',
       id: nextId,
       courtId: dto.courtId,
       courtName: dto.courtName,
       courtZone: dto.courtZone || 'Khu A',
       courtSubtype: dto.courtSubtype || 'Sân Cầu Lông Đa Năng',
-      isCourtLocked: shouldLockCourt,
       equipmentCode: dto.equipmentCode,
       equipmentName: dto.equipmentName,
+      compensationItemId: dto.compensationItemId,
+      compensationPrice: dto.compensationPrice,
       title: dto.title.trim(),
       description: dto.description?.trim() || 'Cần kiểm tra kỹ thuật tại chỗ',
       severity: dto.severity,
@@ -401,9 +404,9 @@ export class FacilityService {
       status: 'cho_xu_ly',
       statusLabel: 'Chờ xử lý',
       reportedAt,
-      reporterName: dto.reporterName || 'Nguyễn Văn An',
+      reporterName: dto.reporterName,
       reporterRole: dto.reporterRole || 'Nhân viên vận hành',
-      reporterPhone: dto.reporterPhone || '0901.234.567',
+      reporterPhone: dto.reporterPhone,
       damageItems,
       timelineLogs: initialTimelineLogs,
       technicianNote: dto.technicianNote,
@@ -416,7 +419,7 @@ export class FacilityService {
     const created = facilityRepository.createIncident(newIncident);
     return {
       incident: created,
-      courtLocked: shouldLockCourt,
+      courtLocked: false,
     };
   }
 
@@ -456,7 +459,7 @@ export class FacilityService {
     };
   }
 
-  public addTimelineLog(incidentId: string, title: string, description: string): FacilityIncident {
+  public addTimelineLog(incidentId: string, title: string, description: string, images: string[] = []): FacilityIncident {
     this.getIncident(incidentId);
 
     const nowTime = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
@@ -465,6 +468,7 @@ export class FacilityService {
       time: nowTime,
       title: title.trim(),
       description: description.trim(),
+      images,
       active: true,
     };
 

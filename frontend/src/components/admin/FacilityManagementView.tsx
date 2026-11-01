@@ -1,16 +1,10 @@
 import { useEffect, useState } from 'react';
 import {
-  Wrench,
-  Search,
   ArrowRightLeft,
-  Layers,
-  Lightbulb,
-  Sparkles,
   CheckCircle2,
   Lock,
   Building2,
   X,
-  Clock,
   AlertTriangle,
 } from 'lucide-react';
 import type { FacilityEquipment, CourtStatusItem, FacilityIncident } from '../../types/admin';
@@ -73,8 +67,6 @@ export default function FacilityManagementView({
 
 
   // Filter & Search
-  const [locationFilter, setLocationFilter] = useState<string>('ALL');
-  const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedEquipmentDetail, setSelectedEquipmentDetail] = useState<FacilityEquipment | null>(null);
 
   // Court Lock Dialog
@@ -191,32 +183,6 @@ export default function FacilityManagementView({
 
     setRelocatingEq(null);
     setIsAssignBooking(false);
-  };
-
-  // Filtered Equipment List
-  const filteredEquipments = equipments.filter((eq) => {
-    const matchesLocation = locationFilter === 'ALL' || eq.currentLocation === locationFilter;
-    const matchesQuery =
-      !searchQuery.trim() ||
-      eq.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      eq.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      eq.categoryLabel.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesLocation && matchesQuery;
-  });
-
-  const getEquipmentIcon = (category: string) => {
-    switch (category) {
-      case 'tru_luoi':
-        return <span className="text-base">🏸</span>;
-      case 'tham_san':
-        return <Layers className="w-4 h-4 text-rose-600" />;
-      case 'chieu_sang':
-        return <Lightbulb className="w-4 h-4 text-amber-600" />;
-      case 've_sinh':
-        return <Sparkles className="w-4 h-4 text-blue-600" />;
-      default:
-        return <Wrench className="w-4 h-4 text-emerald-600" />;
-    }
   };
 
   const handleCompleteEquipmentWarranty = (equipmentCode: string, equipmentName?: string) => {
