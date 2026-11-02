@@ -1,6 +1,6 @@
 import useCompleteCheckout from '../hooks/useCompleteCheckout';
 import { useStoredIncidents, mergeIncidents, writeIncidentSnapshot, type IncidentReporter } from '../utils/incidentStorage';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Menu,
   User as UserIcon,
@@ -21,7 +21,6 @@ import StaffDetailView from '../components/admin/StaffDetailView';
 import EditStaffView from '../components/admin/EditStaffView';
 import WalletRevenueView from '../components/admin/WalletRevenueView';
 import FacilityManagementView from '../components/admin/FacilityManagementView';
-import { getStoredBookingRequests } from '../types/bookingRequest';
 import useCourtAvailability from '../hooks/useCourtAvailability';
 import type { Employee, Transaction, FacilityEquipment, FacilityIncident } from '../types/admin';
 import { INITIAL_EMPLOYEES, INITIAL_TRANSACTIONS, INITIAL_EQUIPMENT } from '../types/admin';
