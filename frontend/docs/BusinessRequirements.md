@@ -99,8 +99,10 @@ Các thông tin này là cơ sở cốt lõi để lập trình logic xử lý, 
 ## 6. CHÍNH SÁCH HỦY ĐẶT SÂN & HOÀN TIỀN (CANCELLATION & REFUND)
 
 1. **Khách hàng tự hủy trên hệ thống:**
-   * **Hủy trước $\ge$ 24 giờ:** Khách hàng được phép tự thao tác bấm "Hủy vé" trực tuyến trên hệ thống. Đơn chuyển sang trạng thái "Đã hủy - Chờ duyệt hoàn tiền", hoàn trả 100% số tiền đã thanh toán. Chủ sân xử lý đối soát và chuyển khoản hoàn tiền trong vòng 24 giờ.
-   * **Hủy trong vòng < 24 giờ trước giờ chơi:** Hệ thống khóa chức năng tự hủy trực tuyến. Khách hàng bắt buộc phải liên hệ trực tiếp với Chủ sân để xử lý ngoại lệ thủ công.
+   * Khách hàng chọn "Hủy" trên đơn đặt sân đã xác thực. Hệ thống kiểm tra đơn còn hiệu lực và thời điểm bắt đầu lượt đặt sân.
+   * **Hủy trước giờ sử dụng ít nhất 24 giờ:** Hệ thống xác định khách đủ điều kiện hoàn tiền, tính số tiền hoàn theo chính sách hoàn tiền hiện hành (mặc định hoàn 100% số tiền đã thanh toán), xử lý hoàn tiền, hủy đơn, giải phóng khung giờ trên lịch sân và gửi xác nhận hủy cho khách.
+   * **Hủy trước giờ sử dụng dưới 24 giờ:** Hệ thống thông báo khách không đủ điều kiện hoàn tiền và hỏi khách có tiếp tục hủy sân không. Nếu khách đồng ý, hệ thống hủy đơn, không hoàn tiền, giải phóng khung giờ trên lịch sân và gửi xác nhận hủy. Nếu khách không đồng ý, hệ thống giữ nguyên lịch đặt sân.
+   * Mỗi lần xử lý hủy phải lưu thời điểm hủy, người thực hiện, kết quả kiểm tra điều kiện, số tiền hoàn (nếu có), trạng thái hoàn tiền và trạng thái cuối cùng của đơn để phục vụ tra cứu, đối soát.
 2. **Quyền hạn Nhân viên / Chủ sân chủ động hủy sân:**
    * Nhân viên hoặc Chủ sân có toàn quyền **chủ động hủy lịch đặt sân của khách** trong các trường hợp bất khả kháng: Sự cố hỏng hóc khẩn cấp (cháy đèn chiếu sáng, rách thảm sân, gãy khung thành, mất điện lưới...) hoặc phục vụ bảo trì đột xuất.
    * Khi nhân viên hủy sân, bắt buộc phải ghi rõ `ly_do_huy` trên hệ thống. Hệ thống tự động giải phóng sân, gửi thông báo xin lỗi đến khách hàng và tạo lệnh hoàn tiền 100% cho khách.
