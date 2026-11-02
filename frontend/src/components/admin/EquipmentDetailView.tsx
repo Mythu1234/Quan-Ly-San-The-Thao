@@ -248,18 +248,22 @@ export default function EquipmentDetailView({
 
           <div className="flex justify-between pt-2">
             <span className="text-slate-500 font-medium">Hãng / Nhà cung cấp:</span>
-            <span className="font-bold text-slate-800">{currentEq.supplier || 'Công ty Thể Thao Đại Việt (Yonex VN)'}</span>
+            <span className="font-bold text-slate-800">{currentEq.supplier || 'Chưa cập nhật'}</span>
           </div>
 
           <div className="flex justify-between items-center pt-2">
             <span className="text-slate-500 font-medium">Hotline bảo hành:</span>
-            <a
-              href={`tel:${currentEq.supplierPhone || '19006868'}`}
+            {currentEq.supplierPhone ? <a
+              href={`tel:${currentEq.supplierPhone.replace(/[^+\d]/g, '')}`}
               className="inline-flex items-center gap-1 font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-200 hover:bg-emerald-100 transition"
             >
               <Phone className="w-3 h-3 text-emerald-600" />
-              <span>{currentEq.supplierPhone || '1900 6868'}</span>
-            </a>
+              <span>{currentEq.supplierPhone}</span>
+            </a> : <span className="text-slate-600">Chưa cập nhật</span>}
+          </div>
+          <div className="flex justify-between items-start gap-3 pt-2">
+            <span className="shrink-0 text-slate-500 font-medium">Địa chỉ bảo hành:</span>
+            <span className="min-w-0 break-words text-right font-medium text-slate-800">{currentEq.warrantyAddress || 'Chưa cập nhật'}</span>
           </div>
 
           <div className="flex justify-between pt-2">
@@ -270,6 +274,15 @@ export default function EquipmentDetailView({
           <div className="flex justify-between pt-2">
             <span className="text-slate-500 font-medium">Ngày nhập kho:</span>
             <span className="font-bold text-slate-800">{currentEq.purchaseDate || '15/01/2026'}</span>
+          </div>
+
+          <div className="flex justify-between gap-3 pt-2">
+            <span className="text-slate-500 font-medium">Giá mua:</span>
+            <span className="font-bold text-slate-800">{currentEq.purchasePrice !== undefined ? `${currentEq.purchasePrice.toLocaleString('vi-VN')} VND` : 'Chưa cập nhật'}</span>
+          </div>
+          <div className="flex justify-between gap-3 pt-2">
+            <span className="text-slate-500 font-medium">Giá bồi thường:</span>
+            <span className="font-bold text-emerald-800">{currentEq.compensationPrice !== undefined ? `${currentEq.compensationPrice.toLocaleString('vi-VN')} VND` : 'Chưa cập nhật'}</span>
           </div>
 
           <div className="flex justify-between items-center pt-2">

@@ -1,4 +1,8 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
+import useVietnamToday from '../hooks/useVietnamToday';
+import useSharedBookings from '../hooks/useSharedBookings';
+import { scheduleBookingsForDate } from '../utils/courtBookingWarnings';
+import useCourtAvailability, { isCourtLocked } from '../hooks/useCourtAvailability';
 import { Calendar, ChevronLeft, ChevronRight, LayoutGrid, CheckCircle2, ArrowRight, ZoomIn, ZoomOut } from 'lucide-react';
 
 export interface CourtItem {
@@ -30,7 +34,6 @@ export const STANDARD_15_COURTS: CourtItem[] = [
   { id: 'SAN_BD_02', code: 'BD-02', name: 'Sân BD-02', sportId: 'football', sportName: 'Bóng Đá Mini', pricePerHour: 200000 },
   { id: 'SAN_BD_03', code: 'BD-03', name: 'Sân BD-03', sportId: 'football', sportName: 'Bóng Đá Mini', pricePerHour: 200000 },
   { id: 'SAN_BD_04', code: 'BD-04', name: 'Sân BD-04', sportId: 'football', sportName: 'Bóng Đá Mini', pricePerHour: 200000 },
-  { id: 'SAN_BD_05', code: 'BD-05', name: 'Sân BD-05', sportId: 'football', sportName: 'Bóng Đá Mini', pricePerHour: 200000 },
 ];
 
 export interface CourtBookingRecord {
@@ -110,8 +113,21 @@ export default function CustomerSchedule({
   isModalMode: _isModalMode = false,
   hideHeaderControls = false,
 }: CustomerScheduleProps) {
+  const [courtStatuses] = useCourtAvailability();
   const [selectedSport, setSelectedSport] = useState<'all' | 'badminton' | 'volleyball' | 'football'>(initialSport || 'all');
-  const [selectedDate, setSelectedDate] = useState<Date>(initialDate || new Date());
+  const today = useVietnamToday();
+  const previousTodayRef = useRef(today);
+  const [selectedDate, setSelectedDate] = useState<Date>(initialDate || today);
+  const [sharedBookings] = useSharedBookings();
+  const scheduleBookings = useMemo(()=>scheduleBookingsForDate(sharedBookings,selectedDate),[sharedBookings,selectedDate]);
+  useEffect(() => {
+    const previous = previousTodayRef.current;
+    if (!initialDate && previous.getTime() !== today.getTime()) {
+      setSelectedDate((selected) => selected.getFullYear() === previous.getFullYear()
+        && selected.getMonth() === previous.getMonth() && selected.getDate() === previous.getDate() ? today : selected);
+    }
+    previousTodayRef.current = today;
+  }, [today, initialDate]);
   const [intervalMode, setIntervalMode] = useState<30 | 60>(60); // 30 mins or 60 mins (default 1h)
   const [zoomMode, setZoomMode] = useState<'compact' | 'standard'>('compact'); // 'compact' thu nhỏ nhiều cột (54px), 'standard' mở rộng (72px)
   const [selectedSlotModal, setSelectedSlotModal] = useState<{
@@ -193,7 +209,6 @@ export default function CustomerSchedule({
   };
 
   const isToday = (date: Date) => {
-    const today = new Date();
     return date.getDate() === today.getDate() && date.getMonth() === today.getMonth() && date.getFullYear() === today.getFullYear();
   };
 
@@ -220,9 +235,9 @@ export default function CustomerSchedule({
 
   // Filter courts by sport
   const displayedCourts = useMemo(() => {
-    if (selectedSport === 'all') return STANDARD_15_COURTS;
-    return STANDARD_15_COURTS.filter((c) => c.sportId === selectedSport);
-  }, [selectedSport]);
+    return STANDARD_15_COURTS.filter(c => !isCourtLocked(c.code)
+      && (selectedSport === 'all' || c.sportId === selectedSport));
+  }, [selectedSport, courtStatuses]);
 
   const parseTimeToMinutes = (t: string) => {
     const [h, m] = t.split(':').map(Number);
@@ -231,7 +246,7 @@ export default function CustomerSchedule({
 
   // Check if a specific court is occupied
   const getBookingAt = (courtCode: string, startMin: number, endMin: number) => {
-    return STANDARD_15_BOOKINGS.find((b) => {
+    return scheduleBookings.find((b) => {
       if (b.courtCode !== courtCode) return false;
       const bStartMin = b.startH * 60 + b.startM;
       const bEndMin = b.endH * 60 + b.endM;
@@ -240,6 +255,7 @@ export default function CustomerSchedule({
   };
 
   const handleSlotClick = (sportId: 'badminton' | 'volleyball' | 'football', courtName: string, time: string, price: string) => {
+    if (isCourtLocked(courtName)) return;
     if (onSelectSlot) {
       onSelectSlot(sportId, courtName, time, formatDate(selectedDate));
       return;
@@ -280,7 +296,7 @@ export default function CustomerSchedule({
                   selectedSport === 'all' ? 'bg-slate-900 text-white shadow-2xs' : 'bg-slate-100 text-slate-600'
                 }`}
               >
-                {initialSport && initialSport !== 'all' ? 'Xem tất cả 15 sân' : 'Tất cả 15 sân (3 môn)'}
+                {initialSport && initialSport !== 'all' ? 'Xem tất cả sân đang mở' : `Tất cả ${STANDARD_15_COURTS.filter(c => !isCourtLocked(c.code)).length} sân đang mở`}
               </button>
             </div>
 
@@ -374,7 +390,12 @@ export default function CustomerSchedule({
             <input 
               type="date"
               value={htmlDate}
-              onChange={(e) => { if (e.target.value) setSelectedDate(new Date(e.target.value)); }}
+              onChange={(e) => {
+                if (e.target.value) {
+                  const [year, month, day] = e.target.value.split('-').map(Number);
+                  setSelectedDate(new Date(year, month - 1, day));
+                }
+              }}
               className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
             />
 
@@ -398,7 +419,7 @@ export default function CustomerSchedule({
                   : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
               }`}
             >
-              Tất cả 15 sân
+              Tất cả {STANDARD_15_COURTS.filter(c => !isCourtLocked(c.code)).length} sân
             </button>
             <button
               type="button"
@@ -409,7 +430,7 @@ export default function CustomerSchedule({
                   : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
               }`}
             >
-              Cầu lông (5 sân)
+              Cầu lông ({STANDARD_15_COURTS.filter(c => c.sportId === 'badminton' && !isCourtLocked(c.code)).length} sân)
             </button>
             <button
               type="button"
@@ -420,7 +441,7 @@ export default function CustomerSchedule({
                   : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
               }`}
             >
-              Bóng chuyền (5 sân)
+              Bóng chuyền ({STANDARD_15_COURTS.filter(c => c.sportId === 'volleyball' && !isCourtLocked(c.code)).length} sân)
             </button>
             <button
               type="button"
@@ -431,7 +452,7 @@ export default function CustomerSchedule({
                   : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
               }`}
             >
-              Bóng đá mini (5 sân)
+              Bóng đá mini ({STANDARD_15_COURTS.filter(c => c.sportId === 'football' && !isCourtLocked(c.code)).length} sân)
             </button>
           </div>
 
@@ -795,6 +816,10 @@ export default function CustomerSchedule({
               <button
                 type="button"
                 onClick={() => {
+                  if (isCourtLocked(selectedSlotModal.courtName)) {
+                    setSelectedSlotModal(null);
+                    return;
+                  }
                   if (onSelectSlot) {
                     onSelectSlot(
                       selectedSlotModal.sportId,

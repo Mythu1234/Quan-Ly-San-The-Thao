@@ -4,6 +4,8 @@ import QrCodeArtwork from '../components/QrCodeArtwork';
 import EmployeeDashboard from './employee/EmployeeDashboard';
 import VipCustomerDashboard from './VipCustomerDashboard';
 import { addBookingRequest } from '../types/bookingRequest';
+import type { IncidentReporter } from '../utils/incidentStorage';
+import { isCourtLocked } from '../hooks/useCourtAvailability';
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { Search, MapPin, Phone, Clock, Play, Home, Calendar as CalendarIcon, X, Zap, User, Lock, Eye, EyeOff, Bell, Key, ArrowLeft, ArrowRight, ChevronLeft, ChevronRight, ChevronDown, Trophy, CheckCircle2, RefreshCw, MessageSquare, Copy, Check, AlertTriangle } from 'lucide-react';
 
@@ -55,6 +57,7 @@ const VolleyballIcon = () => (
 
 
 export default function TrangChu() {
+  const [currentUser, setCurrentUser] = useState<IncidentReporter | null>(null);
   // Navigation tab state
   const [activeTab, setActiveTab] = useState<'booking' | 'lookup'>('booking');
 
@@ -744,7 +747,7 @@ export default function TrangChu() {
   };
 
   useEffect(() => {
-    if (selectedCourt && currentSport && !currentSport.courts.includes(selectedCourt)) {
+    if (selectedCourt && (isCourtLocked(selectedCourt) || (currentSport && !currentSport.courts.includes(selectedCourt)))) {
       setSelectedCourt('');
       setSelectedStartTime('');
     }
@@ -1003,11 +1006,11 @@ export default function TrangChu() {
   };
 
   if (isAdminLoggedIn) {
-    return <AdminDashboard onLogout={() => setIsAdminLoggedIn(false)} />;
+    return currentUser && <AdminDashboard currentUser={currentUser} onLogout={() => { setIsAdminLoggedIn(false); setCurrentUser(null); }} />;
   }
 
   if (isEmployeeLoggedIn) {
-    return <EmployeeDashboard onLogout={() => setIsEmployeeLoggedIn(false)} />;
+    return currentUser && <EmployeeDashboard currentUser={currentUser} onLogout={() => { setIsEmployeeLoggedIn(false); setCurrentUser(null); }} />;
   }
 
   if (isVipLoggedIn) {
@@ -2354,7 +2357,8 @@ export default function TrangChu() {
                           (rawUser === 'admin' && (passwordInput === 'admin' || (targetAcc && passwordInput === targetAcc.password))) ||
                           (targetAcc && targetAcc.role === 'admin' && passwordInput === targetAcc.password)
                         ) {
-                          setIsAdminLoggedIn(true);
+                          setCurrentUser({ name: targetAcc?.name || accountCredentials.admin.name, phone: targetAcc?.phone || accountCredentials.admin.phone, role: 'Chủ sân' });
+        setIsAdminLoggedIn(true);
                           setShowLogin(false);
                           setUsername('');
                           setPasswordInput('');
@@ -2362,7 +2366,8 @@ export default function TrangChu() {
                           (rawUser === 'nhanvien' && (passwordInput === 'nhanvien' || (targetAcc && passwordInput === targetAcc.password))) ||
                           (targetAcc && targetAcc.role === 'employee' && passwordInput === targetAcc.password)
                         ) {
-                          setIsEmployeeLoggedIn(true);
+                          setCurrentUser({ name: targetAcc?.name || accountCredentials.nhanvien.name, phone: targetAcc?.phone || accountCredentials.nhanvien.phone, role: 'Nhân viên' });
+        setIsEmployeeLoggedIn(true);
                           setShowLogin(false);
                           setUsername('');
                           setPasswordInput('');

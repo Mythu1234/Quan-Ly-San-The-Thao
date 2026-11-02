@@ -1,35 +1,34 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
-  Wrench,
-  Plus,
-  Bell,
-  Search,
   ArrowRightLeft,
-  ChevronRight,
-  Layers,
-  Lightbulb,
-  Sparkles,
   CheckCircle2,
   Lock,
   Building2,
   X,
-  Clock,
+  AlertTriangle,
 } from 'lucide-react';
 import type { FacilityEquipment, CourtStatusItem, FacilityIncident } from '../../types/admin';
 import ReportIncidentView from './ReportIncidentView';
+import IncidentReportsList from './IncidentReportsList';
+import useSharedBookings, { getSharedBookings } from '../../hooks/useSharedBookings';
+import { getCourtLockWarnings, vietnamBookingDate } from '../../utils/courtBookingWarnings';
 import IncidentDetailView from './IncidentDetailView';
+import { type IncidentReporter } from '../../utils/incidentStorage';
 import AddEquipmentView from './AddEquipmentView';
 import EquipmentDetailView from './EquipmentDetailView';
 import NotificationModal from './NotificationModal';
+import CompensationPriceTable from './CompensationPriceTable';
 
 interface FacilityManagementViewProps {
+  currentUser: IncidentReporter;
   equipments: FacilityEquipment[];
   courts: CourtStatusItem[];
   incidents: FacilityIncident[];
-  onAddEquipment: (newEq: FacilityEquipment) => void;
+  onAddEquipment: (newEq: FacilityEquipment) => void | Promise<void>;
   onUpdateEquipmentLocation: (equipmentCode: string, newLocation: string) => void;
-  onToggleCourtLock: (courtId: string, isLocked: boolean, reason?: string) => void;
-  onSubmitIncident: (newIncident: FacilityIncident, lockCourt: boolean) => void;
+  onToggleCourtLock: (courtId: string, isLocked: boolean, reason?: string) => void | Promise<void>;
+  onDeleteIncident: (id: string) => Promise<void>;
+  onSubmitIncident: (newIncident: FacilityIncident, lockCourt: boolean) => void | Promise<void>;
   onUpdateIncidentStatus: (incidentId: string, newStatus: 'cho_xu_ly' | 'dang_sua_chua' | 'da_khac_phuc', unlockCourt?: boolean) => void;
   onReturnToWarehouse?: (equipmentCode: string) => void;
   onAssignBookingToEquipment?: (
@@ -40,11 +39,12 @@ interface FacilityManagementViewProps {
     customerName: string
   ) => void;
   onCompleteEquipmentWarranty?: (equipmentCode: string, equipmentName?: string) => void;
-  onAddTimelineLog?: (incidentId: string, title: string, description: string) => void;
+  onAddTimelineLog?: (incidentId: string, title: string, description: string, images?: string[]) => void;
   isBackendOnline?: boolean;
 }
 
 export default function FacilityManagementView({
+  currentUser,
   equipments,
   courts,
   incidents,
@@ -52,6 +52,7 @@ export default function FacilityManagementView({
   onUpdateEquipmentLocation,
   onToggleCourtLock,
   onSubmitIncident,
+  onDeleteIncident,
   onUpdateIncidentStatus,
   onReturnToWarehouse,
   onAssignBookingToEquipment,
@@ -63,14 +64,25 @@ export default function FacilityManagementView({
   const [subView, setSubView] = useState<'main' | 'report_incident' | 'incident_detail' | 'add_equipment' | 'equipment_detail' | 'notifications'>('main');
   const [selectedIncidentId, setSelectedIncidentId] = useState<string>('SC-8921');
 
+
+
   // Filter & Search
-  const [locationFilter, setLocationFilter] = useState<string>('ALL');
-  const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedEquipmentDetail, setSelectedEquipmentDetail] = useState<FacilityEquipment | null>(null);
 
   // Court Lock Dialog
   const [lockingCourt, setLockingCourt] = useState<CourtStatusItem | null>(null);
   const [lockReasonInput, setLockReasonInput] = useState<string>('');
+  const [bookings] = useSharedBookings();
+  const [warningTime,setWarningTime] = useState(()=>new Date());
+  const [lockSaving,setLockSaving] = useState(false);
+  const [lockError,setLockError] = useState('');
+  const lockWarnings = lockingCourt ? getCourtLockWarnings(bookings,lockingCourt.code||lockingCourt.name,warningTime) : [];
+  useEffect(()=>{
+    if(!lockingCourt)return;
+    const timer=window.setInterval(()=>setWarningTime(new Date()),15000);
+    return()=>window.clearInterval(timer);
+  },[lockingCourt]);
+  const [courtSportFilter, setCourtSportFilter] = useState<'all' | 'badminton' | 'volleyball' | 'football'>('all');
 
   // Equipment Relocate Dialog
   const [relocatingEq, setRelocatingEq] = useState<FacilityEquipment | null>(null);
@@ -94,14 +106,16 @@ export default function FacilityManagementView({
     setSubView('incident_detail');
   };
 
-  const handleCreateIncident = (newIncident: FacilityIncident, lockCourt: boolean) => {
-    onSubmitIncident(newIncident, lockCourt);
+  const handleCreateIncident = async (newIncident: FacilityIncident, lockCourt: boolean) => {
+    await onSubmitIncident(newIncident, lockCourt);
+
     setSubView('main');
-    showToast(`Đã ghi nhận sự cố #${newIncident.id} thành công!`);
+    showToast('Đã lưu báo cáo sự cố.');
+    requestAnimationFrame(() => document.getElementById('recent-incidents')?.scrollIntoView({ block: 'start', behavior: 'smooth' }));
   };
 
-  const handleAddNewEquipment = (newEq: FacilityEquipment) => {
-    onAddEquipment(newEq);
+  const handleAddNewEquipment = async (newEq: FacilityEquipment) => {
+    await onAddEquipment(newEq);
     setSubView('main');
     showToast(`Đã thêm thiết bị [${newEq.code}] ${newEq.name}!`);
   };
@@ -115,15 +129,29 @@ export default function FacilityManagementView({
     } else {
       // Open dialog to input reason
       setLockingCourt(court);
-      setLockReasonInput('Sửa thảm & kiểm tra thiết bị');
+      setLockReasonInput('');
+      setWarningTime(new Date());
+      setLockError('');
     }
   };
 
-  const handleConfirmLockCourt = () => {
-    if (!lockingCourt) return;
-    onToggleCourtLock(lockingCourt.id, true, lockReasonInput.trim() || 'Bảo trì kỹ thuật');
-    showToast(`Đã kích hoạt khóa bảo trì ${lockingCourt.name}!`);
-    setLockingCourt(null);
+  const handleConfirmLockCourt = async () => {
+    if (!lockingCourt || lockSaving) return;
+    const signature=(list:typeof lockWarnings)=>list.map(booking=>`${booking.bookingDate}:${booking.code}:${booking.time}:${booking.status}`).join('|');
+    const latest=getCourtLockWarnings(getSharedBookings(),lockingCourt.code||lockingCourt.name,new Date());
+    if(signature(latest)!==signature(lockWarnings)) {
+      setWarningTime(new Date());
+      setLockError('Lượt đặt vừa thay đổi. Vui lòng kiểm tra và xác nhận lại.');
+      return;
+    }
+    setLockSaving(true);
+    setLockError('');
+    try {
+      await onToggleCourtLock(lockingCourt.id, true, lockReasonInput.trim() || 'Bảo trì kỹ thuật');
+      showToast(`Đã khóa ${lockingCourt.name} cho đến khi được mở lại.`);
+      setLockingCourt(null);
+    } catch { setLockError('Chưa khóa được sân. Vui lòng thử lại.'); }
+    finally { setLockSaving(false); }
   };
 
   // Equipment relocation & booking allocation
@@ -157,34 +185,6 @@ export default function FacilityManagementView({
     setIsAssignBooking(false);
   };
 
-  // KPI Calculations
-  const urgentIncidentsCount = incidents.filter(i => i.status !== 'da_khac_phuc').length;
-
-  // Filtered Equipment List
-  const filteredEquipments = equipments.filter((eq) => {
-    const matchesLocation = locationFilter === 'ALL' || eq.currentLocation === locationFilter;
-    const matchesQuery =
-      !searchQuery.trim() ||
-      eq.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      eq.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      eq.categoryLabel.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesLocation && matchesQuery;
-  });
-
-  const getEquipmentIcon = (category: string) => {
-    switch (category) {
-      case 'tru_luoi':
-        return <span className="text-base">🏸</span>;
-      case 'tham_san':
-        return <Layers className="w-4 h-4 text-rose-600" />;
-      case 'chieu_sang':
-        return <Lightbulb className="w-4 h-4 text-amber-600" />;
-      case 've_sinh':
-        return <Sparkles className="w-4 h-4 text-blue-600" />;
-      default:
-        return <Wrench className="w-4 h-4 text-emerald-600" />;
-    }
-  };
 
   const handleCompleteEquipmentWarranty = (equipmentCode: string, equipmentName?: string) => {
     const today = new Date().toLocaleDateString('vi-VN');
@@ -196,7 +196,7 @@ export default function FacilityManagementView({
         ...selectedEquipmentDetail,
         status: 'san_sang',
         statusLabel: 'Sẵn sàng',
-        healthRate: 'Tốt (Đã nghiệm thu bảo hành)',
+        healthRate: 'Tốt (Đã nghiệm thu)',
         lastMaintenance: formattedDate,
       });
     }
@@ -214,6 +214,7 @@ export default function FacilityManagementView({
   if (subView === 'report_incident') {
     return (
       <ReportIncidentView
+        currentUser={currentUser}
         equipments={equipments}
         courts={courts}
         onBack={() => setSubView('main')}
@@ -227,6 +228,7 @@ export default function FacilityManagementView({
     return (
       <IncidentDetailView
         incident={currentIncident}
+        equipments={equipments}
         onBack={() => setSubView('main')}
         onUpdateStatus={(id, st, unlock) => {
           onUpdateIncidentStatus(id, st, unlock);
@@ -285,7 +287,7 @@ export default function FacilityManagementView({
   // RENDER MAIN VIEW
   // ==========================================
   return (
-    <div className="flex-1 space-y-4 p-4 pb-28 animate-in fade-in duration-200 w-full max-w-full min-w-0">
+    <div className="flex-1 min-h-full space-y-4 bg-white p-4 pb-8 animate-in fade-in duration-200 w-full max-w-full min-w-0">
       {/* Toast Notification */}
       {toastMessage && (
         <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 rounded-2xl bg-emerald-600 text-white border border-emerald-500 px-4 py-2.5 text-xs font-black shadow-2xl shadow-emerald-900/30 flex items-center gap-2 animate-in fade-in slide-in-from-top duration-200 w-[90%] max-w-[360px] justify-center text-center">
@@ -294,82 +296,18 @@ export default function FacilityManagementView({
         </div>
       )}
 
-      {/* 🟢 Top Badge */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-xs font-black text-emerald-800 border border-emerald-200 shadow-2xs">
-            <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-            QUẢN TRỊ CƠ SỞ VẬT CHẤT
-          </div>
-        </div>
-
-        <button
-          type="button"
-          onClick={() => setSubView('notifications')}
-          className="relative flex h-8 w-8 items-center justify-center rounded-full bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 transition cursor-pointer shadow-2xs"
-          title="Thông báo hệ thống"
-        >
-          <Bell className="w-4 h-4" />
-          {urgentIncidentsCount > 0 && (
-            <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-rose-600 ring-2 ring-white" />
-          )}
-        </button>
-      </div>
-
-      {/* 🟢 Main Title */}
-      <div>
+      <div className="flex items-start justify-between gap-3">
         <h1 className="text-2xl font-black tracking-tight text-slate-900 leading-tight">
           QUẢN LÝ CƠ SỞ VẬT CHẤT <br />
-          <span className="text-emerald-600">& THIẾT BỊ</span>
+          <span className="text-emerald-800">& THIẾT BỊ</span>
         </h1>
-        <p className="mt-1 text-xs text-slate-500 leading-relaxed font-medium">
-          Theo dõi trạng thái mặt sân, điều phối thiết bị thi đấu và xử lý sự cố kỹ thuật.
-        </p>
+
       </div>
 
-      {/* 2. Thao tác cơ sở */}
-      <div className="space-y-2">
-        <h2 className="text-xs font-black text-slate-900 px-1">
-          Thao tác cơ sở
-        </h2>
+      <IncidentReportsList incidents={incidents} onView={handleOpenIncidentDetail} onDelete={onDeleteIncident} onCreate={() => setSubView('report_incident')} />
 
-        {/* Primary CTA */}
-        <button
-          type="button"
-          onClick={() => setSubView('report_incident')}
-          className="w-full flex items-center justify-center gap-2 rounded-2xl bg-emerald-700 hover:bg-emerald-800 py-3 text-xs font-black text-white shadow-md shadow-emerald-700/20 active:scale-95 transition cursor-pointer"
-        >
-          <Bell className="w-4 h-4 text-emerald-200" />
-          <span>+ Báo sự cố hỏng hóc mới</span>
-        </button>
-
-        {/* Secondary CTAs */}
-        <div className="grid grid-cols-2 gap-2">
-          <button
-            type="button"
-            onClick={() => setSubView('add_equipment')}
-            className="flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 py-2.5 text-xs font-bold text-slate-700 active:scale-95 transition shadow-2xs cursor-pointer"
-          >
-            <Plus className="w-3.5 h-3.5 text-emerald-700" />
-            <span>Thêm thiết bị</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              const el = document.getElementById('court-switch-section');
-              if (el) el.scrollIntoView({ behavior: 'smooth' });
-            }}
-            className="flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 py-2.5 text-xs font-bold text-slate-700 active:scale-95 transition shadow-2xs cursor-pointer"
-          >
-            <Lock className="w-3.5 h-3.5 text-amber-600" />
-            <span>Khóa / Mở sân</span>
-          </button>
-        </div>
-      </div>
-
-      {/* 3. Chuyển đổi trạng thái sân (Court Status Switches) */}
-      <div id="court-switch-section" className="rounded-3xl border border-slate-200 bg-white p-4 shadow-2xs space-y-3">
+      {/* 3. Chuyển đổi trạng thái sân */}
+      <div id="court-switch-section" className="rounded-2xl border border-black/15 bg-white p-4 space-y-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Building2 className="w-4 h-4 text-emerald-700" />
@@ -378,54 +316,73 @@ export default function FacilityManagementView({
             </h2>
           </div>
           <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[10px] font-bold">
-            Bảo trì
+            {courts.filter(c => c.isLocked).length} đang khóa
           </span>
         </div>
 
+        {/* Bộ lọc môn */}
+        <div className="flex gap-1.5">
+          {(['all', 'badminton', 'volleyball', 'football'] as const).map((f) => {
+            const labels = { all: 'Tất cả', badminton: 'Cầu lông', volleyball: 'Bóng chuyền', football: 'Bóng đá' };
+            return (
+              <button
+                key={f}
+                type="button"
+                onClick={() => setCourtSportFilter(f)}
+                className={`px-2.5 py-1 rounded-xl border text-[10px] font-bold transition cursor-pointer ${
+                  courtSportFilter === f
+                    ? 'border-emerald-700 bg-emerald-700 text-white'
+                    : 'border-emerald-200 bg-white text-emerald-800 hover:bg-emerald-50'
+                }`}
+              >
+                {labels[f]}
+              </button>
+            );
+          })}
+        </div>
+
         <div className="space-y-2">
-          {courts.map((court) => (
+          {courts
+            .filter((c) => {
+              if (courtSportFilter === 'all') return true;
+              return c.sportId === courtSportFilter;
+            })
+            .map((court) => (
             <div
               key={court.id}
-              className={`flex items-center justify-between p-3 rounded-2xl border transition ${
+              className={`flex items-center justify-between gap-3 p-3 rounded-xl border bg-white transition ${
                 court.isLocked
-                  ? 'border-rose-200 bg-rose-50/50'
-                  : 'border-slate-100 bg-slate-50/80 hover:bg-slate-100/60'
+                  ? 'border-red-200'
+                  : 'border-black/10 hover:border-emerald-300'
               }`}
             >
               <div className="flex items-center gap-3">
                 <div
-                  className={`flex h-9 w-9 items-center justify-center rounded-xl text-xs font-black ${
-                    court.isLocked
-                      ? 'bg-rose-100 text-rose-700'
-                      : 'bg-emerald-100 text-emerald-700'
+                  aria-hidden="true"
+                  className={`h-9 w-9 shrink-0 rounded-xl ${
+                    court.sportId === 'volleyball' ? 'bg-orange-200'
+                      : court.sportId === 'football' ? 'bg-blue-200'
+                      : 'bg-emerald-200'
                   }`}
-                >
-                  {court.courtNumber ? `S${court.courtNumber}` : 'CX'}
-                </div>
+                />
                 <div>
-                  <div className="text-xs font-black text-slate-900">
-                    {court.name}
-                  </div>
-                  <div className="text-[11px] font-semibold mt-0.5 flex items-center gap-1">
-                    {court.isLocked ? (
-                      <span className="text-rose-700">
-                        • Đang Khóa: {court.lockReason || 'Bảo trì kỹ thuật'}
-                      </span>
-                    ) : (
-                      <span className="text-emerald-700">
-                        • Đang Mở: Nhận khách tốt
-                      </span>
-                    )}
+                  <div className="text-xs font-black text-slate-900">{court.name}</div>
+                  <div className={`text-[11px] font-semibold mt-0.5 ${
+                    court.isLocked ? 'text-red-700' : 'text-emerald-800'
+                  }`}>
+                    {court.isLocked
+                      ? `● Đang khóa${court.lockReason ? ': ' + court.lockReason : ''}`
+                      : '● Đang mở'}
                   </div>
                 </div>
               </div>
 
-              {/* Interactive Switch */}
+              {/* Toggle switch */}
               <button
                 type="button"
                 onClick={() => handleCourtSwitchClick(court)}
                 className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none cursor-pointer ${
-                  court.isLocked ? 'bg-rose-600' : 'bg-slate-300'
+                  court.isLocked ? 'bg-red-500' : 'bg-emerald-700'
                 }`}
                 title={court.isLocked ? 'Bấm để mở lại sân' : 'Bấm để khóa bảo trì'}
               >
@@ -440,227 +397,28 @@ export default function FacilityManagementView({
         </div>
       </div>
 
-      {/* 4. Báo cáo sự cố gần đây (Recent Incidents) */}
-      <div className="space-y-2.5">
-        <div className="flex items-center justify-between px-1">
-          <div className="flex items-center gap-1.5">
-            <Wrench className="w-4 h-4 text-rose-600" />
-            <h2 className="text-xs font-black text-slate-900 uppercase tracking-wider">
-              Báo cáo sự cố gần đây
-            </h2>
-          </div>
-          <span className="px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 text-[10px] font-black border border-rose-200">
-            {String(incidents.length).padStart(2, '0')} Mới nhất
-          </span>
-        </div>
-
-        <div className="space-y-3">
-          {incidents.slice(0, 3).map((incident) => (
-            <div
-              key={incident.id}
-              className="rounded-3xl border border-slate-200 bg-white p-4 shadow-2xs space-y-3 hover:border-slate-300 transition"
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  <span className="px-2 py-0.5 rounded-lg bg-slate-100 text-slate-800 text-[11px] font-black">
-                    #{incident.id}
-                  </span>
-                  <span
-                    className={`px-2 py-0.5 rounded-lg text-[10px] font-black ${
-                      incident.severity === 'khan_cap'
-                        ? 'bg-rose-100 text-rose-800'
-                        : incident.severity === 'trung_binh'
-                        ? 'bg-amber-100 text-amber-800'
-                        : 'bg-slate-100 text-slate-800'
-                    }`}
-                  >
-                    • {incident.severityLabel}
-                  </span>
-                  <span
-                    className={`px-2 py-0.5 rounded-lg text-[10px] font-black ${
-                      incident.status === 'da_khac_phuc'
-                        ? 'bg-emerald-100 text-emerald-800'
-                        : incident.status === 'dang_sua_chua'
-                        ? 'bg-blue-100 text-blue-800'
-                        : 'bg-slate-100 text-slate-700'
-                    }`}
-                  >
-                    {incident.statusLabel}
-                  </span>
-                </div>
-                <span className="text-[11px] font-bold text-slate-400">
-                  {incident.reportedAt}
-                </span>
-              </div>
-
-              <div>
-                <h3 className="text-xs font-black text-slate-900 leading-snug">
-                  {incident.title}
-                </h3>
-                <p className="text-[11px] text-slate-600 mt-1 leading-relaxed line-clamp-2 font-medium">
-                  {incident.description}
-                </p>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => handleOpenIncidentDetail(incident.id)}
-                className="w-full flex items-center justify-center gap-1 py-2 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-800 text-xs font-bold transition active:scale-95 cursor-pointer border border-blue-200/60"
-              >
-                <span>Xem chi tiết báo cáo sự cố</span>
-                <ChevronRight className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* 5. Danh mục trang thiết bị (Lưu động) */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between px-1 gap-2">
-          <div className="flex items-center gap-2 shrink-0">
-            <span className="text-base">📋</span>
-            <h2 className="text-xs font-black uppercase tracking-wider text-slate-800">
-              Danh mục trang thiết bị
-            </h2>
-          </div>
-          <span className="text-[10px] sm:text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-xl border border-emerald-200 text-center leading-tight">
-            Tự động thu hồi khi Check-out sân
-          </span>
-        </div>
-
-        {/* Filter Chips by Court / Warehouse - ĐỦ 8 SÂN + KHO CHUNG */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar">
-          {['ALL', 'Sân 01', 'Sân 02', 'Sân 03', 'Sân 04', 'Sân 05', 'Sân 06', 'Sân 07', 'Sân 08', 'Kho chung'].map((loc) => (
-            <button
-              key={loc}
-              type="button"
-              onClick={() => setLocationFilter(loc)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold shrink-0 transition cursor-pointer ${
-                locationFilter === loc
-                  ? 'bg-emerald-700 text-white shadow-xs'
-                  : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
-              }`}
-            >
-              {loc === 'ALL' ? 'Tất cả' : loc}
-            </button>
-          ))}
-        </div>
-
-        {/* Search Input */}
-        <div className="relative">
-          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Tìm theo tên thiết bị hoặc mã dán MATB..."
-            className="w-full rounded-2xl border border-slate-200 bg-white pl-9 pr-3 py-2.5 text-xs font-bold text-slate-800 outline-none focus:border-emerald-600 shadow-2xs"
-          />
-        </div>
-
-        {/* Equipment Items List matching mockup */}
-        <div className="space-y-2">
-          {filteredEquipments.map((eq) => (
-            <div
-              key={eq.id}
-              onClick={() => {
-                setSelectedEquipmentDetail(eq);
-                setSubView('equipment_detail');
-              }}
-              className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white p-3 shadow-2xs hover:border-emerald-300 hover:shadow-xs transition cursor-pointer active:scale-[0.99]"
-            >
-              <div className="flex items-center gap-3 min-w-0">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-50 border border-slate-100">
-                  {getEquipmentIcon(eq.category)}
-                </div>
-                <div className="min-w-0">
-                  <div className="text-xs font-black text-slate-900 truncate">
-                    {eq.name}
-                  </div>
-                  <div className="text-[11px] font-medium text-slate-500 mt-0.5 truncate flex items-center gap-1">
-                    <span className="font-bold text-slate-700">{eq.currentLocation}</span>
-                    <span>•</span>
-                    <span
-                      className={
-                        eq.status === 'bao_tri'
-                          ? 'text-rose-600 font-bold'
-                          : eq.status === 'san_sang'
-                          ? 'text-blue-600 font-bold'
-                          : 'text-emerald-700 font-bold'
-                      }
-                    >
-                      {eq.healthRate}
-                    </span>
-                  </div>
-
-                  {/* 🕒 Ghi nhận ca đặt sân & giờ đặt của thiết bị */}
-                  {eq.assignedTimeSlot && (
-                    <div className="mt-1 flex items-center gap-1.5 flex-wrap">
-                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-800 text-[10px] font-black border border-amber-200">
-                        <Clock className="w-3 h-3 text-amber-600" />
-                        Ca: {eq.assignedTimeSlot} ({eq.assignedBookingCode || 'BK'})
-                      </span>
-                      {eq.assignedCustomer && (
-                        <span className="text-[10px] text-slate-500 font-bold truncate max-w-[120px]">
-                          • {eq.assignedCustomer}
-                        </span>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Right: MATB sticker tag + Quick Checkout to Warehouse + Relocate Button */}
-              <div className="flex items-center gap-1.5 shrink-0 ml-2">
-                <div className="text-right">
-                  <div className="inline-block px-2 py-0.5 rounded-lg bg-emerald-50 border border-emerald-300 text-emerald-800 text-[10px] font-black tracking-wider">
-                    {eq.code}
-                  </div>
-                  <div className="text-[9px] text-slate-400 font-bold">Mã dán</div>
-                </div>
-
-                {/* Nút Điều phối vị trí */}
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setRelocatingEq(eq);
-                    setTargetLocation(eq.currentLocation === 'Kho chung' ? 'Sân 01' : 'Kho chung');
-                    setIsAssignBooking(false);
-                  }}
-                  className="flex h-8 w-8 items-center justify-center rounded-xl bg-slate-100 text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 transition cursor-pointer"
-                  title="Điều phối vị trí lưu động"
-                >
-                  <ArrowRightLeft className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            </div>
-          ))}
-
-          {filteredEquipments.length === 0 && (
-            <div className="rounded-2xl border border-dashed border-slate-300 p-6 text-center text-xs text-slate-500 font-medium">
-              Không tìm thấy thiết bị nào phù hợp với bộ lọc.
-            </div>
-          )}
-        </div>
-      </div>
+      {/* 5. Bảng giá bồi thường thiết bị */}
+      <CompensationPriceTable
+        onAddEquipment={() => setSubView('add_equipment')}
+        equipments={equipments}
+      />
 
       {/* ============================================================ */}
       {/* MODAL: KHÓA SÂN BẢO TRÌ                                      */}
       {/* ============================================================ */}
       {lockingCourt && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-in fade-in">
-          <div className="w-full max-w-sm rounded-3xl bg-white p-5 shadow-2xl space-y-4 animate-in zoom-in-95">
+          <div role="alertdialog" aria-modal="true" aria-labelledby="court-lock-title" className="w-full max-w-sm max-h-[85dvh] overflow-y-auto rounded-2xl bg-white p-4 shadow-2xl space-y-3 animate-in zoom-in-95">
             <div className="flex items-center justify-between border-b border-slate-100 pb-2">
               <div className="flex items-center gap-2">
                 <Lock className="w-4 h-4 text-rose-600" />
-                <h3 className="text-xs font-black uppercase tracking-wider text-slate-900">
+                <h3 id="court-lock-title" className="text-xs font-black uppercase tracking-wider text-slate-900">
                   Khóa bảo trì {lockingCourt.name}
                 </h3>
               </div>
               <button
                 type="button"
+                disabled={lockSaving}
                 onClick={() => setLockingCourt(null)}
                 className="text-slate-400 hover:text-slate-600"
               >
@@ -670,16 +428,29 @@ export default function FacilityManagementView({
 
             <div className="space-y-3">
               <p className="text-xs text-slate-600 leading-relaxed font-medium">
-                Khi khóa bảo trì, hệ thống sẽ ngắt ca đặt và gỡ lịch đặt trực tuyến của sân này cho đến khi được mở lại.
+                Sân sẽ ẩn khỏi lịch và không nhận đặt mới cho đến khi được mở lại. Các lượt đã đặt được giữ nguyên để xử lý riêng.
               </p>
+              {lockWarnings.length>0 && <div className="space-y-2 rounded-xl border border-amber-300 bg-amber-50 p-3">
+                <p className="flex items-start gap-1.5 text-xs font-bold text-amber-900"><AlertTriangle className="h-4 w-4 shrink-0"/>{lockingCourt.name} có {lockWarnings.length} lượt đặt cần lưu ý</p>
+                <ul className="max-h-40 space-y-2 overflow-y-auto text-[11px] text-amber-950">
+                  {lockWarnings.map(booking=><li key={`${booking.bookingDate}:${booking.code}`} className="rounded-lg bg-white/70 p-2">
+                    <p className="font-bold">{(booking.bookingDate||vietnamBookingDate(warningTime)).split('-').reverse().join('/')} · {booking.time}</p>
+                    <p className="mt-0.5">{booking.customerName} · {booking.code}</p>
+                    {booking.status==='Đang sử dụng'&&<p className="mt-0.5 font-semibold text-red-700">Đang sử dụng sân</p>}
+                  </li>)}
+                </ul>
+                <p className="text-[11px] leading-relaxed text-amber-900">Vui lòng liên hệ xử lý các lượt này. Nếu vẫn xác nhận, sân sẽ khóa ngay.</p>
+              </div>}
+              {lockError&&<p role="alert" className="text-xs text-red-700">{lockError}</p>}
 
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Lý do khóa sân <span className="text-rose-500">*</span>
+                  Lý do khóa sân
                 </label>
                 <input
                   type="text"
                   value={lockReasonInput}
+                  disabled={lockSaving}
                   onChange={(e) => setLockReasonInput(e.target.value)}
                   placeholder="Ví dụ: Sửa thảm & thay bóng đèn LED Line 2..."
                   className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-xs font-bold text-slate-800 outline-none focus:border-rose-500"
@@ -690,6 +461,7 @@ export default function FacilityManagementView({
             <div className="grid grid-cols-2 gap-2 pt-2">
               <button
                 type="button"
+                disabled={lockSaving}
                 onClick={() => setLockingCourt(null)}
                 className="rounded-xl border border-slate-200 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-50 cursor-pointer"
               >
@@ -697,10 +469,11 @@ export default function FacilityManagementView({
               </button>
               <button
                 type="button"
+                disabled={lockSaving}
                 onClick={handleConfirmLockCourt}
                 className="rounded-xl bg-rose-600 hover:bg-rose-700 py-2.5 text-xs font-black text-white shadow-md shadow-rose-600/25 cursor-pointer"
               >
-                Xác nhận khóa
+                {lockSaving?'Đang khóa...':lockWarnings.length?'Vẫn xác nhận khóa':'Xác nhận khóa'}
               </button>
             </div>
           </div>

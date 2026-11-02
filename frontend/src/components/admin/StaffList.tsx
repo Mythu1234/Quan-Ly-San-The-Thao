@@ -62,7 +62,7 @@ export default function StaffList({
   }
 
   return (
-    <div className="flex-1 space-y-4 p-4 pb-28 animate-in fade-in duration-200">
+    <div className="flex-1 space-y-3 p-3 pb-20 animate-in fade-in duration-200">
       {/* 🟢 Top Badge */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
@@ -85,7 +85,7 @@ export default function StaffList({
 
       {/* 🟢 Main Title */}
       <div>
-        <h1 className="text-2xl font-black tracking-tight text-slate-900 leading-tight">
+        <h1 className="text-xl font-extrabold tracking-tight text-slate-900 leading-tight">
           QUẢN LÝ NHÂN VIÊN
         </h1>
         <p className="mt-1 text-xs text-slate-500 leading-relaxed font-medium">
@@ -98,16 +98,16 @@ export default function StaffList({
         onSubmit={(e) => {
           e.preventDefault();
         }}
-        className="flex items-center gap-2"
+        className="flex flex-wrap items-center gap-2"
       >
-        <div className="relative flex-1">
+        <div className="relative w-full">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <input
             type="text"
             placeholder="Tìm kiếm nhân viên theo tên, SĐT..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full rounded-2xl border border-slate-200 bg-white py-3 pl-10 pr-9 text-xs font-semibold text-slate-800 placeholder-slate-400 outline-none transition focus:border-emerald-600 shadow-2xs"
+            className="h-10 w-full rounded-xl border border-slate-200 bg-white pl-10 pr-9 text-xs font-medium text-slate-800 placeholder-slate-400 outline-none transition focus:border-emerald-600 shadow-2xs"
           />
           {searchQuery && (
             <button
@@ -122,12 +122,22 @@ export default function StaffList({
         </div>
         <button
           type="submit"
-          className="flex h-11 items-center justify-center gap-1.5 px-4 rounded-2xl bg-emerald-500 text-white hover:bg-emerald-600 active:scale-95 transition shadow-xs cursor-pointer text-xs font-bold shrink-0"
+          className="flex h-9 flex-1 items-center justify-center gap-1.5 px-3 rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 active:scale-[0.99] transition shadow-sm cursor-pointer text-xs font-bold"
           title="Tìm kiếm"
         >
           <Search className="w-4 h-4 stroke-[2.2]" />
           <span>Tìm kiếm</span>
         </button>
+        {!readOnly && (
+          <button
+            type="button"
+            onClick={onAddNew}
+            className="flex h-9 flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-xl bg-emerald-600 px-3 text-xs font-bold text-white shadow-sm transition hover:bg-emerald-700 active:scale-[0.99] cursor-pointer"
+          >
+            <UserPlus className="w-4 h-4 shrink-0" />
+            <span>Thêm nhân viên mới</span>
+          </button>
+        )}
       </form>
 
       {/* 🟢 Quick filter tags */}
@@ -138,7 +148,7 @@ export default function StaffList({
           className={[
             'rounded-full px-3.5 py-1.5 font-bold transition whitespace-nowrap cursor-pointer',
             filterMode === 'all'
-              ? 'bg-emerald-500 text-white shadow-xs'
+              ? 'bg-emerald-600 text-white shadow-sm hover:bg-emerald-700'
               : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50',
           ].join(' ')}
         >
@@ -151,7 +161,7 @@ export default function StaffList({
           className={[
             'rounded-full px-3.5 py-1.5 font-bold transition whitespace-nowrap cursor-pointer',
             filterMode === 'active'
-              ? 'bg-emerald-500 text-white shadow-xs'
+              ? 'bg-emerald-600 text-white shadow-sm hover:bg-emerald-700'
               : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50',
           ].join(' ')}
         >
@@ -164,7 +174,7 @@ export default function StaffList({
           className={[
             'rounded-full px-3.5 py-1.5 font-bold transition whitespace-nowrap cursor-pointer',
             filterMode === 'inactive'
-              ? 'bg-emerald-500 text-white shadow-xs'
+              ? 'bg-emerald-600 text-white shadow-sm hover:bg-emerald-700'
               : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50',
           ].join(' ')}
         >
@@ -173,7 +183,7 @@ export default function StaffList({
       </div>
 
       {/* 🟢 Staff List Cards */}
-      <div className="space-y-3">
+      <div className="space-y-2">
         {filteredEmployees.length === 0 ? (
           <div className="rounded-3xl border border-dashed border-slate-200 bg-white p-8 text-center space-y-2">
             <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-400">
@@ -201,19 +211,19 @@ export default function StaffList({
             return (
               <div
                 key={emp.id}
-                className="relative rounded-2xl border border-slate-200 bg-white p-3.5 shadow-2xs transition hover:shadow-xs"
+                className="relative rounded-xl border border-slate-200 bg-white p-3 shadow-2xs transition hover:shadow-xs"
               >
                 {/* Top Info Row */}
                 <div className="flex items-start justify-between">
                   <div
                     onClick={() => onSelectEmployee(emp)}
-                    className="flex items-center gap-3 cursor-pointer flex-1"
+                    className="flex min-w-0 items-center gap-2.5 cursor-pointer flex-1"
                   >
                     {/* Avatar with status indicator */}
-                    <div className="relative">
+                    <div className="relative shrink-0">
                       <div
                         className={[
-                          'flex h-12 w-12 items-center justify-center rounded-2xl font-black text-sm border',
+                          'flex h-10 w-10 items-center justify-center rounded-xl font-bold text-xs border',
                           emp.avatarBg,
                         ].join(' ')}
                       >
@@ -228,9 +238,9 @@ export default function StaffList({
                     </div>
 
                     {/* Name & Phone */}
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-sm text-slate-900">{emp.name}</span>
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                        <span className="font-bold text-[13px] text-slate-900">{emp.name}</span>
                         <span
                           className={[
                             'rounded-full px-2 py-0.5 text-[10px] font-bold',
@@ -305,17 +315,6 @@ export default function StaffList({
         )}
       </div>
 
-      {/* 🟢 Action Button: + THÊM NHÂN VIÊN MỚI */}
-      {!readOnly && (
-        <button
-          type="button"
-          onClick={onAddNew}
-          className="w-full flex items-center justify-center gap-2 rounded-2xl bg-emerald-500 hover:bg-emerald-600 py-4 text-xs font-black uppercase tracking-wider text-white shadow-lg shadow-emerald-500/25 transition active:scale-95 cursor-pointer"
-        >
-          <UserPlus className="w-4 h-4 stroke-[2.2]" />
-          <span>THÊM NHÂN VIÊN MỚI</span>
-        </button>
-      )}
     </div>
   );
 }

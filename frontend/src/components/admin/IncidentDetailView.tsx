@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   ChevronLeft,
   Shield,
@@ -14,41 +14,83 @@ import {
   Lock,
   Unlock,
 } from 'lucide-react';
-import type { FacilityIncident } from '../../types/admin';
+import type { FacilityIncident, FacilityEquipment } from '../../types/admin';
+import useVietnamToday from '../../hooks/useVietnamToday';
+import { getEquipmentWarranty } from '../../utils/equipmentWarranty';
+import { getIncidentTimeline } from '../../utils/incidentStorage';
+import useCourtAvailability, { normalizeCourtCode } from '../../hooks/useCourtAvailability';
 
 interface IncidentDetailViewProps {
   incident: FacilityIncident;
+  equipments: FacilityEquipment[];
   onBack: () => void;
   onUpdateStatus: (incidentId: string, newStatus: 'cho_xu_ly' | 'dang_sua_chua' | 'da_khac_phuc', unlockCourt?: boolean) => void;
-  onAddTimelineLog?: (incidentId: string, title: string, description: string) => void;
+  onAddTimelineLog?: (incidentId: string, title: string, description: string, images?: string[]) => void;
   onCompleteEquipmentWarranty?: (equipmentCode: string, equipmentName?: string) => void;
 }
 
 export default function IncidentDetailView({
   incident,
+  equipments,
   onBack,
   onUpdateStatus,
   onAddTimelineLog,
   onCompleteEquipmentWarranty,
 }: IncidentDetailViewProps) {
   const [currentStatus, setCurrentStatus] = useState(incident.status);
-  const [timelineLogs, setTimelineLogs] = useState(incident.timelineLogs || []);
+  const [timelineLogs, setTimelineLogs] = useState(() => getIncidentTimeline(incident));
   const [newLogTitle, setNewLogTitle] = useState('');
   const [newLogDesc, setNewLogDesc] = useState('');
+  const [newLogImages, setNewLogImages] = useState<string[]>([]);
+  const [imageError, setImageError] = useState('');
+  const [readingImage, setReadingImage] = useState(false);
   const [showAddLog, setShowAddLog] = useState(false);
   const [showSuccessToast, setShowSuccessToast] = useState(false);
-  const [isEquipmentWarrantyDone, setIsEquipmentWarrantyDone] = useState(false);
   const [warrantyToast, setWarrantyToast] = useState<string | null>(null);
+  useEffect(() => { setTimelineLogs(getIncidentTimeline(incident)); }, [incident]);
 
-  const targetEquipmentCode = incident.equipmentCode || incident.damageItems?.[0]?.equipmentCode || 'MATB-02';
-  const targetEquipmentName = incident.equipmentName || incident.damageItems?.[0]?.title || 'Thảm sàn Vinyl BWF 4.5mm';
+  const handleLogImage = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > 5 * 1024 * 1024) {
+      setImageError('Chọn ảnh JPG, PNG hoặc WebP tối đa 5 MB.');
+      return;
+    }
+    setImageError('');
+    setReadingImage(true);
+    const reader = new FileReader();
+    reader.onload = () => { setNewLogImages([String(reader.result)]); setReadingImage(false); };
+    reader.onerror = () => { setImageError('Không đọc được ảnh.'); setReadingImage(false); };
+    reader.readAsDataURL(file);
+  };
+
+  const targetEquipmentCode = incident.equipmentCode || incident.damageItems?.[0]?.equipmentCode || '';
+  const targetEquipment = equipments.find(equipment => equipment.code === targetEquipmentCode);
+  const today = useVietnamToday();
+  const warranty = getEquipmentWarranty(targetEquipment?.warrantyExpire, today);
+  const targetEquipmentName = targetEquipment?.name || incident.equipmentName || 'Chưa liên kết thiết bị';
+  const equipmentStatuses = {
+    san_sang: { label: 'Sẵn sàng', color: 'bg-emerald-50 text-emerald-800' },
+    dang_su_dung: { label: 'Đang sử dụng', color: 'bg-emerald-50 text-emerald-800' },
+    bao_tri: { label: 'Bảo trì', color: 'bg-amber-100 text-amber-800' },
+    hong: { label: 'Hỏng', color: 'bg-red-50 text-red-700' },
+  };
+  const getEquipmentStatus = (equipment?: FacilityEquipment) => equipment
+    ? equipmentStatuses[equipment.status]
+    : { label: 'Chưa liên kết', color: 'bg-amber-100 text-amber-800' };
+  const targetStatus = getEquipmentStatus(targetEquipment);
+  const isEquipmentWarrantyDone = targetEquipment?.status === 'san_sang';
 
   const isResolved = currentStatus === 'da_khac_phuc';
+  const [courtStatuses] = useCourtAvailability();
+  const courtLocked = courtStatuses.some(court => court.isLocked && (court.id === incident.courtId
+    || normalizeCourtCode(court.code || court.name) === normalizeCourtCode(incident.courtName)));
 
   const handleCompleteWarranty = () => {
+    if (!targetEquipment || isEquipmentWarrantyDone) return;
     const nowTime = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
-    const logTitle = `Nghiệm thu hoàn tất bảo hành [${targetEquipmentCode}]`;
-    const logDesc = `Đã nghiệm thu thiết bị ${targetEquipmentName} sau khi hoàn tất bảo hành/sửa chữa kỹ thuật. Thiết bị đạt chuẩn kiểm định và chuyển về trạng thái 🟢 Sẵn sàng vận hành.`;
+    const logTitle = `Hoàn tất ${warranty.active ? 'bảo hành' : 'sửa chữa'} [${targetEquipmentCode}]`;
+    const logDesc = `Đã nghiệm thu ${targetEquipmentName} sau ${warranty.active ? 'bảo hành' : 'sửa chữa'}. Thiết bị chuyển sang trạng thái Sẵn sàng.`;
 
     const warrantyLog = {
       id: `TL-${Date.now()}`,
@@ -59,16 +101,13 @@ export default function IncidentDetailView({
     };
 
     setTimelineLogs((prev) => [warrantyLog, ...prev.map((l) => ({ ...l, active: false }))]);
-    setIsEquipmentWarrantyDone(true);
 
-    if (onAddTimelineLog) {
-      onAddTimelineLog(incident.id, logTitle, logDesc);
-    }
+    // The equipment completion handler records the acceptance once in the related incident.
     if (onCompleteEquipmentWarranty) {
       onCompleteEquipmentWarranty(targetEquipmentCode, targetEquipmentName);
     }
 
-    setWarrantyToast(`Đã nghiệm thu thiết bị [${targetEquipmentCode}]! Trạng thái chuyển về 🟢 Sẵn sàng và ghi nhận vào Nhật ký sự cố. Sân ${incident.courtName} vẫn giữ nguyên trạng thái khóa.`);
+    setWarrantyToast(`Đã nghiệm thu thiết bị ${targetEquipmentCode}. Trạng thái sân giữ nguyên.`);
     setTimeout(() => setWarrantyToast(null), 4500);
   };
 
@@ -77,12 +116,12 @@ export default function IncidentDetailView({
     const newLog = {
       id: `TL-${Date.now()}`,
       time: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
-      title: 'Nghiệm thu hoàn tất & Mở lại sân',
-      description: 'Ban quản lý đã kiểm tra hiện trường, các hạng mục hỏng hóc đã khắc phục đạt chuẩn. Sân 03 được mở lại cho khách đặt.',
+      title: 'Hoàn tất xử lý sự cố',
+      description: `Đã kiểm tra và khắc phục các hạng mục hỏng hóc tại ${incident.courtName}. Trạng thái sân giữ nguyên.`,
       active: true,
     };
     setTimelineLogs([newLog, ...timelineLogs.map(l => ({ ...l, active: false }))]);
-    onUpdateStatus(incident.id, 'da_khac_phuc', true);
+    onUpdateStatus(incident.id, 'da_khac_phuc', false);
     if (onAddTimelineLog) {
       onAddTimelineLog(incident.id, newLog.title, newLog.description);
     }
@@ -92,27 +131,29 @@ export default function IncidentDetailView({
 
   const handleChangeStatus = (newSt: 'cho_xu_ly' | 'dang_sua_chua' | 'da_khac_phuc') => {
     setCurrentStatus(newSt);
-    onUpdateStatus(incident.id, newSt, newSt === 'da_khac_phuc');
+    onUpdateStatus(incident.id, newSt, false);
   };
 
   const handleAddNewLog = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newLogTitle.trim()) return;
+    if (!newLogTitle.trim() || readingImage || imageError) return;
 
     const newLog = {
       id: `TL-${Date.now()}`,
       time: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
       title: newLogTitle.trim(),
-      description: newLogDesc.trim() || 'Cập nhật tiến độ xử lý hiện trường.',
+      description: newLogDesc.trim(),
+      images: newLogImages,
       active: true,
     };
 
     setTimelineLogs([newLog, ...timelineLogs.map(l => ({ ...l, active: false }))]);
     if (onAddTimelineLog) {
-      onAddTimelineLog(incident.id, newLog.title, newLog.description);
+      onAddTimelineLog(incident.id, newLog.title, newLog.description, newLog.images);
     }
     setNewLogTitle('');
     setNewLogDesc('');
+    setNewLogImages([]);
     setShowAddLog(false);
   };
 
@@ -125,7 +166,7 @@ export default function IncidentDetailView({
   };
 
   return (
-    <div className="flex-1 space-y-4 p-4 pb-28 animate-in fade-in duration-200 w-full max-w-full min-w-0">
+    <div className="flex-1 space-y-3 bg-white p-3 pb-6 animate-in fade-in duration-200 w-full max-w-full min-w-0">
       {/* 🟢 Top Badge & Navigation */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
@@ -138,40 +179,30 @@ export default function IncidentDetailView({
             <ChevronLeft className="w-5 h-5 stroke-[2.5]" />
           </button>
 
-          <div className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-xs font-black text-emerald-800 border border-emerald-200 shadow-2xs">
-            <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-            BIÊN BẢN KIỂM SOÁT SỰ CỐ
-          </div>
+          <h1 className="text-base font-bold text-slate-900">
+            Sự cố <span className="text-emerald-800">#{incident.id}</span>
+          </h1>
         </div>
 
-        <span className={`px-2.5 py-1 rounded-full text-[11px] font-black border shadow-2xs ${
+        <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold border shadow-2xs ${
           currentStatus === 'da_khac_phuc'
             ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
             : currentStatus === 'dang_sua_chua'
-            ? 'bg-blue-100 text-blue-800 border-blue-300'
+            ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
             : 'bg-amber-100 text-amber-800 border-amber-300'
         }`}>
           {currentStatus === 'da_khac_phuc' ? 'Đã khắc phục' : currentStatus === 'dang_sua_chua' ? 'Đang sửa chữa' : 'Chờ xử lý'}
         </span>
       </div>
 
-      {/* 🟢 Main Title */}
-      <div>
-        <h1 className="text-2xl font-black tracking-tight text-slate-900 leading-tight">
-          CHI TIẾT SỰ CỐ <span className="text-emerald-600">#{incident.id}</span>
-        </h1>
-        <p className="mt-1 text-xs text-slate-500 leading-relaxed font-medium">
-          Hồ sơ kiểm soát kỹ thuật, nhật ký sửa chữa và nghiệm thu vận hành {incident.courtName}.
-        </p>
-      </div>
 
       {/* Success Toast */}
       {showSuccessToast && (
         <div className="rounded-2xl bg-emerald-600 text-white p-3.5 shadow-lg flex items-center justify-between animate-in slide-in-from-top duration-300">
           <div className="flex items-center gap-2">
             <CheckCircle2 className="w-5 h-5 text-emerald-100" />
-            <span className="text-xs font-black">
-              Đã nghiệm thu thành công! Sân {incident.courtName} đã được mở lại.
+            <span className="text-xs font-bold">
+              Đã hoàn tất xử lý sự cố.
             </span>
           </div>
         </div>
@@ -182,99 +213,60 @@ export default function IncidentDetailView({
         <div className="rounded-2xl bg-emerald-700 text-white p-3.5 shadow-lg flex items-center justify-between animate-in slide-in-from-top duration-300">
           <div className="flex items-center gap-2">
             <CheckCircle2 className="w-5 h-5 text-emerald-200 shrink-0" />
-            <span className="text-xs font-black">
+            <span className="text-xs font-bold">
               {warrantyToast}
             </span>
           </div>
         </div>
       )}
 
-      {/* 1. Header Banner (Red/Pink Gradient) matching mockup */}
-      <div className="rounded-3xl bg-gradient-to-br from-rose-100 via-rose-50 to-red-100/70 border border-rose-200 p-4 space-y-3.5 shadow-sm">
+      {/* Court and incident summary */}
+      <div className="rounded-2xl bg-white border border-black/15 p-3 space-y-2.5 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-sm font-bold text-slate-900">{incident.courtName}</span>
+            {incident.courtZone && (
+              <span className="rounded-md bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-800">
+                {incident.courtZone}
+              </span>
+            )}
+          </div>
+          <span className="text-[11px] text-slate-600">{incident.reportedAt}</span>
+        </div>
         <div className="flex items-center justify-between gap-2">
-          {isResolved ? (
-            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-700 text-white text-[11px] font-black tracking-wide shadow-2xs">
+          {!courtLocked ? (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-700 text-white text-[11px] font-bold tracking-wide shadow-2xs">
               <Unlock className="w-3.5 h-3.5" />
-              ĐÃ NGHIỆM THU - ĐÃ MỞ SÂN
+              Sân đang mở
             </span>
           ) : (
-            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-700 text-white text-[11px] font-black tracking-wide shadow-2xs">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-700 text-white text-[11px] font-bold tracking-wide shadow-2xs">
               <Lock className="w-3.5 h-3.5" />
-              ĐANG BẢO TRÌ - ĐÃ KHÓA SÂN
+              Sân đang khóa
             </span>
           )}
 
-          <span className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-rose-200/80 text-rose-800 text-[11px] font-black tracking-wide">
-            <span className="text-rose-600 font-bold">!</span>
-            MỨC ĐỘ: {incident.severityLabel.toUpperCase()}
+          <span className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-amber-100 text-amber-800 text-[11px] font-bold tracking-wide">
+            <span className="text-amber-700 font-bold">!</span>
+            {incident.severityLabel}
           </span>
         </div>
 
-        <div className="grid grid-cols-2 gap-2 pt-1 border-t border-rose-200/60">
-          <div>
-            <div className="text-[10px] font-bold text-rose-700/80 uppercase tracking-wider">
-              MÃ PHIẾU KIỂM SOÁT
-            </div>
-            <div className="text-sm font-black text-rose-900 mt-0.5">
-              #{incident.id}
-            </div>
-          </div>
-          <div>
-            <div className="text-[10px] font-bold text-rose-700/80 uppercase tracking-wider">
-              THỜI ĐIỂM GHI NHẬN
-            </div>
-            <div className="text-xs font-bold text-rose-900 mt-0.5">
-              {incident.reportedAt}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* 2. Court Card (Sân 03 Khu A - Master Lock) */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-3.5 shadow-2xs space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700 border border-emerald-100">
-              <span className="text-xl">🏸</span>
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-black text-slate-900">
-                  {incident.courtName}
-                </span>
-                <span className="px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 text-[10px] font-extrabold border border-blue-200/60">
-                  {incident.courtZone || 'Khu A'}
-                </span>
-              </div>
-              <p className="text-[11px] font-medium text-slate-500 mt-0.5">
-                {incident.courtSubtype || 'Sân Cầu Lông Tiêu Chuẩn Quốc Tế'}
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-rose-50 border border-rose-200/80 text-rose-700 text-[11px] font-black">
-            <span className={`h-2 w-2 rounded-full ${isResolved ? 'bg-emerald-500' : 'bg-rose-600 animate-pulse'}`} />
-            {isResolved ? 'Unlocked' : 'Master Lock'}
-          </div>
-        </div>
-
-        <div className="flex items-start gap-2.5 rounded-xl bg-blue-50/80 border border-blue-100 p-2.5 text-xs">
-          <Shield className="w-4 h-4 shrink-0 text-blue-600 mt-0.5" />
-          <span className="text-blue-900 text-[11px] font-medium leading-relaxed">
-            {isResolved
-              ? 'Sân đã được mở khóa an toàn. Khách hàng có thể tiếp tục tạo slot đặt sân trên hệ thống CourtX.'
-              : 'Hệ thống đã tự động gỡ lịch đặt trực tuyến. Khách hàng không thể tạo slot giữ chỗ trên ' + incident.courtName + ' trong thời gian này.'}
-          </span>
-        </div>
       </div>
 
       {/* 3. Detailed Damage Items ("Hạng mục hư hại chi tiết") */}
+      {incident.bookingCode && <div className="space-y-1 rounded-xl border border-emerald-200 bg-white p-3 text-xs">
+        <div className="flex justify-between gap-2"><span className="text-slate-600">Lượt đặt</span><strong className="text-emerald-800">{incident.bookingCode}</strong></div>
+        <div className="flex justify-between gap-2"><span className="text-slate-600">Trách nhiệm</span><span>{incident.liability === 'DO_KHACH_LAM_HONG' ? 'Do khách làm hỏng' : 'Sân chịu chi phí'}</span></div>
+        {incident.compensationAmount !== undefined && <div className="flex justify-between gap-2"><span className="text-slate-600">Bồi thường</span><strong>{incident.compensationAmount.toLocaleString('vi-VN')} VND</strong></div>}
+        <p className="text-right text-[11px] text-emerald-800">{incident.compensationPaymentStatus === 'paid' ? 'Đã thu qua VietQR khi trả sân' : incident.compensationPaymentStatus === 'not_required' ? 'Không thu phí khách' : 'Chưa quyết toán'}</p>
+      </div>}
       <div className="space-y-3">
         <div className="flex items-center justify-between px-1">
           <div className="flex items-center gap-2">
             <Layers className="w-4 h-4 text-emerald-700" />
-            <h2 className="text-xs font-black uppercase tracking-wider text-slate-800">
-              Hạng mục hư hại chi tiết
+            <h2 className="text-xs font-bold uppercase tracking-wider text-slate-800">
+              Hạng mục hư hại
             </h2>
           </div>
           <span className="px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[11px] font-bold">
@@ -286,19 +278,19 @@ export default function IncidentDetailView({
           incident.damageItems.map((item, idx) => (
             <div
               key={item.id || idx}
-              className="rounded-3xl border border-slate-200 bg-white p-4 shadow-2xs space-y-3 overflow-hidden"
+              className="rounded-2xl border border-slate-200 bg-white p-3 space-y-2 overflow-hidden"
             >
               <div className="flex items-start justify-between gap-2">
                 <div className="flex items-center gap-2.5">
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-rose-50 text-rose-600 border border-rose-100">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-red-50 text-red-600 border border-red-100">
                     {idx === 0 ? <Layers className="w-4 h-4" /> : <Lightbulb className="w-4 h-4" />}
                   </div>
                   <div>
-                    <h3 className="text-xs font-black text-slate-900">
-                      {item.title}
+                    <h3 className="text-xs font-bold text-slate-900">
+                      {equipments.find(equipment => equipment.code === item.equipmentCode)?.name || item.title}
                     </h3>
                     {item.equipmentCode && (
-                      <span className="inline-block mt-0.5 text-[10px] font-black text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                      <span className="inline-block mt-0.5 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
                         Mã TB: {item.equipmentCode}
                       </span>
                     )}
@@ -306,15 +298,11 @@ export default function IncidentDetailView({
                 </div>
 
                 <span
-                  className={`px-2.5 py-1 rounded-xl text-[10px] font-black ${
-                    item.riskColor === 'rose'
-                      ? 'bg-rose-100 text-rose-800'
-                      : item.riskColor === 'blue'
-                      ? 'bg-blue-100 text-blue-800'
-                      : 'bg-amber-100 text-amber-800'
+                  className={`px-2.5 py-1 rounded-xl text-[10px] font-bold ${
+                    getEquipmentStatus(equipments.find(equipment => equipment.code === item.equipmentCode)).color
                   }`}
                 >
-                  {item.riskBadge}
+                  {getEquipmentStatus(equipments.find(equipment => equipment.code === item.equipmentCode)).label}
                 </span>
               </div>
 
@@ -340,14 +328,14 @@ export default function IncidentDetailView({
             </div>
           ))
         ) : (
-          <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-2xs space-y-3">
+          <div className="rounded-2xl border border-slate-200 bg-white p-3 space-y-2">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Wrench className="w-4 h-4 text-emerald-600" />
-                <span className="text-xs font-black text-slate-900">{incident.title}</span>
+                <span className="text-xs font-bold text-slate-900">{incident.title}</span>
               </div>
               {incident.equipmentCode && (
-                <span className="text-[10px] font-black text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
                   {incident.equipmentCode}
                 </span>
               )}
@@ -374,119 +362,118 @@ export default function IncidentDetailView({
       </div>
 
       {/* 3.5. Equipment Warranty & Acceptance Card ("BẢO HÀNH & NGHIỆM THU THIẾT BỊ") */}
-      <div className="rounded-3xl border border-emerald-200 bg-gradient-to-br from-emerald-50/70 via-white to-emerald-50/30 p-4 shadow-2xs space-y-3.5">
+      <div className="rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50/70 via-white to-emerald-50/30 p-3 space-y-2.5">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Wrench className="w-4 h-4 text-emerald-700" />
-            <h2 className="text-xs font-black uppercase tracking-wider text-slate-800">
-              Bảo hành & Nghiệm thu thiết bị
+            <h2 className="text-xs font-bold uppercase tracking-wider text-slate-800">
+              {warranty.active ? 'Bảo hành & nghiệm thu' : 'Sửa chữa & nghiệm thu'}
             </h2>
           </div>
-          <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black border ${
-            isEquipmentWarrantyDone
-              ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
-              : 'bg-amber-100 text-amber-800 border-amber-300'
+          <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
+            targetStatus.color
           }`}>
-            {isEquipmentWarrantyDone ? '🟢 Đã nghiệm thu' : 'Chờ nghiệm thu'}
+            {targetStatus.label}
           </span>
         </div>
 
         <div className="rounded-2xl bg-white border border-slate-200/80 p-3 space-y-2 text-xs">
           <div className="flex items-center justify-between">
-            <span className="text-slate-500 font-medium">Thiết bị cần nghiệm thu:</span>
+            <span className="text-slate-600 font-medium">Thiết bị</span>
             <span className="font-bold text-slate-800">{targetEquipmentName}</span>
           </div>
           <div className="flex items-center justify-between">
-            <span className="text-slate-500 font-medium">Mã dán thiết bị:</span>
-            <span className="font-mono font-black text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-              {targetEquipmentCode}
+            <span className="text-slate-600 font-medium">Mã thiết bị</span>
+            <span className="font-mono font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+              {targetEquipmentCode || 'Chưa liên kết'}
             </span>
           </div>
           <div className="flex items-center justify-between">
-            <span className="text-slate-500 font-medium">Trạng thái thiết bị:</span>
-            <span className={`font-bold ${isEquipmentWarrantyDone ? 'text-emerald-700 font-black' : 'text-amber-700'}`}>
-              {isEquipmentWarrantyDone ? '🟢 Sẵn sàng vận hành' : '🟡 Đang sửa chữa / Chờ bảo hành'}
+            <span className="text-slate-600 font-medium">Trạng thái</span>
+            <span className={`rounded-md px-2 py-0.5 font-bold ${targetStatus.color}`}>
+              {targetStatus.label}
             </span>
           </div>
-          <div className="flex items-center justify-between pt-1 border-t border-slate-100">
-            <span className="text-slate-500 font-medium">Hotline bảo hành hãng:</span>
-            <span className="font-bold text-emerald-700">1900 6868 (Yonex / Đại Việt)</span>
+          <div className="flex items-center justify-between gap-3 pt-1 border-t border-slate-100">
+            <span className="text-slate-600 font-medium">Bảo hành</span>
+            <span className="text-right font-semibold text-slate-700">{warranty.label}</span>
+          </div>
+          <div className="flex items-center justify-between gap-3 pt-1 border-t border-slate-100">
+            <span className="text-slate-600 font-medium">SĐT bảo hành</span>
+            {targetEquipment?.supplierPhone?.trim() ? (
+              <a href={`tel:${targetEquipment.supplierPhone.replace(/[^+\d]/g, '')}`} className="font-bold text-emerald-700">{targetEquipment.supplierPhone}</a>
+            ) : <span className="text-slate-500">Chưa cập nhật</span>}
+          </div>
+          <div className="flex items-start justify-between gap-3 pt-1 border-t border-slate-100">
+            <span className="shrink-0 text-slate-600 font-medium">Địa chỉ bảo hành</span>
+            <span className="text-right font-medium text-slate-800 break-words min-w-0">{targetEquipment?.warrantyAddress?.trim() || 'Chưa cập nhật'}</span>
           </div>
         </div>
 
         <p className="text-[11px] text-slate-500 leading-relaxed font-medium">
-          💡 Khi hãng hoặc thợ bảo trì đã sửa xong thiết bị, bấm nút nghiệm thu bên dưới để chuyển thiết bị về 🟢 <strong>Sẵn sàng</strong> và tự động ghi vào Nhật ký xử lý sự cố. <em>(Sân đấu vẫn giữ nguyên trạng thái khóa, người quản lý sẽ tự mở lại sân khi kiểm tra an toàn xong).</em>
+          Nghiệm thu đưa thiết bị về trạng thái sẵn sàng. Khóa/mở sân tại “Chuyển đổi trạng thái sân”.
         </p>
 
         {/* Nút Nghiệm thu thiết bị */}
         <button
           type="button"
-          disabled={isEquipmentWarrantyDone}
+          disabled={!targetEquipment || isEquipmentWarrantyDone}
           onClick={handleCompleteWarranty}
-          className={`w-full flex items-center justify-center gap-2 rounded-2xl py-3.5 text-xs font-black transition active:scale-95 cursor-pointer shadow-md ${
+          className={`w-full flex items-center justify-center gap-2 rounded-2xl py-2.5 text-xs font-bold transition active:scale-95 cursor-pointer shadow-md ${
             isEquipmentWarrantyDone
               ? 'bg-emerald-100 text-emerald-800 border border-emerald-300 cursor-default'
-              : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/25'
+              : 'bg-emerald-700 hover:bg-emerald-800 text-white shadow-emerald-600/25'
           }`}
         >
           <CheckCircle2 className="w-4 h-4 text-emerald-100" />
           <span>
             {isEquipmentWarrantyDone
-              ? `✓ Đã nghiệm thu [${targetEquipmentCode}] (🟢 Sẵn sàng)`
-              : 'Xác nhận đã bảo hành xong / Nghiệm thu'}
+              ? 'Đã nghiệm thu thiết bị'
+              : warranty.active ? 'Nghiệm thu thiết bị' : 'Xác nhận sửa xong'}
           </span>
         </button>
       </div>
 
       {/* 4. Reporter Card ("NGƯỜI LẬP BIÊN BẢN") */}
-      <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-2xs space-y-3">
-        <h2 className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+      <div className="rounded-2xl border border-slate-200 bg-white p-3 space-y-2">
+        <h2 className="text-[11px] font-bold uppercase tracking-wide text-emerald-800">
           NGƯỜI LẬP BIÊN BẢN
         </h2>
 
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-emerald-700 text-white font-black text-sm shadow-sm">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-emerald-700 text-white font-bold text-sm shadow-sm">
               {getInitials(incident.reporterName)}
             </div>
             <div>
-              <div className="text-xs font-black text-slate-900">
+              <div className="text-xs font-bold text-slate-900">
                 {incident.reporterName}
               </div>
               <div className="text-[11px] text-slate-500 font-medium mt-0.5">
-                {incident.reporterRole || 'Nhân viên trực ca • 05:00 - 11:00'}
+                {incident.reporterRole || 'Nhân viên'}
               </div>
             </div>
           </div>
 
-          <a
-            href={`tel:${incident.reporterPhone || '0912345678'}`}
-            className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-blue-700 hover:bg-blue-100 transition active:scale-95 cursor-pointer border border-blue-200/60"
-            title="Gọi điện"
-          >
-            <Phone className="w-4 h-4" />
-          </a>
         </div>
 
-        <div className="rounded-xl bg-blue-50/70 border border-blue-100 px-3 py-2 flex items-center justify-between text-xs">
-          <span className="text-[11px] font-bold text-slate-500">Số điện thoại liên hệ</span>
-          <span className="text-xs font-black text-slate-800 tracking-wider">
-            {incident.reporterPhone || '0912.345.678'}
-          </span>
+        <div className="flex items-center gap-2 text-xs text-emerald-800">
+          <Phone className="h-3.5 w-3.5 shrink-0" />
+          {incident.reporterPhone ? <a className="font-semibold" href={`tel:${incident.reporterPhone.replace(/[^+\d]/g, '')}`}>{incident.reporterPhone}</a> : <span className="text-slate-500">Chưa cập nhật</span>}
         </div>
       </div>
 
       {/* 5. Incident Timeline ("Nhật ký xử lý sự cố (Thời gian thực)") */}
-      <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-2xs space-y-3.5">
+      <div className="rounded-2xl border border-slate-200 bg-white p-3 space-y-2.5">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Clock className="w-4 h-4 text-emerald-700" />
-            <h2 className="text-xs font-black uppercase tracking-wider text-slate-800">
+            <h2 className="text-xs font-bold uppercase tracking-wider text-slate-800">
               Nhật ký xử lý sự cố
             </h2>
           </div>
           <span className="text-[11px] font-bold text-emerald-700">
-            Thời gian thực
+            {timelineLogs.length} cập nhật
           </span>
         </div>
 
@@ -499,14 +486,20 @@ export default function IncidentDetailView({
                 }`}
               />
               <div className="flex items-baseline justify-between gap-2">
-                <h4 className="text-xs font-black text-slate-900">{log.title}</h4>
+                <h4 className="text-xs font-bold text-slate-900">{log.title}</h4>
                 <span className="text-[11px] font-bold text-slate-400 shrink-0">
                   {log.time}
                 </span>
               </div>
-              <p className="text-[11px] text-slate-600 mt-0.5 font-medium leading-relaxed">
+              <p className="whitespace-pre-wrap text-[11px] text-slate-600 mt-0.5 font-medium leading-relaxed">
                 {log.description}
               </p>
+              {log.id === `REPORT-${incident.id}` && incident.technicianNote && (
+                <p className="mt-1 whitespace-pre-wrap text-[11px] text-slate-600">Ghi chú: {incident.technicianNote}</p>
+              )}
+              {log.images?.map((src, index) => (
+                <img key={`${log.id}-${index}`} src={src} alt={`Ảnh nhật ký: ${log.title}`} className="mt-2 max-h-48 w-full rounded-lg border border-slate-200 object-contain bg-white" />
+              ))}
             </div>
           ))}
         </div>
@@ -519,13 +512,13 @@ export default function IncidentDetailView({
             className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl border border-dashed border-slate-300 text-xs font-bold text-slate-600 hover:bg-slate-50 active:scale-95 transition cursor-pointer"
           >
             <Plus className="w-3.5 h-3.5" />
-            <span>Ghi thêm nhật ký tiến độ</span>
+            <span>Thêm nhật ký</span>
           </button>
         ) : (
           <form onSubmit={handleAddNewLog} className="space-y-2 p-3 rounded-2xl bg-slate-50 border border-slate-200 animate-in fade-in">
             <input
               type="text"
-              placeholder="Tiêu đề nhật ký (ví dụ: Kỹ thuật viên dán xong mép thảm...)"
+              placeholder="Tiêu đề cập nhật"
               value={newLogTitle}
               onChange={(e) => setNewLogTitle(e.target.value)}
               className="w-full rounded-xl border border-slate-200 bg-white p-2 text-xs font-bold text-slate-800 outline-none focus:border-emerald-500"
@@ -538,21 +531,28 @@ export default function IncidentDetailView({
               className="w-full rounded-xl border border-slate-200 bg-white p-2 text-xs font-medium text-slate-800 outline-none focus:border-emerald-500"
             />
             <div className="flex items-center justify-end gap-2 pt-1">
+              <label className="mr-auto cursor-pointer text-xs font-semibold text-emerald-800">
+                <span className="inline-flex items-center gap-1"><Camera className="h-3.5 w-3.5" />Thêm ảnh</span>
+                <input type="file" accept="image/jpeg,image/png,image/webp" onChange={handleLogImage} className="sr-only" />
+              </label>
               <button
                 type="button"
                 onClick={() => setShowAddLog(false)}
-                className="px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-100 cursor-pointer"
+                className="px-3 py-1.5 rounded-lg border border-red-200 bg-red-50 text-xs font-bold text-red-700 hover:bg-red-100 cursor-pointer"
               >
                 Hủy
               </button>
               <button
                 type="submit"
-                className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-xs font-black text-white shadow cursor-pointer"
+                disabled={readingImage || !!imageError}
+                className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-xs font-bold text-white shadow cursor-pointer"
               >
                 <Send className="w-3 h-3" />
                 <span>Lưu nhật ký</span>
               </button>
             </div>
+            {imageError && <p className="text-xs text-red-700">{imageError}</p>}
+            {newLogImages.map(src => <div key={src} className="flex items-center gap-2"><img src={src} alt="Ảnh cập nhật" className="h-20 rounded-lg" /><button type="button" className="text-xs text-red-700" onClick={() => { setNewLogImages([]); setImageError(''); }}>Bỏ ảnh</button></div>)}
           </form>
         )}
       </div>
@@ -560,13 +560,13 @@ export default function IncidentDetailView({
       {/* 6. Quick Status Switcher */}
       <div className="rounded-2xl border border-slate-200 bg-white p-3.5 shadow-2xs space-y-2">
         <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-          Chuyển đổi trạng thái xử lý
+          Trạng thái xử lý
         </label>
         <div className="grid grid-cols-3 gap-2">
           <button
             type="button"
             onClick={() => handleChangeStatus('cho_xu_ly')}
-            className={`py-2 px-1 text-center rounded-xl text-xs font-black transition cursor-pointer ${
+            className={`py-2 px-1 text-center rounded-xl text-xs font-bold transition cursor-pointer ${
               currentStatus === 'cho_xu_ly'
                 ? 'bg-amber-100 text-amber-800 ring-2 ring-amber-300'
                 : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
@@ -577,9 +577,9 @@ export default function IncidentDetailView({
           <button
             type="button"
             onClick={() => handleChangeStatus('dang_sua_chua')}
-            className={`py-2 px-1 text-center rounded-xl text-xs font-black transition cursor-pointer ${
+            className={`py-2 px-1 text-center rounded-xl text-xs font-bold transition cursor-pointer ${
               currentStatus === 'dang_sua_chua'
-                ? 'bg-blue-100 text-blue-800 ring-2 ring-blue-300'
+                ? 'bg-emerald-100 text-emerald-800 ring-2 ring-emerald-300'
                 : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
             }`}
           >
@@ -588,7 +588,7 @@ export default function IncidentDetailView({
           <button
             type="button"
             onClick={() => handleChangeStatus('da_khac_phuc')}
-            className={`py-2 px-1 text-center rounded-xl text-xs font-black transition cursor-pointer ${
+            className={`py-2 px-1 text-center rounded-xl text-xs font-bold transition cursor-pointer ${
               currentStatus === 'da_khac_phuc'
                 ? 'bg-emerald-100 text-emerald-800 ring-2 ring-emerald-300'
                 : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
@@ -601,37 +601,19 @@ export default function IncidentDetailView({
 
       {/* 7. Bottom Main CTA */}
       <div className="pt-2 space-y-2.5">
-        <button
-          type="button"
-          disabled={isEquipmentWarrantyDone}
-          onClick={handleCompleteWarranty}
-          className={`w-full flex items-center justify-center gap-2 rounded-2xl py-3 text-xs font-black transition active:scale-95 cursor-pointer shadow-sm ${
-            isEquipmentWarrantyDone
-              ? 'bg-emerald-100 text-emerald-800 border border-emerald-300 cursor-default'
-              : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/20'
-          }`}
-        >
-          <CheckCircle2 className="w-4 h-4 text-emerald-100" />
-          <span>
-            {isEquipmentWarrantyDone
-              ? `✓ Đã nghiệm thu thiết bị [${targetEquipmentCode}] (🟢 Sẵn sàng)`
-              : 'Xác nhận đã bảo hành xong / Nghiệm thu'}
-          </span>
-        </button>
-
         {!isResolved ? (
           <button
             type="button"
             onClick={handleResolveAndUnlock}
-            className="w-full flex items-center justify-center gap-2 rounded-2xl bg-slate-800 hover:bg-slate-900 py-3.5 text-xs font-black text-white shadow-lg transition active:scale-95 cursor-pointer"
+            className="w-full flex items-center justify-center gap-2 rounded-2xl bg-emerald-700 hover:bg-emerald-800 py-2.5 text-xs font-bold text-white shadow-lg transition active:scale-95 cursor-pointer"
           >
             <Shield className="w-4 h-4 text-emerald-300" />
-            <span>Nghiệm thu toàn bộ sự cố & Mở lại sân</span>
+            <span>Hoàn tất xử lý</span>
           </button>
         ) : (
-          <div className="w-full flex items-center justify-center gap-2 rounded-2xl bg-emerald-100 border border-emerald-300 py-3 text-xs font-black text-emerald-800">
+          <div className="w-full flex items-center justify-center gap-2 rounded-2xl bg-emerald-100 border border-emerald-300 py-2.5 text-xs font-bold text-emerald-800">
             <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-            <span>Đã nghiệm thu đạt chuẩn • Sân đang hoạt động tốt</span>
+            <span>Đã khắc phục</span>
           </div>
         )}
       </div>

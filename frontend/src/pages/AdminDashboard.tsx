@@ -1,3 +1,5 @@
+import useCompleteCheckout from '../hooks/useCompleteCheckout';
+import { useStoredIncidents, mergeIncidents, writeIncidentSnapshot, type IncidentReporter } from '../utils/incidentStorage';
 import { useState, useEffect } from 'react';
 import {
   Menu,
@@ -19,23 +21,23 @@ import StaffDetailView from '../components/admin/StaffDetailView';
 import EditStaffView from '../components/admin/EditStaffView';
 import WalletRevenueView from '../components/admin/WalletRevenueView';
 import FacilityManagementView from '../components/admin/FacilityManagementView';
-import type { Employee, Transaction, FacilityEquipment, CourtStatusItem, FacilityIncident } from '../types/admin';
-import { INITIAL_EMPLOYEES, INITIAL_TRANSACTIONS, INITIAL_EQUIPMENT, INITIAL_COURT_STATUSES, INITIAL_INCIDENTS } from '../types/admin';
+import useCourtAvailability from '../hooks/useCourtAvailability';
+import type { Employee, Transaction, FacilityEquipment, FacilityIncident } from '../types/admin';
+import { INITIAL_EMPLOYEES, INITIAL_TRANSACTIONS, INITIAL_EQUIPMENT } from '../types/admin';
 import { employeeApiService } from '../services/employeeService';
-import { facilityApiService } from '../services/facilityService';
+import { facilityApiService, FacilitySaveError } from '../services/facilityService';
+import { saveLocalEquipment, withLocalEquipment } from '../utils/localEquipment';
 
-export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
+export default function AdminDashboard({ onLogout, currentUser }: { onLogout: () => void; currentUser: IncidentReporter }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [isCheckoutMode, setIsCheckoutMode] = useState(false);
   const [isSetupMode, setIsSetupMode] = useState(false);
-  const showScheduleControls = !isCheckoutMode && !isSetupMode;
   
   const [activeTab, setActiveTab] = useState<'lich_san' | 'nhan_vien' | 'vi_thu' | 'co_so_vat_chat'>('lich_san');
   const [employees, setEmployees] = useState<Employee[]>(INITIAL_EMPLOYEES);
   const [transactions, setTransactions] = useState<Transaction[]>(INITIAL_TRANSACTIONS);
-  const [equipments, setEquipments] = useState<FacilityEquipment[]>(INITIAL_EQUIPMENT);
-  const [courtStatuses, setCourtStatuses] = useState<CourtStatusItem[]>(INITIAL_COURT_STATUSES);
-  const [incidents, setIncidents] = useState<FacilityIncident[]>(INITIAL_INCIDENTS);
+  const [equipments, setEquipments] = useState<FacilityEquipment[]>(() => withLocalEquipment(INITIAL_EQUIPMENT));
+  const [courtStatuses, setCourtStatuses] = useCourtAvailability();
+  const [incidents, setIncidents] = useStoredIncidents();
   const [staffSubView, setStaffSubView] = useState<'list' | 'add' | 'detail' | 'edit'>('list');
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
 
@@ -61,9 +63,9 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
           setEmployees(empRes.employees);
           setIsBackendOnline(empRes.isBackendOnline || facRes.isBackendOnline);
           if (facRes.isBackendOnline) {
-            setEquipments(facRes.equipments);
+            setEquipments(withLocalEquipment(facRes.equipments));
             setCourtStatuses(facRes.courts);
-            setIncidents(facRes.incidents);
+            setIncidents(previous => mergeIncidents(facRes.incidents, previous));
           }
         }
       } catch (err) {
@@ -202,8 +204,10 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
       const created = await facilityApiService.createEquipment(newEq);
       setEquipments((prev) => [created, ...prev]);
     } catch (err) {
+      if (err instanceof FacilitySaveError) throw err;
       console.warn('Backend add equipment failed, adding locally:', err);
-      setEquipments([newEq, ...equipments]);
+      saveLocalEquipment(newEq);
+      setEquipments((previous) => [newEq, ...previous]);
     }
   };
 
@@ -240,28 +244,30 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
     }
   };
 
-  const handleSubmitIncident = async (newIncident: FacilityIncident, lockCourt: boolean) => {
+  const completeCheckout = useCompleteCheckout(incidents, setIncidents, equipments, setEquipments);
+
+  const handleDeleteIncident = async (id: string) => {
+    const now = new Date().toISOString();
+    let tombstone: FacilityIncident | undefined;
+    try { tombstone = await facilityApiService.deleteIncident(id); }
+    catch (error) { if (error instanceof FacilitySaveError) throw error; }
+    const next = incidents.map(incident => incident.id === id ? (tombstone || { ...incident, deletedAt: now, updatedAt: now }) : incident);
+    await writeIncidentSnapshot(next);
+    setIncidents(next);
+  };
+
+  const handleSubmitIncident = async (newIncident: FacilityIncident, _lockCourt: boolean) => {
     try {
       const res = await facilityApiService.createIncident({
         ...newIncident,
-        lockCourt,
+        lockCourt: false,
       });
       setIncidents((prev) => [res.incident, ...prev]);
-      if (res.courtLocked && newIncident.courtId) {
-        setCourtStatuses((prev) =>
-          prev.map((c) =>
-            c.id === newIncident.courtId
-              ? { ...c, isLocked: true, lockReason: `Sự cố: ${newIncident.title}` }
-              : c
-          )
-        );
-      }
     } catch (err) {
       console.warn('Backend incident report failed, applying locally:', err);
-      setIncidents([newIncident, ...incidents]);
-      if (lockCourt && newIncident.courtId) {
-        handleToggleCourtLock(newIncident.courtId, true, newIncident.title);
-      }
+      const saved = [newIncident, ...incidents];
+      await writeIncidentSnapshot(saved);
+      setIncidents(saved);
     }
   };
 
@@ -374,49 +380,15 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   };
 
   // Tự động thu hồi thiết bị của sân về Kho chung khi Check-out sân
-  const handleCheckoutCourtEquipment = async (courtName: string, _timeSlot?: string) => {
-    try {
-      const returnedList = await facilityApiService.checkoutCourtEquipments(courtName);
-      const returnedCodes = new Set(returnedList.map((e) => e.code));
-      setEquipments((prev) =>
-        prev.map((eq) => {
-          if (returnedCodes.has(eq.code)) {
-            const found = returnedList.find((r) => r.code === eq.code);
-            return found || eq;
-          }
-          return eq;
-        })
-      );
-    } catch (err) {
-      console.warn('Backend checkout court failed, applying locally:', err);
-      setEquipments((prev) =>
-        prev.map((eq) => {
-          if (eq.currentLocation === courtName || eq.assignedCourt === courtName) {
-            return {
-              ...eq,
-              currentLocation: 'Kho chung',
-              status: 'san_sang',
-              statusLabel: 'Sẵn sàng',
-              healthRate: 'Sẵn sàng điều phối (Đã thu hồi về kho)',
-              assignedBookingCode: undefined,
-              assignedTimeSlot: undefined,
-              assignedCustomer: undefined,
-              assignedCourt: undefined,
-            };
-          }
-          return eq;
-        })
-      );
-    }
-  };
 
-  const handleAddTimelineLog = async (incidentId: string, title: string, description: string) => {
+  const handleAddTimelineLog = async (incidentId: string, title: string, description: string, images: string[] = []) => {
     const nowTime = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
     const newLog = {
       id: `TL-${Date.now()}`,
       time: nowTime,
       title,
       description,
+      images,
       active: true,
     };
     setIncidents((prev) =>
@@ -425,12 +397,14 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
           ? {
               ...i,
               timelineLogs: [newLog, ...(i.timelineLogs || []).map((l) => ({ ...l, active: false }))],
+              updatedAt: new Date().toISOString(),
             }
           : i
       )
     );
     try {
-      await facilityApiService.addTimelineLog(incidentId, title, description);
+      const saved = await facilityApiService.addTimelineLog(incidentId, title, description, images);
+      setIncidents(previous => previous.map(item => item.id === incidentId ? saved : item));
     } catch (err) {
       console.warn('Backend timeline log error:', err);
     }
@@ -448,7 +422,7 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
               ...eq,
               status: 'san_sang',
               statusLabel: 'Sẵn sàng',
-              healthRate: 'Tốt (Đã nghiệm thu bảo hành)',
+              healthRate: 'Tốt (Đã nghiệm thu)',
               lastMaintenance: formattedDate,
             }
           : eq
@@ -460,7 +434,7 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
       await facilityApiService.updateEquipment(equipmentCode, {
         status: 'san_sang',
         statusLabel: 'Sẵn sàng',
-        healthRate: 'Tốt (Đã nghiệm thu bảo hành)',
+        healthRate: 'Tốt (Đã nghiệm thu)',
         lastMaintenance: formattedDate,
       });
     } catch (err) {
@@ -476,8 +450,8 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
       ) || incidents[0];
 
     if (relatedInc) {
-      const logTitle = `Nghiệm thu hoàn tất bảo hành [${equipmentCode}]`;
-      const logDesc = `Đã nghiệm thu thiết bị ${equipmentName ? `${equipmentName} (${equipmentCode})` : equipmentCode} sau bảo hành/sửa chữa. Thiết bị chuyển sang trạng thái Sẵn sàng vận hành.`;
+      const logTitle = `Nghiệm thu thiết bị [${equipmentCode}]`;
+      const logDesc = `Đã nghiệm thu thiết bị ${equipmentName ? `${equipmentName} (${equipmentCode})` : equipmentCode}. Thiết bị chuyển sang trạng thái Sẵn sàng.`;
       await handleAddTimelineLog(relatedInc.id, logTitle, logDesc);
     }
   };
@@ -558,28 +532,15 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
 
         {activeTab === 'lich_san' && (
           <>
-            {showScheduleControls && <button
-              type="button"
-              onClick={() => {
-                setIsCheckoutMode(false);
-                setIsSetupMode(true);
-              }}
-              className="bg-red-50 border-b border-red-100 px-3 py-2.5 flex gap-2 shrink-0 items-start text-left active:bg-red-100"
-            >
-              <AlertTriangle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
-              <p className="text-[12px] text-red-800 font-medium leading-relaxed pr-2">
-                <strong className="font-bold">Nhắc nhở setup mặt sân:</strong> Cần setup chuyển đổi cụm sân 1-4 thành sân bóng chuyền BC1 trước <strong className="font-bold underline">09:30</strong>. Lịch bóng chuyền bắt đầu lúc 09:30.
-              </p>
-            </button>}
-
-
-
             {isSetupMode ? (
               <AdminSetupReminderPage onBack={() => setIsSetupMode(false)} />
             ) : (
               <AdminSchedulePage
-                onCheckoutModeChange={setIsCheckoutMode}
-                onBookingCheckout={handleCheckoutCourtEquipment}
+                equipments={equipments}
+                incidents={incidents}
+                currentUser={currentUser}
+                onCompleteCheckout={completeCheckout}
+                courtStatuses={courtStatuses}
               />
             )}
           </>
@@ -633,12 +594,14 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
         {activeTab === 'co_so_vat_chat' && (
           <div className="flex-1 overflow-auto bg-slate-50 relative custom-scrollbar">
             <FacilityManagementView
+              currentUser={currentUser}
               equipments={equipments}
               courts={courtStatuses}
               incidents={incidents}
               onAddEquipment={handleAddEquipment}
               onUpdateEquipmentLocation={handleUpdateEquipmentLocation}
               onToggleCourtLock={handleToggleCourtLock}
+              onDeleteIncident={handleDeleteIncident}
               onSubmitIncident={handleSubmitIncident}
               onUpdateIncidentStatus={handleUpdateIncidentStatus}
               onReturnToWarehouse={handleReturnToWarehouse}

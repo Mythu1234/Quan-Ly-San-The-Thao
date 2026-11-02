@@ -832,9 +832,12 @@ export interface FacilityEquipment {
   statusLabel: string;      // Sẵn sàng, Đang sử dụng, Bảo trì, Hỏng
   healthRate: string;       // Mới 95%, Tốt, Cần bảo trì ngay, Đạt 500 Lux...
   purchaseDate: string;     // Ngày nhập
+  purchasePrice?: number;   // Giá mua (VNĐ)
+  compensationPrice?: number; // Giá bồi thường niêm yết (VNĐ)
   warrantyExpire: string;   // Hạn bảo hành
   supplier?: string;        // Hãng / Nhà cung cấp bảo hành
   supplierPhone?: string;   // Hotline bảo hành
+  warrantyAddress?: string; // Địa chỉ tiếp nhận bảo hành
   serialNumber?: string;    // Số Seri / Model
   lastMaintenance?: string; // Ngày bảo dưỡng gần nhất
   notes?: string;
@@ -847,11 +850,13 @@ export interface FacilityEquipment {
 }
 
 export interface CourtStatusItem {
-  id: string;               // SAN-01 .. SAN-08
-  courtNumber: number;      // 1 .. 8
-  name: string;             // Sân 01 (Tiêu chuẩn A), Sân 03 (Trong nhà VIP)...
-  isLocked: boolean;        // true = Đang khóa bảo trì, false = Đang mở
-  lockReason?: string;      // Sửa thảm & đèn, Thay lưới...
+  id: string;               // SAN-CL-01 .. SAN-BD-04
+  courtNumber: number;
+  code?: string;            // CL-01, BC-01, BD-01...
+  sportId?: 'badminton' | 'volleyball' | 'football';
+  name: string;             // Sân CL-01, Sân BC-01...
+  isLocked: boolean;
+  lockReason?: string;
   lockedAt?: string;
   lockedBy?: string;
 }
@@ -868,6 +873,7 @@ export interface IncidentDamageItem {
 }
 
 export interface IncidentTimelineLog {
+  images?: string[];
   id: string;
   time: string;             // 08:00
   title: string;            // Tiếp nhận & chuẩn bị vật tư dán nhiệt
@@ -876,6 +882,18 @@ export interface IncidentTimelineLog {
 }
 
 export interface FacilityIncident {
+  bookingCode?: string;
+  bookingDate?: string;
+  checkoutReference?: string;
+  liability?: 'DO_KHACH_LAM_HONG' | 'BAO_HANH_SAN_VAN_DONG';
+  compensationAmount?: number;
+  compensationPaymentStatus?: 'pending' | 'paid' | 'not_required';
+  compensationPaidAt?: string;
+  deletedAt?: string;
+  compensationItemId?: string;
+  compensationPrice?: number;
+  createdAt?: string;
+  updatedAt?: string;
   id: string;               // SC-2024-8921 / SC-8921
   courtId?: string;
   courtName: string;        // Sân 03 (Trong nhà VIP)
@@ -902,14 +920,23 @@ export interface FacilityIncident {
 }
 
 export const INITIAL_COURT_STATUSES: CourtStatusItem[] = [
-  { id: 'SAN-01', courtNumber: 1, name: 'Sân 01 (Tiêu chuẩn A)', isLocked: false },
-  { id: 'SAN-02', courtNumber: 2, name: 'Sân 02 (Tiêu chuẩn A)', isLocked: false },
-  { id: 'SAN-03', courtNumber: 3, name: 'Sân 03 (Trong nhà VIP)', isLocked: true, lockReason: 'Sửa thảm & đèn', lockedAt: '14:20 Hôm nay', lockedBy: 'Nguyễn Văn An' },
-  { id: 'SAN-04', courtNumber: 4, name: 'Sân 04 (Tiêu chuẩn B)', isLocked: false },
-  { id: 'SAN-05', courtNumber: 5, name: 'Sân 05 (Tiêu chuẩn B)', isLocked: false },
-  { id: 'SAN-06', courtNumber: 6, name: 'Sân 06 (Tiêu chuẩn B)', isLocked: false },
-  { id: 'SAN-07', courtNumber: 7, name: 'Sân 07 (Tiêu chuẩn A)', isLocked: false },
-  { id: 'SAN-08', courtNumber: 8, name: 'Sân 08 (Tiêu chuẩn A)', isLocked: false },
+  // Cầu lông
+  { id: 'SAN-CL-01', courtNumber: 1, code: 'CL-01', sportId: 'badminton', name: 'Sân CL-01', isLocked: false },
+  { id: 'SAN-CL-02', courtNumber: 2, code: 'CL-02', sportId: 'badminton', name: 'Sân CL-02', isLocked: false },
+  { id: 'SAN-CL-03', courtNumber: 3, code: 'CL-03', sportId: 'badminton', name: 'Sân CL-03', isLocked: true, lockReason: 'Hư lưới', lockedAt: '14:20 Hôm nay', lockedBy: 'Nguyễn Văn An' },
+  { id: 'SAN-CL-04', courtNumber: 4, code: 'CL-04', sportId: 'badminton', name: 'Sân CL-04', isLocked: false },
+  { id: 'SAN-CL-05', courtNumber: 5, code: 'CL-05', sportId: 'badminton', name: 'Sân CL-05', isLocked: false },
+  // Bóng chuyền
+  { id: 'SAN-BC-01', courtNumber: 1, code: 'BC-01', sportId: 'volleyball', name: 'Sân BC-01', isLocked: false },
+  { id: 'SAN-BC-02', courtNumber: 2, code: 'BC-02', sportId: 'volleyball', name: 'Sân BC-02', isLocked: false },
+  { id: 'SAN-BC-03', courtNumber: 3, code: 'BC-03', sportId: 'volleyball', name: 'Sân BC-03', isLocked: false },
+  { id: 'SAN-BC-04', courtNumber: 4, code: 'BC-04', sportId: 'volleyball', name: 'Sân BC-04', isLocked: false },
+  { id: 'SAN-BC-05', courtNumber: 5, code: 'BC-05', sportId: 'volleyball', name: 'Sân BC-05', isLocked: false },
+  // Bóng đá mini
+  { id: 'SAN-BD-01', courtNumber: 1, code: 'BĐ-01', sportId: 'football', name: 'Sân BĐ-01', isLocked: false },
+  { id: 'SAN-BD-02', courtNumber: 2, code: 'BĐ-02', sportId: 'football', name: 'Sân BĐ-02', isLocked: false },
+  { id: 'SAN-BD-03', courtNumber: 3, code: 'BĐ-03', sportId: 'football', name: 'Sân BĐ-03', isLocked: false },
+  { id: 'SAN-BD-04', courtNumber: 4, code: 'BĐ-04', sportId: 'football', name: 'Sân BĐ-04', isLocked: false },
 ];
 
 export const INITIAL_EQUIPMENT: FacilityEquipment[] = [
@@ -1563,137 +1590,49 @@ export const INITIAL_EQUIPMENT: FacilityEquipment[] = [
 export const INITIAL_INCIDENTS: FacilityIncident[] = [
   {
     id: 'SC-8921',
-    courtId: 'SAN-03',
-    courtName: 'Sân 03 (Trong nhà VIP)',
-    courtZone: 'Khu A',
-    courtSubtype: 'Sân Cầu Lông Tiêu Chuẩn Quốc Tế',
+    courtId: 'SAN-CL-03',
+    courtName: 'Sân CL-03',
+    courtZone: 'Khu Cầu Lông',
+    courtSubtype: 'Sân Cầu Lông Tiêu Chuẩn',
     isCourtLocked: true,
-    equipmentCode: 'MATB-02',
-    equipmentName: 'Thảm sàn Vinyl BWF 4.5mm',
-    title: 'Sân 03 - Thảm Vinyl bong mép dán & Đèn LED Line 2 chập chờn',
-    description: 'Đã điều kỹ thuật viên xử lý keo nóng và kiểm tra tụ điện trần Line 2 để bảo đảm an toàn cho các hiệp đấu tối.',
-    severity: 'khan_cap',
-    severityLabel: 'Khẩn cấp',
-    status: 'dang_sua_chua',
-    statusLabel: 'Đang sửa chữa',
-    reportedAt: '07:15 • 24/10/2024',
+    equipmentCode: 'MATB-01',
+    equipmentName: 'Lưới thi đấu cầu lông',
+    title: 'Sân CL-03 - Lưới cầu lông bị hư hỏng',
+    description: 'Lưới thi đấu bị đứt dây căng góc trái, độ căng giảm không đạt tiêu chuẩn thi đấu. Đã khóa sân và chuẩn bị xuất kho lưới dự phòng.',
+    severity: 'trung_binh',
+    severityLabel: 'Trung bình',
+    status: 'cho_xu_ly',
+    statusLabel: 'Chờ xử lý',
+    reportedAt: '07:15 • Hôm nay',
     reporterName: 'Nguyễn Văn An',
     reporterRole: 'Nhân viên trực ca 1 • 05:00 - 11:00',
     reporterPhone: '0912.345.678',
     damageItems: [
       {
         id: 'DM-01',
-        equipmentCode: 'MATB-02',
-        title: 'Thảm Vinyl chuyên dụng 5 lớp',
-        riskBadge: 'Nguy cơ cao',
-        riskColor: 'rose',
-        description: 'Bong mép dán 40cm khu vực góc giao bóng bên phải. Gờ cong vênh 1.5cm có thể gây vấp ngã hoặc rách dây chằng khi vận động viên di chuyển phanh gấp.',
-        imageLabel: 'Hiện trường góc giao bóng',
-        imageUrl: '/images/court_vinyl_damage.jpg'
-      },
-      {
-        id: 'DM-02',
-        equipmentCode: 'MATB-08',
-        title: 'Hệ đèn LED 1000 Lux Line 2',
-        riskBadge: 'Cần căn chỉnh',
-        riskColor: 'blue',
-        description: 'Nhấp nháy chập chờn do lỏng giắc cắm nguồn trần trên giàn đỡ số 2, gây chói mắt và không đủ chuẩn độ rọi tổ chức thi đấu.',
-        imageLabel: 'Mô-đun đèn LED nhấp nháy',
-        imageUrl: '/images/court_led_lights.jpg'
+        equipmentCode: 'MATB-01',
+        title: 'Lưới thi đấu cầu lông',
+        riskBadge: 'Cần thay thế',
+        riskColor: 'amber',
+        description: 'Dây căng góc trái bị đứt, độ căng lưới giảm xuống 40%. Không đạt tiêu chuẩn BWF.',
+        imageLabel: 'Dây căng lưới bị đứt'
       }
     ],
     timelineLogs: [
       {
         id: 'TL-01',
-        time: '08:00',
-        title: 'Tiếp nhận & chuẩn bị vật tư dán nhiệt',
-        description: 'Kỹ thuật viên Trần Minh Tuấn nhận điều động, mang bộ kích nhiệt keo chuyên dụng và thang thủy lực kiểm tra giắc nguồn.',
+        time: '07:20',
+        title: 'Khóa sân & báo sự cố',
+        description: 'Nguyễn Văn An phát hiện lưới hư khi kiểm tra ca sáng. Đã khóa Sân CL-03 và báo cho quản lý.',
         active: true
       },
       {
         id: 'TL-02',
-        time: '07:20',
-        title: 'Khóa sân tự động & Phát cảnh báo',
-        description: 'Hệ thống Master Lock kích hoạt đóng Sân 03. Gửi thông báo khẩn qua kênh điều phối Arena Admin.'
-      },
-      {
-        id: 'TL-03',
         time: '07:15',
-        title: 'Ghi nhận biên bản sự cố',
-        description: 'Nguyễn Văn An kiểm tra ca sáng phát hiện sự cố bong sàn và chập giắc điện sau đợt dọn sân sớm.'
+        title: 'Phát hiện sự cố',
+        description: 'Kiểm tra trang thiết bị đầu ca phát hiện lưới thi đấu bị hỏng.'
       }
     ],
-    technicianNote: 'Đã hoàn thành 60% dán mép thảm, đang kiểm tra nguồn điện dàn đèn.'
-  },
-  {
-    id: 'SC-8919',
-    courtId: 'SAN-02',
-    courtName: 'Sân 02 (Tiêu chuẩn A)',
-    courtZone: 'Khu A',
-    courtSubtype: 'Sân Cầu Lông Tiêu Chuẩn',
-    isCourtLocked: false,
-    equipmentCode: 'MATB-01',
-    equipmentName: 'Lưới thi đấu Yonex Pro',
-    title: 'Sân 02 - Lưới Yonex bị đứt dây căng góc trái',
-    description: 'Dây thép định vị bị tưa sau trận bán kết. Đã xuất kho lưới dự phòng sẵn sàng thay thế trước 17:00.',
-    severity: 'trung_binh',
-    severityLabel: 'Trung bình',
-    status: 'cho_xu_ly',
-    statusLabel: 'Chờ xử lý',
-    reportedAt: '09:15 Hôm qua',
-    reporterName: 'Trần Quốc Bảo',
-    reporterRole: 'Nhân viên trực ca 2 • 11:00 - 17:00',
-    reporterPhone: '0988.112.233',
-    damageItems: [
-      {
-        id: 'DM-03',
-        equipmentCode: 'MATB-01',
-        title: 'Bộ căng dây cáp lưới Yonex',
-        riskBadge: 'Cần căn chỉnh',
-        riskColor: 'amber',
-        description: 'Dây cáp bọc nhựa bị xước đứt 3 tao cáp bên cọc số 1, độ căng giảm còn 65%.',
-        imageLabel: 'Góc căng cáp cọc số 1'
-      }
-    ],
-    timelineLogs: [
-      {
-        id: 'TL-04',
-        time: '09:15',
-        title: 'Ghi nhận sự cố lưới',
-        description: 'Trần Quốc Bảo báo cáo cáp lưới trùng sau séc 3 giải phong trào.',
-        active: true
-      }
-    ],
-    technicianNote: 'Đã xuất kho lưới dự phòng MATB-06 để chuẩn bị căng thay thế.'
-  },
-  {
-    id: 'SC-8915',
-    courtId: 'SAN-04',
-    courtName: 'Sân 04 (Tiêu chuẩn B)',
-    courtZone: 'Khu B',
-    courtSubtype: 'Sân Tập Luyện',
-    isCourtLocked: false,
-    equipmentCode: 'MATB-03',
-    equipmentName: 'Bảng điểm lật tay kim loại',
-    title: 'Sân 04 - Bảng điểm lật tay bị kẹt chốt lật số 7',
-    description: 'Chốt số 7 bị rít do khô dầu. Kỹ thuật viên đã tra dầu mỡ bôi trơn và kiểm tra lật thử bình thường.',
-    severity: 'thap',
-    severityLabel: 'Thấp',
-    status: 'da_khac_phuc',
-    statusLabel: 'Đã khắc phục',
-    reportedAt: '10:00 2 ngày trước',
-    reporterName: 'Lê Thị Mai',
-    reporterRole: 'Nhân viên phụ trách ca sáng',
-    reporterPhone: '0903.456.789',
-    timelineLogs: [
-      {
-        id: 'TL-05',
-        time: '10:30',
-        title: 'Đã nghiệm thu & kiểm tra lật số',
-        description: 'Đã bôi trơn và kiểm tra lật mượt mà các số từ 00 đến 30.',
-        active: true
-      }
-    ],
-    technicianNote: 'Đã vệ sinh và tra mỡ bôi trơn chốt xoay, hoạt động hoàn hảo.'
+    technicianNote: 'Đang chờ xuất kho lưới dự phòng để thay thế.'
   }
 ];
