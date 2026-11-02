@@ -79,7 +79,7 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
   const [cancelReviewBooking, setCancelReviewBooking] = useState<BookingDetail | null>(null);
   const [showPendingCancelList, setShowPendingCancelList] = useState(false);
   const [cancelReviewBackTarget, setCancelReviewBackTarget] = useState<'timeline' | 'pendingList'>('timeline');
-  const [cancelReason, setCancelReason] = useState('Khách bận đột xuất công tác liên tỉnh, gọi báo xin hủy ca tối nay.');
+  const [cancelReason, setCancelReason] = useState('Khách bận đột xuất công tác liên tỉnh, gọi báo xin hủy lịch đặt sân tối nay.');
   
   // State for Court Transfer (Phương án 1: Điều chuyển sân trống cùng loại khi có sự cố)
   const [transferBooking, setTransferBooking] = useState<BookingDetail | null>(null);
@@ -866,7 +866,7 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
                     <span className="text-[10px] font-black text-slate-500">Ghi nhận: 14:15</span>
                   </div>
                   <p className="rounded-lg bg-indigo-50 p-3 text-[12px] italic leading-relaxed text-slate-700">
-                    “Khách bận đột xuất công tác liên tỉnh, gọi báo xin hủy ca tối nay.”
+                    “Khách bận đột xuất công tác liên tỉnh, gọi báo xin hủy lịch đặt sân tối nay.”
                   </p>
                 </div>
               </button>
@@ -1076,7 +1076,7 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
 
   if (cancelBooking) {
     const reasonOptions = [
-      { label: 'Khách bận đột xuất', icon: Zap, value: 'Khách bận đột xuất công tác liên tỉnh, gọi báo xin hủy ca tối nay.' },
+      { label: 'Khách bận đột xuất', icon: Zap, value: 'Khách bận đột xuất công tác liên tỉnh, gọi báo xin hủy lịch đặt sân tối nay.' },
       { label: 'Thời tiết/Sức khỏe', icon: Cloud, value: 'Lý do thời tiết/sức khỏe thành viên không đảm bảo, khách xin hủy lịch.' },
       { label: 'Trùng lịch thi đấu', icon: CalendarClock, value: 'Trùng lịch thi đấu giải công ty, khách xin dời lịch.' },
     ];
@@ -1097,7 +1097,7 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
         </button>
 
         <div className="mb-3 flex items-center justify-between gap-2">
-          <h2 className="min-w-0 text-[17px] font-black uppercase tracking-tight text-slate-950">Yêu cầu hủy ca</h2>
+          <h2 className="min-w-0 text-[17px] font-black uppercase tracking-tight text-slate-950">Hủy lịch đặt sân</h2>
           <span className="shrink-0 rounded-full bg-slate-200 px-2.5 py-1 text-[10px] font-black text-slate-600">
             Mã đặt: {cancelBooking.code}
           </span>

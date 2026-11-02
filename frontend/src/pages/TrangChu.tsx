@@ -294,7 +294,7 @@ export default function TrangChu() {
 
   const [otpInput, setOtpInput] = useState<string>('');
   const [otpError, setOtpError] = useState<boolean>(false);
-  const [otpAction, setOtpAction] = useState<'booking' | 'lookup'>('booking');
+  const [otpAction, setOtpAction] = useState<'booking' | 'lookup' | 'cancel'>('booking');
   const [bookingOtp, setBookingOtp] = useState<string>('123456');
   const [otpPhone, setOtpPhone] = useState<string>('');
   const [popup, setPopup] = useState<any>(null);
@@ -307,6 +307,7 @@ export default function TrangChu() {
   const [pendingLookupResults, setPendingLookupResults] = useState<any[]>([]);
   const [hasSearched, setHasSearched] = useState<boolean>(false);
   const [cancelConfirmation, setCancelConfirmation] = useState<any>(null);
+  const [pendingCancelTicket, setPendingCancelTicket] = useState<any>(null);
 
   // Tự động tắt popup thông báo hủy thành công sau 3.5 giây
   useEffect(() => {
@@ -878,6 +879,17 @@ export default function TrangChu() {
         return;
       }
 
+      if (otpAction === 'cancel') {
+        if (pendingCancelTicket) {
+          const ticket = pendingCancelTicket;
+          const isEligible = (ticket.hoursUntilStart ?? 0) >= 24;
+          setPendingCancelTicket(null);
+          setOtpAction('booking');
+          completeCancellation(ticket, isEligible);
+        }
+        return;
+      }
+
       setShowPayment(true);
     } else {
       setOtpError(true);
@@ -923,23 +935,31 @@ export default function TrangChu() {
     const phone = query.replace(/[\s().-]/g, '');
     if (/^\d{9,11}$/.test(phone)) {
       const matches = demoBookings.filter((booking) => booking.phone.replace(/\D/g, '') === phone);
-      const newOtp = Math.floor(100000 + Math.random() * 900000).toString();
-      setBookingOtp(newOtp);
-      setOtpPhone(phone);
-      setPendingLookupResults(matches);
-      setLookupResults([]);
-      setHasSearched(false);
-      setOtpAction('lookup');
-      setOtpInput('');
-      setOtpError(false);
-      setShowOTP(true);
+      setLookupResults(matches);
+      setHasSearched(true);
       return;
     }
 
     const bookingCode = query.replace(/^#/, '').toUpperCase();
-    const match = demoBookings.find((booking) => booking.code === bookingCode);
-    setLookupResults(match ? [match] : []);
+    const matches = demoBookings.filter((booking) =>
+      booking.code.toUpperCase() === bookingCode ||
+      booking.code.toUpperCase().replace(/[^A-Z0-9]/g, '') === bookingCode.replace(/[^A-Z0-9]/g, '')
+    );
+    setLookupResults(matches);
     setHasSearched(true);
+  };
+
+  const handleProceedCancelWithOTP = (ticket: any) => {
+    setCancelConfirmation(null);
+    setPendingCancelTicket(ticket);
+    const targetPhone = ticket.phone || '0912345678';
+    const newOtp = Math.floor(100000 + Math.random() * 900000).toString();
+    setBookingOtp(newOtp);
+    setOtpPhone(targetPhone);
+    setOtpAction('cancel');
+    setOtpInput('');
+    setOtpError(false);
+    setShowOTP(true);
   };
 
   const handleCancelTicket = (ticket: any) => {
@@ -2112,12 +2132,44 @@ export default function TrangChu() {
             </div>
 
             <h3 className="text-lg font-black text-slate-900 uppercase tracking-wide">
-              {otpAction === 'lookup' ? 'Xác thực tra cứu' : 'Xác thực OTP'}
+              {otpAction === 'lookup'
+                ? 'Xác thực tra cứu'
+                : otpAction === 'cancel'
+                  ? 'Xác thực hủy đặt sân'
+                  : 'Xác thực OTP'}
             </h3>
             <p className="text-xs text-slate-500 mt-1 mb-4 text-center">
-              Vui lòng nhập mã gồm 6 chữ số được gửi đến số điện thoại <br />
-              <strong className="text-slate-800">{otpPhone}</strong>
+              {otpAction === 'cancel' ? (
+                <>
+                  Vui lòng nhập mã OTP gồm 6 chữ số gửi về số điện thoại <br />
+                  <strong className="text-slate-800">{otpPhone}</strong> để xác nhận hủy vé
+                </>
+              ) : (
+                <>
+                  Vui lòng nhập mã gồm 6 chữ số được gửi đến số điện thoại <br />
+                  <strong className="text-slate-800">{otpPhone}</strong>
+                </>
+              )}
             </p>
+
+            {otpAction === 'cancel' && pendingCancelTicket && (
+              <div className="w-full mb-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 text-center text-xs space-y-1">
+                <div className="flex items-center justify-between text-slate-600">
+                  <span>Mã đơn:</span>
+                  <span className="font-mono font-bold text-slate-900">{pendingCancelTicket.code}</span>
+                </div>
+                <div className="flex items-center justify-between text-slate-600">
+                  <span>Sân:</span>
+                  <span className="font-bold text-slate-800">{pendingCancelTicket.court}</span>
+                </div>
+                <div className="flex items-center justify-between pt-1 border-t border-slate-200">
+                  <span>Hoàn tiền:</span>
+                  <span className={`font-black ${((pendingCancelTicket.hoursUntilStart ?? 0) >= 24) ? 'text-emerald-600' : 'text-red-500'}`}>
+                    {((pendingCancelTicket.hoursUntilStart ?? 0) >= 24) ? `${pendingCancelTicket.total} (Hoàn 100%)` : '0đ (Hủy dưới 24h)'}
+                  </span>
+                </div>
+              </div>
+            )}
 
             <div className="w-full space-y-4">
               <div>
@@ -2147,6 +2199,9 @@ export default function TrangChu() {
                     setOtpError(false);
                     if (otpAction === 'lookup') {
                       setPendingLookupResults([]);
+                      setOtpAction('booking');
+                    } else if (otpAction === 'cancel') {
+                      setPendingCancelTicket(null);
                       setOtpAction('booking');
                     } else {
                       setShowBookingPopup(true);
@@ -2742,7 +2797,7 @@ export default function TrangChu() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => completeCancellation(cancelConfirmation, isEligible)}
+                  onClick={() => handleProceedCancelWithOTP(cancelConfirmation)}
                   className={`rounded-xl py-2.5 text-xs font-bold text-white active:scale-95 transition cursor-pointer shadow-sm ${isEligible
                       ? 'bg-emerald-600 hover:bg-emerald-700'
                       : 'bg-red-600 hover:bg-red-700'
