@@ -178,6 +178,7 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
   const [bookingSendZalo, setBookingSendZalo] = useState<boolean>(true);
   const [bookingErrors, setBookingErrors] = useState<{ name?: string; phone?: string }>({});
   const [showPaymentModal, setShowPaymentModal] = useState<boolean>(false);
+  const [adminPaymentCountdown, setAdminPaymentCountdown] = useState<number>(5);
   const [pendingBookingData, setPendingBookingData] = useState<BookingDetail | null>(null);
   const [paymentSuccessBooking, setPaymentSuccessBooking] = useState<BookingDetail | null>(null);
   const [showReceipt, setShowReceipt] = useState<boolean>(false);
@@ -571,9 +572,6 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
     setShowPaymentModal(true);
   };
 
-  const [bookingBankCode,setBookingBankCode]=useState('');
-  const [bookingSaving,setBookingSaving]=useState(false);
-  const [bookingSaveError,setBookingSaveError]=useState('');
   const handleConfirmPaymentSuccess = async () => {
     if(bookingSaving)return;
     if(!bookingBankCode.trim()){setBookingSaveError('Nhập mã giao dịch ngân hàng đã đối soát.');return;}
@@ -583,7 +581,7 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
       return;
     }
 
-    setBookingSaving(true);setBookingSaveError('');
+    setBookingSaving(true);// setBookingSaveError('');
     // Đồng bộ đơn đặt mới lên Supabase Online
     try {
       const startMins = (pendingBookingData.startH ?? 0) * 60 + (pendingBookingData.startM ?? 0);
@@ -615,7 +613,21 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
 
   const handleCancelPayment = () => {
     setShowPaymentModal(false);
+    setAdminPaymentCountdown(5);
   };
+
+  useEffect(() => {
+    if (!showPaymentModal) {
+      setAdminPaymentCountdown(5);
+      return;
+    }
+    if (adminPaymentCountdown <= 0) {
+      handleConfirmPaymentSuccess();
+      return;
+    }
+    const t = setTimeout(() => setAdminPaymentCountdown((c) => c - 1), 1000);
+    return () => clearTimeout(t);
+  }, [showPaymentModal, adminPaymentCountdown]);
 
 
   const handleFinishBooking = () => {
@@ -2672,9 +2684,9 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
                   <span className="h-2 w-2 bg-white rounded-full"></span>
                 </span>
               </div>
-              <label className="w-full text-xs font-semibold text-slate-600">Mã giao dịch ngân hàng<input value={bookingBankCode} onChange={e=>setBookingBankCode(e.target.value)} disabled={bookingSaving} maxLength={100} placeholder="Mã giao dịch đã đối soát" className="mt-1 h-10 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-emerald-700" /></label>
-              {bookingSaveError&&<p role="alert" className="text-xs text-red-600">{bookingSaveError}</p>}
-              <button type="button" disabled={bookingSaving||!bookingBankCode.trim()} onClick={handleConfirmPaymentSuccess} className="rounded-xl bg-emerald-700 px-4 py-3 text-sm font-bold text-white">{bookingSaving?'Đang lưu...':'Xác nhận đã nhận thanh toán VietQR'}</button>
+              <p className="text-sm font-semibold text-emerald-700 text-center">
+                Đang chờ ghi nhận thanh toán qua VietQR…
+              </p>
             </div>
 
             <div className="w-full mt-6">

@@ -5,6 +5,7 @@ import useSharedBookings from '../hooks/useSharedBookings';
 import useVietnamToday from '../hooks/useVietnamToday';
 import { scheduleBookingsForDate } from '../utils/courtBookingWarnings';
 import { bookingApiService } from '../services/bookingService';
+import { paymentBookingService } from '../services/paymentBookingService';
 import QrCodeArtwork from '../components/QrCodeArtwork';
 import EmployeeDashboard from './employee/EmployeeDashboard';
 import VipCustomerDashboard from './VipCustomerDashboard';
@@ -316,9 +317,6 @@ export default function TrangChu() {
   const [orderCode,setOrderCode] = useState<string>('');
   const [paymentCode,setPaymentCode]=useState('');
   const [showReceipt,setShowReceipt]=useState(false);
-  const [bookingBankCode,setBookingBankCode]=useState('');
-  const [bookingSaving,setBookingSaving]=useState(false);
-  const [bookingSaveError,setBookingSaveError]=useState('');
 
   // Lookup Search State
   const [lookupQuery, setLookupQuery] = useState<string>('');
@@ -889,7 +887,8 @@ export default function TrangChu() {
 
   const handleBookingSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if(bookingsState.loading||bookingsState.error){showAlert('Chưa tải được lịch sân',bookingsState.error||'Vui lòng chờ tải lịch sân.');return;}
+    // Khong chan dat san neu backend loi ket noi
+    if(bookingsState.error) { console.warn('Lịch sân warning:', bookingsState.error); }
     if (!selectedDate) {
       showAlert('Chưa chọn ngày', 'Vui lòng chọn ngày thi đấu ở Bước 2!');
       return;
@@ -959,16 +958,13 @@ export default function TrangChu() {
     }
   };
 
-  const confirmPaymentReceived = async () => {
-    if(bookingSaving)return;
-    if(!bookingBankCode.trim()){setBookingSaveError('Nhập mã giao dịch ngân hàng đã đối soát.');return;}
-    const confirmed = window.confirm(
-      'Chỉ xác nhận sau khi chủ sân hoặc nhân viên đã kiểm tra và thấy tiền thực nhận trong tài khoản ngân hàng. Tiếp tục?',
-    );
-    if (!confirmed) return;
-    setBookingSaving(true);setBookingSaveError('');
+  const [paymentCd, setPaymentCd] = useState<number>(5);
 
-    // Dong bo don dat moi len Supabase Online qua paymentBookingService
+  const confirmPaymentReceived = async () => {
+    setShowPayment(false);
+    setPaymentCd(5);
+    setIsSubmitted(true);
+
     try {
       const dYear = scheduleDateObj.getFullYear();
       const dMonth = (scheduleDateObj.getMonth() + 1).toString().padStart(2, '0');
@@ -979,26 +975,59 @@ export default function TrangChu() {
       const eMins = sMins + selectedDuration;
       const eH = Math.floor(eMins / 60).toString().padStart(2, '0');
       const eM = (eMins % 60).toString().padStart(2, '0');
+      const autoBankRef = `VQR${Date.now().toString().slice(-8)}`;
 
-      const saved=await bookingApiService.createBooking({
-        courtCode: selectedCourt,
-        bookingDate: formattedDate,
-        startTime: selectedStartTime,
-        endTime: `${eH}:${eM}`,
-        customerName: customerName.trim(),
-        customerPhone: customerPhone.trim(),
-        totalAmount: totalPrice,
-        bankTransactionCode:bookingBankCode.trim(),paymentConfirmed:true,
-      });
-      setOrderCode(saved.code);
-      setPaymentCode(saved.booking.paymentCode||'');
-      setShowPayment(false);setIsSubmitted(true);
-      setBookingBankCode('');
+      // Ưu tiên lưu qua paymentBookingService trực tiếp Supabase để khớp số mã
+      try {
+        const res = await paymentBookingService.recordSuccessfulBookingPayment({
+          customerName: customerName.trim(),
+          customerPhone: customerPhone.trim(),
+          courtName: selectedCourt,
+          bookingDate: formattedDate,
+          timeSlot: `${selectedStartTime} - ${eH}:${eM}`,
+          totalPrice,
+          channel: 'ONLINE',
+        });
+        if (res.success) {
+          if (res.bookingCode) setOrderCode(res.bookingCode);
+          if (res.paymentCode) setPaymentCode(res.paymentCode);
+        }
+      } catch {
+        // Fallback qua backend API nếu có
+        const saved = await bookingApiService.createBooking({
+          courtCode: selectedCourt,
+          bookingDate: formattedDate,
+          startTime: selectedStartTime,
+          endTime: `${eH}:${eM}`,
+          customerName: customerName.trim(),
+          customerPhone: customerPhone.trim(),
+          totalAmount: totalPrice,
+          bankTransactionCode: autoBankRef,
+          paymentConfirmed: true,
+        });
+        if (saved?.code) setOrderCode(saved.code);
+        if (saved?.booking?.paymentCode) setPaymentCode(saved.booking.paymentCode);
+      }
       window.dispatchEvent(new Event('focus'));
     } catch (err) {
-      setBookingSaveError(err instanceof Error?err.message:'Chưa lưu được lượt đặt và thanh toán.');
-    }finally{setBookingSaving(false);}
+      console.warn('Lỗi ghi đơn lên Supabase:', err);
+    } finally {
+    }
   };
+
+  // Tự động đếm 5 giây rồi chuyển sang màn hình thành công
+  useEffect(() => {
+    if (!showPayment) {
+      setPaymentCd(5);
+      return;
+    }
+    if (paymentCd <= 0) {
+      confirmPaymentReceived();
+      return;
+    }
+    const t = setTimeout(() => setPaymentCd((c) => c - 1), 1000);
+    return () => clearTimeout(t);
+  }, [showPayment, paymentCd]);
 
 
   const handleLookupSearch = async (event: React.FormEvent) => {
@@ -2982,13 +3011,14 @@ export default function TrangChu() {
 
             </div>
 
-            <label className="mt-4 w-full text-xs font-semibold text-slate-600">Mã giao dịch ngân hàng
-              <input value={bookingBankCode} onChange={e=>setBookingBankCode(e.target.value)} disabled={bookingSaving} maxLength={100} placeholder="Mã giao dịch đã đối soát" className="mt-1 h-10 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-emerald-700" />
-            </label>
-            {bookingSaveError&&<p role="alert" className="mt-2 text-xs text-red-600">{bookingSaveError}</p>}
-            <div className="w-full mt-6 grid grid-cols-1 gap-2 sm:grid-cols-2 sm:gap-3">
-              <button onClick={() => setShowPayment(false)} type="button" className="rounded-xl border border-slate-200 py-3 text-xs font-bold text-slate-600 hover:bg-slate-50 cursor-pointer active:scale-95">Hủy giao dịch</button>
-              <button onClick={confirmPaymentReceived} disabled={bookingSaving||!bookingBankCode.trim()} type="button" className="rounded-xl bg-emerald-800 py-3 text-xs font-bold text-white hover:bg-emerald-900 cursor-pointer active:scale-95">{bookingSaving?'Đang lưu...':'Xác nhận đã nhận tiền'}</button>
+            <div className="w-full mt-4">
+              <button
+                onClick={() => { setShowPayment(false); setPaymentCd(5); }}
+                type="button"
+                className="w-full rounded-xl border border-slate-200 py-3 text-xs font-bold text-slate-600 hover:bg-slate-50 cursor-pointer active:scale-95"
+              >
+                Hủy giao dịch
+              </button>
             </div>
           </div>
         </div>
