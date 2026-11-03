@@ -1,5 +1,5 @@
-import useCompleteCheckout from '../hooks/useCompleteCheckout';
-import { useStoredIncidents, mergeIncidents, writeIncidentSnapshot, type IncidentReporter } from '../utils/incidentStorage';
+import type { IncidentReporter } from '../utils/incidentStorage';
+import useFacilityOperations from '../hooks/useFacilityOperations';
 import { useState, useEffect } from 'react';
 import {
   Menu,
@@ -21,12 +21,9 @@ import StaffDetailView from '../components/admin/StaffDetailView';
 import EditStaffView from '../components/admin/EditStaffView';
 import WalletRevenueView from '../components/admin/WalletRevenueView';
 import FacilityManagementView from '../components/admin/FacilityManagementView';
-import useCourtAvailability from '../hooks/useCourtAvailability';
-import type { Employee, Transaction, FacilityEquipment, FacilityIncident } from '../types/admin';
-import { INITIAL_EMPLOYEES, INITIAL_TRANSACTIONS, INITIAL_EQUIPMENT } from '../types/admin';
+import type { Employee, Transaction } from '../types/admin';
+import { INITIAL_EMPLOYEES, INITIAL_TRANSACTIONS } from '../types/admin';
 import { employeeApiService } from '../services/employeeService';
-import { facilityApiService, FacilitySaveError } from '../services/facilityService';
-import { saveLocalEquipment, withLocalEquipment } from '../utils/localEquipment';
 
 export default function AdminDashboard({ onLogout, currentUser }: { onLogout: () => void; currentUser: IncidentReporter }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -35,9 +32,6 @@ export default function AdminDashboard({ onLogout, currentUser }: { onLogout: ()
   const [activeTab, setActiveTab] = useState<'lich_san' | 'nhan_vien' | 'vi_thu' | 'co_so_vat_chat'>('lich_san');
   const [employees, setEmployees] = useState<Employee[]>(INITIAL_EMPLOYEES);
   const [transactions, setTransactions] = useState<Transaction[]>(INITIAL_TRANSACTIONS);
-  const [equipments, setEquipments] = useState<FacilityEquipment[]>(() => withLocalEquipment(INITIAL_EQUIPMENT));
-  const [courtStatuses, setCourtStatuses] = useCourtAvailability();
-  const [incidents, setIncidents] = useStoredIncidents();
   const [staffSubView, setStaffSubView] = useState<'list' | 'add' | 'detail' | 'edit'>('list');
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
 
@@ -58,32 +52,12 @@ export default function AdminDashboard({ onLogout, currentUser }: { onLogout: ()
   // State for backend connectivity status
   const [isBackendOnline, setIsBackendOnline] = useState<boolean>(false);
 
-  // Load employees, facility data, and shifts from backend API on mount
   useEffect(() => {
-    let isMounted = true;
-    const loadInitialData = async () => {
-      try {
-        const [empRes, facRes] = await Promise.all([
-          employeeApiService.getEmployees(),
-          facilityApiService.loadAllFacilityData(),
-        ]);
-        if (isMounted) {
-          setEmployees(empRes.employees);
-          setIsBackendOnline(empRes.isBackendOnline || facRes.isBackendOnline);
-          if (facRes.isBackendOnline) {
-            setEquipments(withLocalEquipment(facRes.equipments));
-            setCourtStatuses(facRes.courts);
-            setIncidents(previous => mergeIncidents(facRes.incidents, previous));
-          }
-        }
-      } catch (err) {
-        console.warn('Could not load data from backend, using local state:', err);
-      }
-    };
-    loadInitialData();
-    return () => {
-      isMounted = false;
-    };
+    let mounted = true;
+    employeeApiService.getEmployees().then(result => {
+      if(mounted) setEmployees(result.employees);
+    }).catch(console.error);
+    return () => { mounted = false; };
   }, []);
 
   // Staff handlers connected to backend
@@ -212,265 +186,10 @@ export default function AdminDashboard({ onLogout, currentUser }: { onLogout: ()
     setTransactions(transactions.map(t => t.id === id ? { ...t, status: 'refunded', statusLabel: 'Đã hoàn tiền' } : t));
   };
 
-  // Facility handlers connected to backend
-  const handleAddEquipment = async (newEq: FacilityEquipment) => {
-    try {
-      const created = await facilityApiService.createEquipment(newEq);
-      setEquipments((prev) => [created, ...prev]);
-    } catch (err) {
-      if (err instanceof FacilitySaveError) throw err;
-      console.warn('Backend add equipment failed, adding locally:', err);
-      saveLocalEquipment(newEq);
-      setEquipments((previous) => [newEq, ...previous]);
-    }
-  };
-
-  const handleUpdateEquipmentLocation = async (equipmentCode: string, newLocation: string) => {
-    try {
-      const updated = await facilityApiService.relocateEquipment(equipmentCode, newLocation);
-      setEquipments((prev) => prev.map((eq) => (eq.code === equipmentCode ? updated : eq)));
-    } catch (err) {
-      console.warn('Backend relocate failed, applying locally:', err);
-      setEquipments((prev) =>
-        prev.map((eq) => (eq.code === equipmentCode ? { ...eq, currentLocation: newLocation } : eq))
-      );
-    }
-  };
-
-  const handleToggleCourtLock = async (courtId: string, isLocked: boolean, reason?: string) => {
-    try {
-      const updated = await facilityApiService.toggleCourtLock(courtId, isLocked, reason);
-      setCourtStatuses((prev) => prev.map((c) => (c.id === courtId ? updated : c)));
-    } catch (err) {
-      console.warn('Backend court lock failed, applying locally:', err);
-      setCourtStatuses((prev) =>
-        prev.map((c) =>
-          c.id === courtId
-            ? {
-                ...c,
-                isLocked,
-                lockReason: isLocked ? (reason || 'Bảo trì kỹ thuật') : undefined,
-                lockedAt: isLocked ? 'Vừa xong' : undefined,
-              }
-            : c
-        )
-      );
-    }
-  };
-
-  const completeCheckout = useCompleteCheckout(incidents, setIncidents, equipments, setEquipments);
-
-  const handleDeleteIncident = async (id: string) => {
-    const now = new Date().toISOString();
-    let tombstone: FacilityIncident | undefined;
-    try { tombstone = await facilityApiService.deleteIncident(id); }
-    catch (error) { if (error instanceof FacilitySaveError) throw error; }
-    const next = incidents.map(incident => incident.id === id ? (tombstone || { ...incident, deletedAt: now, updatedAt: now }) : incident);
-    await writeIncidentSnapshot(next);
-    setIncidents(next);
-  };
-
-  const handleSubmitIncident = async (newIncident: FacilityIncident, _lockCourt: boolean) => {
-    try {
-      const res = await facilityApiService.createIncident({
-        ...newIncident,
-        lockCourt: false,
-      });
-      setIncidents((prev) => [res.incident, ...prev]);
-    } catch (err) {
-      console.warn('Backend incident report failed, applying locally:', err);
-      const saved = [newIncident, ...incidents];
-      await writeIncidentSnapshot(saved);
-      setIncidents(saved);
-    }
-  };
-
-  const handleUpdateIncidentStatus = async (
-    incidentId: string,
-    newStatus: 'cho_xu_ly' | 'dang_sua_chua' | 'da_khac_phuc',
-    unlockCourt?: boolean
-  ) => {
-    try {
-      const res = await facilityApiService.updateIncidentStatus(incidentId, newStatus, unlockCourt);
-      setIncidents((prev) => prev.map((i) => (i.id === incidentId ? res.incident : i)));
-      if (res.courtUnlocked) {
-        const targetInc = incidents.find((i) => i.id === incidentId);
-        if (targetInc?.courtId) {
-          setCourtStatuses((prev) =>
-            prev.map((c) => (c.id === targetInc.courtId ? { ...c, isLocked: false } : c))
-          );
-        }
-      }
-    } catch (err) {
-      console.warn('Backend incident update failed, applying locally:', err);
-      setIncidents(
-        incidents.map((i) => {
-          if (i.id === incidentId) {
-            return {
-              ...i,
-              status: newStatus,
-              statusLabel:
-                newStatus === 'da_khac_phuc'
-                  ? 'Đã khắc phục'
-                  : newStatus === 'dang_sua_chua'
-                  ? 'Đang sửa chữa'
-                  : 'Chờ xử lý',
-              isCourtLocked: newStatus !== 'da_khac_phuc' ? i.isCourtLocked : false,
-            };
-          }
-          return i;
-        })
-      );
-      if (unlockCourt) {
-        const targetInc = incidents.find((i) => i.id === incidentId);
-        if (targetInc?.courtId) {
-          handleToggleCourtLock(targetInc.courtId, false);
-        }
-      }
-    }
-  };
-
-  // Trả thiết bị về kho chung khi check-out hoặc điều phối
-  const handleReturnToWarehouse = async (equipmentCode: string) => {
-    try {
-      const updated = await facilityApiService.returnToWarehouse(equipmentCode);
-      setEquipments((prev) => prev.map((eq) => (eq.code === equipmentCode ? updated : eq)));
-    } catch (err) {
-      console.warn('Backend return to warehouse failed, applying locally:', err);
-      setEquipments((prev) =>
-        prev.map((eq) =>
-          eq.code === equipmentCode
-            ? {
-                ...eq,
-                currentLocation: 'Kho chung',
-                status: 'san_sang',
-                statusLabel: 'Sẵn sàng',
-                healthRate: 'Sẵn sàng điều phối',
-                assignedBookingCode: undefined,
-                assignedTimeSlot: undefined,
-                assignedCustomer: undefined,
-                assignedCourt: undefined,
-              }
-            : eq
-        )
-      );
-    }
-  };
-
-  // Ghi nhận ca đặt sân cho thiết bị
-  const handleAssignBookingToEquipment = async (
-    equipmentCode: string,
-    courtName: string,
-    timeSlot: string,
-    bookingCode: string,
-    customerName: string
-  ) => {
-    try {
-      const updated = await facilityApiService.relocateEquipment(equipmentCode, courtName, {
-        bookingCode,
-        timeSlot,
-        customerName,
-      });
-      setEquipments((prev) => prev.map((eq) => (eq.code === equipmentCode ? updated : eq)));
-    } catch (err) {
-      console.warn('Backend assign booking failed, applying locally:', err);
-      setEquipments((prev) =>
-        prev.map((eq) =>
-          eq.code === equipmentCode
-            ? {
-                ...eq,
-                currentLocation: courtName,
-                status: 'dang_su_dung',
-                statusLabel: 'Đang sử dụng',
-                assignedBookingCode: bookingCode || 'BK-8491',
-                assignedTimeSlot: timeSlot || '06:00 - 07:30',
-                assignedCustomer: customerName || 'Khách đặt sân',
-                assignedCourt: courtName,
-              }
-            : eq
-        )
-      );
-    }
-  };
-
-  // Tự động thu hồi thiết bị của sân về Kho chung khi Check-out sân
-
-  const handleAddTimelineLog = async (incidentId: string, title: string, description: string, images: string[] = []) => {
-    const nowTime = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
-    const newLog = {
-      id: `TL-${Date.now()}`,
-      time: nowTime,
-      title,
-      description,
-      images,
-      active: true,
-    };
-    setIncidents((prev) =>
-      prev.map((i) =>
-        i.id === incidentId
-          ? {
-              ...i,
-              timelineLogs: [newLog, ...(i.timelineLogs || []).map((l) => ({ ...l, active: false }))],
-              updatedAt: new Date().toISOString(),
-            }
-          : i
-      )
-    );
-    try {
-      const saved = await facilityApiService.addTimelineLog(incidentId, title, description, images);
-      setIncidents(previous => previous.map(item => item.id === incidentId ? saved : item));
-    } catch (err) {
-      console.warn('Backend timeline log error:', err);
-    }
-  };
-
-  const handleCompleteEquipmentWarranty = async (equipmentCode: string, equipmentName?: string) => {
-    const today = new Date().toLocaleDateString('vi-VN');
-    const formattedDate = `Hôm nay (${today})`;
-
-    // 1. Update equipment locally in AdminDashboard
-    setEquipments((prev) =>
-      prev.map((eq) =>
-        eq.code === equipmentCode
-          ? {
-              ...eq,
-              status: 'san_sang',
-              statusLabel: 'Sẵn sàng',
-              healthRate: 'Tốt (Đã nghiệm thu)',
-              lastMaintenance: formattedDate,
-            }
-          : eq
-      )
-    );
-
-    // 2. Persist to backend
-    try {
-      await facilityApiService.updateEquipment(equipmentCode, {
-        status: 'san_sang',
-        statusLabel: 'Sẵn sàng',
-        healthRate: 'Tốt (Đã nghiệm thu)',
-        lastMaintenance: formattedDate,
-      });
-    } catch (err) {
-      console.warn('Backend equipment update error:', err);
-    }
-
-    // 3. Find related incident and append timeline log
-    const relatedInc =
-      incidents.find(
-        (i) =>
-          i.equipmentCode === equipmentCode ||
-          i.damageItems?.some((d) => d.equipmentCode === equipmentCode)
-      ) || incidents[0];
-
-    if (relatedInc) {
-      const logTitle = `Nghiệm thu thiết bị [${equipmentCode}]`;
-      const logDesc = `Đã nghiệm thu thiết bị ${equipmentName ? `${equipmentName} (${equipmentCode})` : equipmentCode}. Thiết bị chuyển sang trạng thái Sẵn sàng.`;
-      await handleAddTimelineLog(relatedInc.id, logTitle, logDesc);
-    }
-  };
-
-
+  const {equipments, incidents, courtStatuses, facilityError, refreshFacility, completeCheckout,
+    handleAddEquipment, handleUpdateEquipmentLocation, handleToggleCourtLock, handleDeleteIncident,
+    handleSubmitIncident, handleUpdateIncidentStatus, handleReturnToWarehouse,
+    handleAssignBookingToEquipment, handleAddTimelineLog, handleCompleteEquipmentWarranty} = useFacilityOperations();
 
   return (
     <div data-admin-dashboard="true" className="flex h-screen bg-slate-50 text-slate-900 w-full animate-in fade-in zoom-in-95 duration-300 relative overflow-hidden">
@@ -525,6 +244,7 @@ export default function AdminDashboard({ onLogout, currentUser }: { onLogout: ()
       )}
 
       <div className="flex-1 flex flex-col w-full h-full overflow-hidden">
+        {facilityError && <div role="alert" className="m-3 rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-700">{facilityError}<button type="button" onClick={()=>void refreshFacility()} className="ml-2 font-bold underline">Thử lại</button></div>}
         <header className="h-12 bg-white border-b border-slate-200 flex items-center justify-between px-2 shrink-0 z-30 shadow-sm relative">
           <div className="flex items-center gap-2">
             <button onClick={() => setSidebarOpen(true)} className="w-10 h-10 flex items-center justify-center text-emerald-700 active:scale-95 bg-emerald-50 rounded-lg">

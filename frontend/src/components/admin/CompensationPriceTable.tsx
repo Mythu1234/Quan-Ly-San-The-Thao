@@ -35,6 +35,8 @@ export default function CompensationPriceTable({
   const [tab, setTab] = useState<SportTab>('badminton');
   const [viewingItem, setViewingItem] = useState<PriceRow | null>(null);
   const [deletingItem, setDeletingItem] = useState<PriceRow | null>(null);
+  const [deleteError,setDeleteError]=useState('');
+  const [deleting,setDeleting]=useState(false);
   const sport = DATA[tab];
   const mergedItems = useCompensationCatalog(equipments).filter(item => item.sport === tab);
 
@@ -141,11 +143,14 @@ export default function CompensationPriceTable({
           <section role="alertdialog" aria-modal="true" aria-labelledby="delete-price-title" aria-describedby="delete-price-description" className="w-full max-w-sm space-y-3 rounded-2xl border border-black/15 bg-white p-4 shadow-xl">
             <h3 id="delete-price-title" className="text-sm font-bold text-slate-900">Xóa thiết bị khỏi bảng giá?</h3>
             <p id="delete-price-description" className="text-xs leading-relaxed text-slate-600">Xóa “{deletingItem.name}” khỏi bảng giá bồi thường. Hồ sơ thiết bị và lịch sử sự cố vẫn được lưu.</p>
+            {deleteError&&<p role="alert" className="text-xs text-red-700">{deleteError}</p>}
             <div className="grid grid-cols-2 gap-2">
               <button type="button" onClick={() => setDeletingItem(null)} className="rounded-xl border border-slate-200 py-2 text-xs font-semibold text-slate-700">Giữ lại</button>
-              <button type="button" onClick={() => {
-                hideCompensationItem(deletingItem.id);
-                setDeletingItem(null);
+              <button type="button" disabled={deleting} onClick={async () => {
+                setDeleting(true);setDeleteError('');
+                try{await hideCompensationItem(deletingItem.id);setDeletingItem(null);}
+                catch(error){setDeleteError(error instanceof Error?error.message:'Chưa lưu được thay đổi.');}
+                finally{setDeleting(false);}
               }} className="rounded-xl border border-red-200 bg-red-50 py-2 text-xs font-bold text-red-700 hover:bg-red-100">Xóa khỏi bảng giá</button>
             </div>
           </section>

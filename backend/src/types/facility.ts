@@ -146,6 +146,7 @@ export interface FacilityIncident {
 }
 
 export interface CreateIncidentDTO {
+  id?: string;
   bookingCode?: string;
   bookingDate?: string;
   liability?: 'DO_KHACH_LAM_HONG' | 'BAO_HANH_SAN_VAN_DONG';

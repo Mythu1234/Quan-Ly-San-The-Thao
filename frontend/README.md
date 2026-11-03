@@ -1,4 +1,33 @@
-# React + TypeScript + Vite
+# CourtX Arena Frontend
+
+## Kết nối Supabase sau khi pull code
+
+1. Mở terminal tại thư mục `frontend/`, tạo file `.env` từ file mẫu:
+
+   ```powershell
+   Copy-Item .env.example .env
+   ```
+
+   Nếu đã có `.env`, cập nhật hai biến `VITE_SUPABASE_URL` và
+   `VITE_SUPABASE_ANON_KEY` theo cấu hình Supabase của dự án.
+
+2. Cài các thư viện, bao gồm `@supabase/supabase-js`:
+
+   ```powershell
+   npm.cmd install
+   ```
+
+3. Chạy frontend:
+
+   ```powershell
+   npm.cmd run dev
+   ```
+
+   Nếu Vite đang chạy khi thay đổi `.env`, dừng bằng `Ctrl+C` rồi chạy lại.
+   File `.env` được Git bỏ qua; file `.env.example` là mẫu để các thành viên
+   thiết lập trên máy của mình.
+
+## React + TypeScript + Vite
 
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 

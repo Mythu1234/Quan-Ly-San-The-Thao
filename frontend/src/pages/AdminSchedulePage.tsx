@@ -22,7 +22,8 @@ const getVietnamTime = (instant = new Date()) => {
 const isSameDay = (a: Date, b: Date) =>
   a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 
-import useSharedBookings from '../hooks/useSharedBookings';
+import useSharedBookings, { refreshSharedBookings } from '../hooks/useSharedBookings';
+import { bookingApiService } from '../services/bookingService';
 import { calendarBookingDate } from '../utils/courtBookingWarnings';
 import type { BookingDetail } from '../types/schedule';
 export type { BookingDetail } from '../types/schedule';
@@ -140,7 +141,9 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
   }, []);
 
   // Active Admin Bookings State
-  const [allBookings, setAdminBookings] = useSharedBookings();
+  const [allBookings, setAdminBookings, bookingsState] = useSharedBookings();
+  const [checkinSaving,setCheckinSaving]=useState(false);
+  const [checkinError,setCheckinError]=useState('');
   const adminBookings = allBookings.filter(booking => booking.bookingDate === calendarBookingDate(selectedDate));
 
   // Booking Modal State (Đặt sân tại quầy trực tiếp trên lịch)
@@ -562,6 +565,7 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
   };
 
   const openCheckinDetail = (booking: BookingDetail) => {
+    setCheckinError('');
     setCheckinBooking(booking);
     setSelectedBooking(null);
     onCheckoutModeChange?.(true);
@@ -611,6 +615,11 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
 
   if (checkinBooking) {
     const courtNumber = checkinBooking.court.match(/\d+/)?.[0]?.padStart(2, '0') ?? '01';
+    const checkinStart=(checkinBooking.startH||0)*60+(checkinBooking.startM||0);
+    const checkinEnd=(checkinBooking.endH||0)*60+(checkinBooking.endM||0);
+    const checkinDuration=checkinEnd-checkinStart;
+    const startAt=new Date(`${checkinBooking.bookingDate||calendarBookingDate(selectedDate)}T${checkinBooking.time.slice(0,5)}:00+07:00`);
+    const minutesToStart=Math.ceil((startAt.getTime()-Date.now())/60000);
 
     return (
       <div className="flex-1 min-h-0 overflow-y-auto bg-white px-3 py-3">
@@ -644,8 +653,8 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
             <Clock3 className="h-4 w-4" />
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-[12px] font-black text-slate-800">Bắt đầu sau <span className="text-emerald-800">35 phút nữa</span></p>
-            <p className="text-[10px] font-medium text-slate-400">Sẵn sàng nhận khách lúc 17:50</p>
+            <p className="text-[12px] font-black text-slate-800">{minutesToStart>0?`Bắt đầu sau ${minutesToStart} phút`:'Đã đến giờ sử dụng sân'}</p>
+            <p className="text-[10px] font-medium text-slate-400">Giờ bắt đầu: {checkinBooking.time.slice(0,5)}</p>
           </div>
           <ChevronRight className="h-3.5 w-3.5 shrink-0 text-slate-300" />
         </section>
@@ -657,7 +666,7 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
               <UserRound className="h-3 w-3" />
               Khách hàng
             </div>
-            <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold text-slate-600 ring-1 ring-black/15">Standard Member</span>
+            <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold text-slate-600 ring-1 ring-black/15">Khách đặt sân</span>
           </div>
           <div className="flex items-center gap-2.5">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white text-[17px] font-black text-emerald-800 ring-1 ring-black/15">
@@ -673,7 +682,7 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
           </div>
           <div className="mt-2 flex items-center gap-1.5 rounded-lg bg-white px-2 py-1.5 ring-1 ring-black/15">
             <Clock3 className="h-3 w-3 shrink-0 text-emerald-800" />
-            <p className="text-[10px] font-medium text-slate-500">Đã chơi 14 trận • Không có vi phạm hủy muộn</p>
+            <p className="text-[10px] font-medium text-slate-500">Đối chiếu khách hàng theo số điện thoại trên lượt đặt.</p>
           </div>
         </section>
 
@@ -692,9 +701,9 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
             </div>
             <div className="min-w-0">
               <p className="text-[13px] font-black text-slate-900">
-                SÂN CL-{courtNumber} <span className="text-emerald-500">•</span>
+                {checkinBooking.court} <span className="text-emerald-500">•</span>
               </p>
-              <p className="text-[10px] font-medium text-slate-400">Khu A • Thảm Yonex tiêu chuẩn</p>
+              <p className="text-[10px] font-medium text-slate-400">{checkinBooking.sport}</p>
             </div>
           </div>
           <div className="grid grid-cols-2 gap-2">
@@ -706,7 +715,7 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
             <div className="rounded-lg bg-white p-2.5 ring-1 ring-black/15">
               <p className="text-[10px] font-bold uppercase tracking-wide text-slate-700">Khung giờ</p>
               <p className="mt-1 text-[13px] font-black text-slate-900">{checkinBooking.time}</p>
-              <p className="text-[10px] font-medium text-slate-400">90 phút</p>
+              <p className="text-[10px] font-medium text-slate-400">{checkinDuration} phút</p>
             </div>
           </div>
         </section>
@@ -722,7 +731,7 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
           </div>
           <div className="space-y-2">
             <div className="flex items-start justify-between gap-3">
-              <span className="text-[11px] font-medium leading-snug text-slate-500">Tổng tiền sân (90 phút • 120.000 VND/h)</span>
+              <span className="text-[11px] font-medium leading-snug text-slate-500">Tổng tiền sân ({checkinDuration} phút)</span>
               <span className="shrink-0 text-[13px] font-black text-slate-900">{checkinBooking.total}</span>
             </div>
             <div className="flex items-center justify-between gap-3">
@@ -740,19 +749,26 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
         </section>
 
         {/* Action buttons */}
+        {checkinError&&<p role="alert" className="mb-3 rounded-lg bg-red-50 p-3 text-xs text-red-700">{checkinError}</p>}
         <div className="mb-4 grid grid-cols-2 gap-2">
           <button
             type="button"
-            onClick={() => {
-              setAdminBookings(previous => previous.map(booking => booking.code === checkinBooking.code
-                && booking.bookingDate === calendarBookingDate(selectedDate) ? {...booking,status:'Đang sử dụng'} : booking));
-              setCheckinBooking(null);
-              onCheckoutModeChange?.(false);
+            disabled={checkinSaving}
+            onClick={async () => {
+              if(checkinSaving)return;
+              setCheckinSaving(true);setCheckinError('');
+              try {
+                await bookingApiService.checkIn(checkinBooking.code,checkinBooking.bookingDate || calendarBookingDate(selectedDate));
+                await refreshSharedBookings();
+                window.dispatchEvent(new Event('courtx:facility-changed'));
+                setCheckinBooking(null);onCheckoutModeChange?.(false);
+              }catch(error){setCheckinError(error instanceof Error?error.message:'Chưa check-in được.');}
+              finally{setCheckinSaving(false);}
             }}
             className="flex h-10 min-w-0 items-center justify-center gap-1.5 rounded-xl bg-emerald-700 px-3 text-[11px] font-black text-white shadow-sm transition hover:bg-emerald-800 active:scale-[0.98]"
           >
             <CheckCircle2 className="h-4 w-4 shrink-0" />
-            <span className="truncate">Check-In Sân</span>
+            <span className="truncate">{checkinSaving?'Đang lưu...':'Check-In Sân'}</span>
           </button>
           <button
             type="button"
@@ -1284,8 +1300,7 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
       equipments={equipments} incidents={incidents} currentUser={currentUser} onComplete={onCompleteCheckout}
       onBack={() => { setCheckoutBooking(null); onCheckoutModeChange?.(false); }}
       onFinished={() => {
-        setAdminBookings(previous => previous.map(booking => booking.code === checkoutBooking.code
-          && booking.bookingDate === calendarBookingDate(selectedDate) ? { ...booking, status:'Đã kết thúc' } : booking));
+        void refreshSharedBookings();
         setCheckoutBooking(null); onCheckoutModeChange?.(false);
       }} />;
   }
@@ -1293,6 +1308,8 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
   return (
     <>
       <div className="flex-1 min-h-0 bg-slate-50 relative overflow-hidden flex flex-col">
+        {bookingsState.loading&&<p className="p-3 text-xs text-slate-600">Đang tải lịch sân từ máy chủ...</p>}
+        {bookingsState.error&&<p role="alert" className="bg-red-50 p-3 text-xs text-red-700">{bookingsState.error}<button onClick={()=>void refreshSharedBookings()} className="ml-2 underline">Thử lại</button></p>}
         {/* 1. TOP TOOLBAR & DATE CONTROLS */}
         <div className="bg-white border-b border-slate-200 p-2.5 space-y-2 shrink-0 shadow-xs z-30">
           {/* Date Picker Bar */}

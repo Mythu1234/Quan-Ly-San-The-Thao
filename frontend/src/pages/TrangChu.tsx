@@ -1,5 +1,9 @@
 import AdminDashboard from './AdminDashboard';
-import CustomerSchedule, { STANDARD_15_BOOKINGS } from '../components/CustomerSchedule';
+import CustomerSchedule from '../components/CustomerSchedule';
+import useSharedBookings from '../hooks/useSharedBookings';
+import useVietnamToday from '../hooks/useVietnamToday';
+import { scheduleBookingsForDate } from '../utils/courtBookingWarnings';
+import { bookingApiService } from '../services/bookingService';
 import QrCodeArtwork from '../components/QrCodeArtwork';
 import EmployeeDashboard from './employee/EmployeeDashboard';
 import VipCustomerDashboard from './VipCustomerDashboard';
@@ -57,6 +61,8 @@ const VolleyballIcon = () => (
 
 
 export default function TrangChu() {
+  const today=useVietnamToday();
+  const [sharedBookings,,bookingsState]=useSharedBookings();
   const [currentUser, setCurrentUser] = useState<IncidentReporter | null>(null);
   // Navigation tab state
   const [activeTab, setActiveTab] = useState<'booking' | 'lookup'>('booking');
@@ -73,8 +79,8 @@ export default function TrangChu() {
   const [selectedDuration, setSelectedDuration] = useState<number>(60); // minutes
 
   // Customer Info State
-  const [customerName, setCustomerName] = useState<string>('Nguyễn Văn An');
-  const [customerPhone, setCustomerPhone] = useState<string>('0912345678');
+  const [customerName, setCustomerName] = useState<string>('');
+  const [customerPhone, setCustomerPhone] = useState<string>('');
   const [customerNote, setCustomerNote] = useState<string>('');
   const [sendZalo, setSendZalo] = useState<boolean>(true);
 
@@ -99,14 +105,14 @@ export default function TrangChu() {
       role: 'admin',
       password: 'admin',
       name: 'Ban Quản Trị (Admin)',
-      phone: '0901234567',
+      phone: '0912345678',
       email: 'admin@courtx.vn',
     },
     nhanvien: {
       role: 'employee',
       password: 'nhanvien',
       name: 'Nguyễn Văn An (Nhân viên)',
-      phone: '0912345678',
+      phone: '0901234567',
       email: 'nhanvien@courtx.vn',
     },
     vip: {
@@ -306,6 +312,9 @@ export default function TrangChu() {
   const [lookupResults, setLookupResults] = useState<any[]>([]);
   const [pendingLookupResults, setPendingLookupResults] = useState<any[]>([]);
   const [hasSearched, setHasSearched] = useState<boolean>(false);
+  const [lookupLoading,setLookupLoading]=useState(false);
+  const [lookupError,setLookupError]=useState('');
+  useEffect(()=>{setLookupResults([]);setLookupError('');setHasSearched(false);},[activeTab]);
   const [cancelConfirmation, setCancelConfirmation] = useState<any>(null);
   const [pendingCancelTicket, setPendingCancelTicket] = useState<any>(null);
 
@@ -384,7 +393,7 @@ export default function TrangChu() {
 
     // If starting on :30 or if 60 mins would conflict, default duration to 30 mins
     const startMins = parseTimeToMinutes(time);
-    const hasConflictWith60 = STANDARD_15_BOOKINGS.some((b) => {
+    const hasConflictWith60 = liveSchedule.some((b) => {
       const isSameCourt = b.courtName === courtName || b.courtCode === courtName || courtName.includes(b.courtCode);
       if (!isSameCourt) return false;
       const bStart = b.startH * 60 + b.startM;
@@ -584,10 +593,10 @@ export default function TrangChu() {
 
   const daysOfWeekVi = ['Chủ Nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
 
-  // Dynamically generate 21 consecutive days from base date (29/10/2026)
+  // Generate dates from the current day in Vietnam.
   const availableDates = useMemo(() => {
     const list = [];
-    const base = new Date(2026, 9, 29); // 29/10/2026
+    const base = today;
     for (let i = 0; i < 21; i++) {
       const d = new Date(base);
       d.setDate(base.getDate() + i);
@@ -598,14 +607,14 @@ export default function TrangChu() {
       const shortDate = `${day}/${month}`;
       list.push({
         label,
-        date: shortDate,
+        date: shortDate, dateObj: d,
       });
     }
     return list;
-  }, []);
+  }, [today]);
 
   const scheduleDateObj = useMemo(() => {
-    if (!selectedDate) return new Date(2026, 9, 29);
+    if (!selectedDate) return today;
     const fullMatch = selectedDate.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
     if (fullMatch) {
       return new Date(parseInt(fullMatch[3], 10), parseInt(fullMatch[2], 10) - 1, parseInt(fullMatch[1], 10));
@@ -614,16 +623,17 @@ export default function TrangChu() {
     if (match) {
       const day = parseInt(match[1], 10);
       const month = parseInt(match[2], 10) - 1;
-      const year = month < 9 ? 2027 : 2026;
-      return new Date(year, month, day);
+      const known=availableDates.find(item=>item.date===`${String(day).padStart(2,'0')}/${String(month+1).padStart(2,'0')}`);
+      return known?.dateObj || new Date(today.getFullYear(), month, day);
     }
-    return new Date(2026, 9, 29);
-  }, [selectedDate]);
+    return today;
+  }, [selectedDate,today,availableDates]);
+  const liveSchedule=useMemo(()=>scheduleBookingsForDate(sharedBookings,scheduleDateObj),[sharedBookings,scheduleDateObj]);
 
 
   // --- INTERACTIVE MONTHLY CALENDAR DROPDOWN ---
   const [isDatePickerOpen, setIsDatePickerOpen] = useState<boolean>(false);
-  const [calendarMonth, setCalendarMonth] = useState<Date>(() => new Date(2026, 9, 1)); // Oct 2026
+  const [calendarMonth, setCalendarMonth] = useState<Date>(() => new Date(today.getFullYear(), today.getMonth(), 1)); // Oct 2026
 
   useEffect(() => {
     if (isDatePickerOpen) {
@@ -632,7 +642,7 @@ export default function TrangChu() {
   }, [isDatePickerOpen, scheduleDateObj]);
 
   const handlePrevMonth = () => {
-    const todayBase = new Date(2026, 9, 1);
+    const todayBase = new Date(today.getFullYear(), today.getMonth(), 1);
     const prev = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() - 1, 1);
     if (prev.getTime() < todayBase.getTime()) {
       showAlert('Thông báo', 'Không thể xem lịch cho các tháng trước tháng hiện tại!');
@@ -701,7 +711,7 @@ export default function TrangChu() {
   }, [calendarMonth]);
 
   const handleSelectCalendarDay = (targetDate: Date) => {
-    const baseToday = new Date(2026, 9, 29); // 29/10/2026
+    const baseToday = today;
     baseToday.setHours(0, 0, 0, 0);
     const target = new Date(targetDate);
     target.setHours(0, 0, 0, 0);
@@ -804,7 +814,7 @@ export default function TrangChu() {
     const reqStart = parseTimeToMinutes(selectedStartTime);
     const reqEnd = reqStart + selectedDuration;
 
-    return STANDARD_15_BOOKINGS.find((b) => {
+    return liveSchedule.find((b) => {
       const isSameCourt =
         b.courtName === selectedCourt ||
         b.courtCode === selectedCourt ||
@@ -817,7 +827,7 @@ export default function TrangChu() {
       // Overlap condition: Math.max(start1, start2) < Math.min(end1, end2)
       return Math.max(reqStart, bStart) < Math.min(reqEnd, bEnd);
     });
-  }, [selectedCourt, selectedStartTime, selectedDuration]);
+  }, [selectedCourt, selectedStartTime, selectedDuration, liveSchedule]);
 
   // Price Calculation
   const durationHours = selectedDuration / 60;
@@ -827,6 +837,7 @@ export default function TrangChu() {
 
   const handleBookingSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if(bookingsState.loading||bookingsState.error){showAlert('Chưa tải được lịch sân',bookingsState.error||'Vui lòng chờ tải lịch sân.');return;}
     if (!selectedDate) {
       showAlert('Chưa chọn ngày', 'Vui lòng chọn ngày thi đấu ở Bước 2!');
       return;
@@ -905,48 +916,17 @@ export default function TrangChu() {
     setIsSubmitted(true);
   };
 
-  const handleLookupSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!lookupQuery.trim()) {
-      setHasSearched(true);
-      setLookupResults([]);
-      return;
-    }
-
-    const demoBookings = [
-      {
-        code: 'CX-88291', name: 'Nguyễn Văn An', phone: '0912345678', sport: 'Bóng Đá',
-        court: 'Sân Bóng Đá 1', date: '02/11/2026', time: '18:00 - 19:30 (1.5 giờ)',
-        total: '450.000đ', status: 'ĐÃ XÁC NHẬN', paymentStatus: 'Đã thanh toán qua VietQR',
-        hoursUntilStart: 12, sportId: 'football',
-      },
-      {
-        code: 'CX-11111', sport: 'Bóng Đá', court: 'Sân Bóng Đá 1', name: 'Nguyễn Văn An',
-        phone: '0912345678', date: '02/11/2026', time: '14:00 - 15:30', total: '450.000đ',
-        status: 'ĐÃ XÁC NHẬN', hoursUntilStart: 12, sportId: 'football',
-      },
-      {
-        code: 'CX-99999', sport: 'Cầu Lông', court: 'Sân Cầu Lông 2', name: 'Nguyễn Văn An',
-        phone: '0912345678', date: '04/11/2026', time: '09:00 - 10:30', total: '180.000đ',
-        status: 'ĐÃ XÁC NHẬN', hoursUntilStart: 48, sportId: 'badminton',
-      },
-    ];
-    const query = lookupQuery.trim();
-    const phone = query.replace(/[\s().-]/g, '');
-    if (/^\d{9,11}$/.test(phone)) {
-      const matches = demoBookings.filter((booking) => booking.phone.replace(/\D/g, '') === phone);
-      setLookupResults(matches);
-      setHasSearched(true);
-      return;
-    }
-
-    const bookingCode = query.replace(/^#/, '').toUpperCase();
-    const matches = demoBookings.filter((booking) =>
-      booking.code.toUpperCase() === bookingCode ||
-      booking.code.toUpperCase().replace(/[^A-Z0-9]/g, '') === bookingCode.replace(/[^A-Z0-9]/g, '')
-    );
-    setLookupResults(matches);
-    setHasSearched(true);
+  const handleLookupSearch = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if(lookupLoading)return;
+    setLookupResults([]);setHasSearched(false);setLookupError('');
+    if(!lookupQuery.trim()){setLookupError('Nhập số điện thoại hoặc mã đặt sân để tra cứu.');return;}
+    setLookupLoading(true);
+    try {
+      const results=await bookingApiService.lookup(lookupQuery.trim());
+      setLookupResults(results);setHasSearched(true);
+    }catch(error){setLookupError(error instanceof Error?error.message:'Chưa tra cứu được dữ liệu. Vui lòng thử lại.');}
+    finally{setLookupLoading(false);}
   };
 
   const handleProceedCancelWithOTP = (ticket: any) => {
@@ -972,57 +952,9 @@ export default function TrangChu() {
     setCancelConfirmation(ticket);
   };
 
-  const completeCancellation = (ticket: any, refundEligible: boolean) => {
+  const completeCancellation = (_ticket: unknown, _refundEligible: boolean) => {
     setCancelConfirmation(null);
-
-    // Nếu đủ điều kiện: bên thứ 3 xử lý hoàn tiền tự động trong 2 giây
-    if (refundEligible) {
-      setPopup({
-        type: 'processing',
-        title: 'Đang xử lý hoàn tiền...',
-        message: 'Hệ thống đang kết nối cổng thanh toán để hoàn tiền tự động...',
-      });
-
-      setTimeout(() => {
-        setLookupResults((current) => current.map((booking) => booking.code === ticket.code
-          ? {
-            ...booking,
-            status: 'ĐÃ HỦY',
-            paymentStatus: 'ĐÃ HOÀN TIỀN',
-            refundAmount: booking.total,
-            cancellationReason: 'Khách hủy trước ít nhất 24 giờ (Đã hoàn tiền tự động)',
-            cancelledAt: new Date().toISOString(),
-          }
-          : booking));
-
-        setPopup({
-          type: 'cancel-success',
-          title: 'Hoàn tiền thành công!',
-          message: 'Lịch đặt sân đã được hủy thành công.',
-          policyMessage: `Đã hoàn trả ${ticket.total} về tài khoản của bạn qua cổng thanh toán.`,
-        });
-      }, 2000);
-      return;
-    }
-
-    // Trường hợp dưới 24h: không hoàn tiền
-    setLookupResults((current) => current.map((booking) => booking.code === ticket.code
-      ? {
-        ...booking,
-        status: 'ĐÃ HỦY',
-        paymentStatus: 'KHÔNG HOÀN TIỀN',
-        refundAmount: '0đ',
-        cancellationReason: 'Khách xác nhận hủy dưới 24 giờ',
-        cancelledAt: new Date().toISOString(),
-      }
-      : booking));
-
-    setPopup({
-      type: 'cancel-success',
-      title: 'Hủy sân thành công!',
-      message: 'Lịch đặt sân đã được hủy.',
-      policyMessage: 'Đơn không được hoàn tiền do hủy dưới 24 giờ.',
-    });
+    showAlert('Hỗ trợ hủy đặt sân','Vui lòng liên hệ quầy để xác thực và xử lý hủy, hoàn tiền.');
   };
 
   if (isAdminLoggedIn) {
@@ -1473,7 +1405,7 @@ export default function TrangChu() {
                   <div className="grid grid-cols-7 gap-1 text-xs">
                     {calendarDays.map((item, idx) => {
                       const itemTime = new Date(item.dateObj.getFullYear(), item.dateObj.getMonth(), item.dateObj.getDate()).getTime();
-                      const baseTime = new Date(2026, 9, 29).getTime(); // 29/10/2026
+                      const baseTime = today.getTime();
                       const isPast = itemTime < baseTime;
                       const isSelected = Boolean(selectedDate) &&
                         scheduleDateObj.getFullYear() === item.dateObj.getFullYear() &&
@@ -1686,7 +1618,7 @@ export default function TrangChu() {
                   TRA CỨU THÔNG TIN ĐẶT SÂN
                 </h2>
                 <p className="mt-1 text-xs text-slate-600">
-                  Tra cứu bằng mã đặt sân hoặc số điện thoại đã đăng ký. Tra cứu bằng SĐT cần xác nhận OTP.
+                  Tra cứu lịch đặt đã lưu bằng mã đặt sân hoặc số điện thoại của khách hàng.
                 </p>
               </div>
               <button
@@ -1703,18 +1635,21 @@ export default function TrangChu() {
                 type="text"
                 value={lookupQuery}
                 onChange={(e) => setLookupQuery(e.target.value)}
-                placeholder="CX-88291 hoặc 0912345678"
+                placeholder="Mã đặt sân hoặc số điện thoại"
+                disabled={lookupLoading}
                 className="flex-1 rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-xs text-slate-900 placeholder-slate-400 outline-none focus:border-emerald-500 shadow-xs"
               />
               <button
                 type="submit"
                 className="rounded-xl bg-emerald-500 px-4 py-3 text-xs font-black uppercase tracking-wider text-white hover:bg-emerald-600 transition shadow-sm active:scale-95 cursor-pointer"
               >
-                TRA CỨU
+                {lookupLoading?'ĐANG TRA CỨU...':'TRA CỨU'}
               </button>
             </form>
 
-            {/* Lookup Demo Result */}
+            {lookupLoading&&<p role="status" className="text-xs text-emerald-800">Đang tra cứu trên hệ thống...</p>}
+            {lookupError&&<p role="alert" className="rounded-xl bg-red-50 p-3 text-xs text-red-700">{lookupError}</p>}
+            {/* Lookup results returned by the backend */}
             {hasSearched ? (
               lookupResults.length > 0 ? (
                 <div className="space-y-3">
@@ -1732,11 +1667,12 @@ export default function TrangChu() {
                         <div className="flex justify-between"><span className="text-slate-500">Môn & Sân:</span> <span className="font-bold text-emerald-600">{lookupResult.sport} - {lookupResult.court}</span></div>
                         <div className="flex justify-between"><span className="text-slate-500">Thời gian:</span> <span className="font-bold text-slate-900">{lookupResult.date} | {lookupResult.time}</span></div>
                         <div className="flex justify-between"><span className="text-slate-500">Tổng tiền:</span> <span className="font-bold text-slate-900">{lookupResult.total}</span></div>
+                        <div className="flex justify-between gap-2"><span className="text-slate-500">Thanh toán:</span><span className="text-right font-semibold text-emerald-800">{lookupResult.paymentStatus}</span></div>
                         {lookupResult.status === 'ĐÃ HỦY' && (
                           <div className="flex justify-between border-t border-slate-100 pt-1.5 mt-1.5">
                             <span className="text-slate-500">Hoàn tiền:</span>
                             <span className={'font-black ' + (lookupResult.paymentStatus === 'ĐÃ HOÀN TIỀN' ? 'text-emerald-600' : 'text-amber-500')}>
-                              {lookupResult.paymentStatus || 'ĐANG XỬ LÝ HOÀN TIỀN'}
+                              {lookupResult.refundStatus || 'Chưa có giao dịch hoàn tiền thành công'}
                             </span>
                           </div>
                         )}
@@ -1752,10 +1688,10 @@ export default function TrangChu() {
                         <button
                           type="button"
                           onClick={() => handleCancelTicket(lookupResult)}
-                          disabled={lookupResult.status === 'ĐÃ HỦY'}
+                          disabled={!lookupResult.canCancel || lookupResult.status === 'ĐÃ HỦY'}
                           className={'w-full rounded-xl border py-2.5 text-xs font-bold active:scale-95 transition ' + (lookupResult.status === 'ĐÃ HỦY' ? 'border-slate-200 text-slate-400 bg-slate-50' : 'border-red-200 text-red-600 hover:bg-red-50')}
                         >
-                          {lookupResult.status === 'ĐÃ HỦY' ? 'Đã hủy' : 'Hủy vé'}
+                          {lookupResult.status === 'ĐÃ HỦY' ? 'Đã hủy' : lookupResult.canCancel ? 'Hủy vé' : 'Liên hệ quầy để hủy đặt sân'}
                         </button>
                       </div>
                     </div>
@@ -1768,27 +1704,7 @@ export default function TrangChu() {
                 </div>
               )
             ) : (
-              <div className="rounded-2xl border border-slate-200 bg-white p-4 space-y-3 text-xs shadow-xs">
-                <div className="flex items-center justify-between text-slate-500">
-                  <span className="font-bold">MÃ ĐẶT SÂN MẪU:</span>
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <button type="button" onClick={() => {
-                    setHasSearched(true); setLookupResults([{
-                      code: 'CX-11111', sport: 'Bóng Đá', court: 'Sân Bóng Đá 1', name: 'Nguyễn Văn An', phone: '0912345678', date: '02/11/2026', time: '14:00 - 15:30', total: '450.000đ', status: 'ĐÃ XÁC NHẬN', hoursUntilStart: 12, sportId: 'football'
-                    }]);
-                  }} className="rounded-xl bg-slate-100 p-2 text-center font-bold text-slate-700 active:scale-95 hover:bg-slate-200">
-                    Đơn dưới 24 giờ
-                  </button>
-                  <button type="button" onClick={() => {
-                    setHasSearched(true); setLookupResults([{
-                      code: 'CX-99999', sport: 'Cầu Lông', court: 'Sân Cầu Lông 2', name: 'Nguyễn Văn An', phone: '0912345678', date: '04/11/2026', time: '09:00 - 10:30', total: '180.000đ', status: 'ĐÃ XÁC NHẬN', hoursUntilStart: 48, sportId: 'badminton'
-                    }]);
-                  }} className="rounded-xl bg-slate-100 p-2 text-center font-bold text-slate-700 active:scale-95 hover:bg-slate-200">
-                    Đơn từ 24 giờ trở lên
-                  </button>
-                </div>
-              </div>
+              <p className="rounded-2xl border border-slate-200 bg-white p-4 text-xs text-slate-600">Nhập số điện thoại đã dùng khi đặt sân hoặc mã đặt sân để xem thông tin.</p>
             )}
           </section>
 

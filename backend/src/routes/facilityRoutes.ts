@@ -1,7 +1,24 @@
 import { Router } from 'express';
 import { facilityController } from '../controllers/facilityController.js';
+import { facilityRepository } from '../repositories/facilityRepository.js';
+import {supabase} from '../lib/supabaseClient.js';
+import {databaseError} from '../repositories/facilityRepository.js';
 
 const router = Router();
+router.post('/equipments/:id/complete-maintenance',async(req,res,next)=>{
+  try {
+    const id=String(req.params.id);
+    const {error}=await supabase.rpc('courtx_complete_maintenance',{p_code:id});
+    if(error)databaseError(error);
+    res.json({success:true,data:await facilityRepository.getEquipmentById(id)});
+  }catch(error){next(error);}
+});
+router.get('/compensation-prices', async (_req,res,next) => {
+  try {res.json({success:true,data:await facilityRepository.getCompensationPrices()});}catch(error){next(error);}
+});
+router.delete('/compensation-prices/:id', async (req,res,next) => {
+  try {await facilityRepository.hideCompensationPrice(String(req.params.id));res.json({success:true});}catch(error){next(error);}
+});
 
 // ==========================================
 // 1. DASHBOARD & KPI (UC-06)

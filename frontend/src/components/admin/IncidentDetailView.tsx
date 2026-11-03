@@ -23,10 +23,10 @@ import useCourtAvailability, { normalizeCourtCode } from '../../hooks/useCourtAv
 interface IncidentDetailViewProps {
   incident: FacilityIncident;
   equipments: FacilityEquipment[];
-  onBack: () => void;
-  onUpdateStatus: (incidentId: string, newStatus: 'cho_xu_ly' | 'dang_sua_chua' | 'da_khac_phuc', unlockCourt?: boolean) => void;
-  onAddTimelineLog?: (incidentId: string, title: string, description: string, images?: string[]) => void;
-  onCompleteEquipmentWarranty?: (equipmentCode: string, equipmentName?: string) => void;
+  onBack: () => void | Promise<void>;
+  onUpdateStatus: (incidentId: string, newStatus: 'cho_xu_ly' | 'dang_sua_chua' | 'da_khac_phuc', unlockCourt?: boolean) => void | Promise<void>;
+  onAddTimelineLog?: (incidentId: string, title: string, description: string, images?: string[]) => void | Promise<void>;
+  onCompleteEquipmentWarranty?: (equipmentCode: string, equipmentName?: string) => void | Promise<void>;
 }
 
 export default function IncidentDetailView({
@@ -38,6 +38,9 @@ export default function IncidentDetailView({
   onCompleteEquipmentWarranty,
 }: IncidentDetailViewProps) {
   const [currentStatus, setCurrentStatus] = useState(incident.status);
+  const [saving,setSaving]=useState(false);
+  const [actionError,setActionError]=useState('');
+  useEffect(()=>{setCurrentStatus(incident.status);},[incident.status]);
   const [timelineLogs, setTimelineLogs] = useState(() => getIncidentTimeline(incident));
   const [newLogTitle, setNewLogTitle] = useState('');
   const [newLogDesc, setNewLogDesc] = useState('');
@@ -86,75 +89,33 @@ export default function IncidentDetailView({
   const courtLocked = courtStatuses.some(court => court.isLocked && (court.id === incident.courtId
     || normalizeCourtCode(court.code || court.name) === normalizeCourtCode(incident.courtName)));
 
-  const handleCompleteWarranty = () => {
-    if (!targetEquipment || isEquipmentWarrantyDone) return;
-    const nowTime = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
-    const logTitle = `Hoàn tất ${warranty.active ? 'bảo hành' : 'sửa chữa'} [${targetEquipmentCode}]`;
-    const logDesc = `Đã nghiệm thu ${targetEquipmentName} sau ${warranty.active ? 'bảo hành' : 'sửa chữa'}. Thiết bị chuyển sang trạng thái Sẵn sàng.`;
-
-    const warrantyLog = {
-      id: `TL-${Date.now()}`,
-      time: nowTime,
-      title: logTitle,
-      description: logDesc,
-      active: true,
-    };
-
-    setTimelineLogs((prev) => [warrantyLog, ...prev.map((l) => ({ ...l, active: false }))]);
-
-    // The equipment completion handler records the acceptance once in the related incident.
-    if (onCompleteEquipmentWarranty) {
-      onCompleteEquipmentWarranty(targetEquipmentCode, targetEquipmentName);
-    }
-
-    setWarrantyToast(`Đã nghiệm thu thiết bị ${targetEquipmentCode}. Trạng thái sân giữ nguyên.`);
-    setTimeout(() => setWarrantyToast(null), 4500);
+  const run=async(action:()=>Promise<void>)=>{
+    if(saving)return;
+    setSaving(true);setActionError('');
+    try {await action();}catch(error){setActionError(error instanceof Error?error.message:'Chưa lưu được thay đổi.');}
+    finally{setSaving(false);}
   };
-
-  const handleResolveAndUnlock = () => {
-    setCurrentStatus('da_khac_phuc');
-    const newLog = {
-      id: `TL-${Date.now()}`,
-      time: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
-      title: 'Hoàn tất xử lý sự cố',
-      description: `Đã kiểm tra và khắc phục các hạng mục hỏng hóc tại ${incident.courtName}. Trạng thái sân giữ nguyên.`,
-      active: true,
-    };
-    setTimelineLogs([newLog, ...timelineLogs.map(l => ({ ...l, active: false }))]);
-    onUpdateStatus(incident.id, 'da_khac_phuc', false);
-    if (onAddTimelineLog) {
-      onAddTimelineLog(incident.id, newLog.title, newLog.description);
-    }
-    setShowSuccessToast(true);
-    setTimeout(() => setShowSuccessToast(false), 3500);
-  };
-
-  const handleChangeStatus = (newSt: 'cho_xu_ly' | 'dang_sua_chua' | 'da_khac_phuc') => {
-    setCurrentStatus(newSt);
-    onUpdateStatus(incident.id, newSt, false);
-  };
-
-  const handleAddNewLog = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newLogTitle.trim() || readingImage || imageError) return;
-
-    const newLog = {
-      id: `TL-${Date.now()}`,
-      time: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
-      title: newLogTitle.trim(),
-      description: newLogDesc.trim(),
-      images: newLogImages,
-      active: true,
-    };
-
-    setTimelineLogs([newLog, ...timelineLogs.map(l => ({ ...l, active: false }))]);
-    if (onAddTimelineLog) {
-      onAddTimelineLog(incident.id, newLog.title, newLog.description, newLog.images);
-    }
-    setNewLogTitle('');
-    setNewLogDesc('');
-    setNewLogImages([]);
-    setShowAddLog(false);
+  const handleCompleteWarranty=()=>run(async()=>{
+    if(!targetEquipment||!onCompleteEquipmentWarranty||isEquipmentWarrantyDone)return;
+    await onCompleteEquipmentWarranty(targetEquipmentCode,targetEquipmentName);
+    setWarrantyToast(`Đã nghiệm thu thiết bị ${targetEquipmentCode}.`);
+    setTimeout(()=>setWarrantyToast(null),4500);
+  });
+  const handleResolveAndUnlock=()=>run(async()=>{
+    await onUpdateStatus(incident.id,'da_khac_phuc',false);
+    setCurrentStatus('da_khac_phuc');setShowSuccessToast(true);
+    setTimeout(()=>setShowSuccessToast(false),3500);
+  });
+  const handleChangeStatus=(status:FacilityIncident['status'])=>run(async()=>{
+    await onUpdateStatus(incident.id,status,false);setCurrentStatus(status);
+  });
+  const handleAddNewLog=(event:React.FormEvent)=>{
+    event.preventDefault();
+    if(!newLogTitle.trim()||readingImage||imageError||!onAddTimelineLog)return;
+    void run(async()=>{
+      await onAddTimelineLog(incident.id,newLogTitle.trim(),newLogDesc.trim(),newLogImages);
+      setNewLogTitle('');setNewLogDesc('');setNewLogImages([]);setShowAddLog(false);
+    });
   };
 
   const getInitials = (name: string) => {
@@ -167,6 +128,8 @@ export default function IncidentDetailView({
 
   return (
     <div className="flex-1 space-y-3 bg-white p-3 pb-6 animate-in fade-in duration-200 w-full max-w-full min-w-0">
+      {actionError&&<p role="alert" className="rounded-lg bg-red-50 p-3 text-xs text-red-700">{actionError}</p>}
+      {saving&&<p role="status" className="text-xs text-emerald-800">Đang lưu thay đổi...</p>}
       {/* 🟢 Top Badge & Navigation */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">

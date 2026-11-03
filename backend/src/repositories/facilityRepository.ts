@@ -1,373 +1,147 @@
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import {
-  FacilityEquipment,
-  CourtStatusItem,
-  FacilityIncident,
-  IncidentTimelineLog,
-} from '../types/facility.js';
-import { INITIAL_EQUIPMENT } from '../data/initialEquipment.js';
-import { INITIAL_COURTS } from '../data/initialCourts.js';
-import { INITIAL_INCIDENTS } from '../data/initialIncidents.js';
+import { supabase } from '../lib/supabaseClient.js';
+import type { FacilityEquipment, CourtStatusItem, FacilityIncident, IncidentTimelineLog } from '../types/facility.js';
 import type { CheckoutResult } from '../types/checkout.js';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-const DATA_DIR = path.resolve(__dirname, '../../data');
-const EQUIPMENTS_FILE = path.join(DATA_DIR, 'equipments.json');
-const COURTS_FILE = path.join(DATA_DIR, 'courts.json');
-const INCIDENTS_FILE = path.join(DATA_DIR, 'incidents.json');
-const CHECKOUTS_FILE = path.join(DATA_DIR, 'checkouts.json');
-
-export class FacilityRepository {
-  private equipments: FacilityEquipment[] = [];
-  private courts: CourtStatusItem[] = [];
-  private incidents: FacilityIncident[] = [];
-  private isLoaded = false;
-
-  constructor() {
-    this.ensureLoaded();
+const equipmentSelect = '*,san(*,bo_mon(*))';
+const incidentSelect = '*,nhan_vien(ma_nhan_vien,ho_ten,so_dien_thoai,vai_tro),dat_san(ngay_dat,san(*)),chi_tiet_su_co(*,thiet_bi(*,san(*)),bang_gia_den_bu(*))';
+const statusLabels: Record<string,string> = {san_sang:'Sẵn sàng',dang_su_dung:'Đang sử dụng',bao_tri:'Bảo trì',hong:'Hỏng'};
+const sportId = (name = ''): 'badminton'|'volleyball'|'football' => /chuyền/i.test(name)?'volleyball':/đá/i.test(name)?'football':'badminton';
+const displayDate = (value?: string) => value ? value.slice(0,10).split('-').reverse().join('/') : '';
+export function databaseError(error: {code?:string;message:string}): never {
+  if (['PGRST202','PGRST204','42703','42883'].includes(error.code || '')) {
+    console.error('Missing facility migration: backend/migrations/20261103_facility_supabase.sql',error.code);
+    throw Object.assign(new Error('Máy chủ chưa hoàn tất cấu hình lưu trữ. Vui lòng liên hệ quản trị.'),{status:503});
   }
-
-  private ensureLoaded(): void {
-    if (this.isLoaded) return;
-
-    try {
-      if (!fs.existsSync(DATA_DIR)) {
-        fs.mkdirSync(DATA_DIR, { recursive: true });
-      }
-
-      // 1. Equipments
-      if (fs.existsSync(EQUIPMENTS_FILE)) {
-        const raw = fs.readFileSync(EQUIPMENTS_FILE, 'utf-8');
-        this.equipments = JSON.parse(raw);
-      } else {
-        this.equipments = [...INITIAL_EQUIPMENT];
-        this.persistEquipments();
-      }
-
-      // 2. Courts
-      if (fs.existsSync(COURTS_FILE)) {
-        const raw = fs.readFileSync(COURTS_FILE, 'utf-8');
-        this.courts = JSON.parse(raw);
-        // Preserve legacy records referenced by incident history, and add missing standard courts.
-        const missing = INITIAL_COURTS.filter(c => !this.courts.some(existing => existing.id === c.id));
-        if (missing.length) {
-          this.courts.push(...missing);
-          this.persistCourts();
-        }
-      } else {
-        this.courts = [...INITIAL_COURTS];
-        this.persistCourts();
-      }
-
-      // 3. Incidents
-      if (fs.existsSync(INCIDENTS_FILE)) {
-        const raw = fs.readFileSync(INCIDENTS_FILE, 'utf-8');
-        this.incidents = JSON.parse(raw);
-      } else {
-        this.incidents = [...INITIAL_INCIDENTS];
-        this.persistIncidents();
-      }
-
-      this.recoverCheckout();
-      this.isLoaded = true;
-    } catch (err) {
-      console.error('FacilityRepository ensureLoaded error:', err);
-      this.equipments = [...INITIAL_EQUIPMENT];
-      this.courts = [...INITIAL_COURTS];
-      this.incidents = [...INITIAL_INCIDENTS];
-      this.isLoaded = true;
-    }
-  }
-
-  private persistEquipments(): void {
-    try {
-      fs.writeFileSync(EQUIPMENTS_FILE, JSON.stringify(this.equipments, null, 2), 'utf-8');
-    } catch (err) {
-      console.error('persistEquipments error:', err);
-    }
-  }
-
-  private readCheckoutLedger(): { receipts: CheckoutResult[]; pending?: CheckoutResult } {
-    return fs.existsSync(CHECKOUTS_FILE) ? JSON.parse(fs.readFileSync(CHECKOUTS_FILE, 'utf8')) : { receipts: [] };
-  }
-
-  private writeCheckoutLedger(ledger: { receipts: CheckoutResult[]; pending?: CheckoutResult }):void {
-    const temporary = `${CHECKOUTS_FILE}.tmp`;
-    fs.writeFileSync(temporary,JSON.stringify(ledger,null,2),'utf8');
-    fs.renameSync(temporary,CHECKOUTS_FILE);
-  }
-
-  private recoverCheckout(): void {
-    const ledger = this.readCheckoutLedger();
-    if (!ledger.pending) return;
-    const result = ledger.pending;
-    const incidentMap = new Map(this.incidents.map(incident => [incident.id, incident]));
-    result.incidents.forEach(incident => incidentMap.set(incident.id, incident));
-    this.incidents = [...incidentMap.values()];
-    const equipmentMap = new Map(result.equipments.map(equipment => [equipment.code, equipment]));
-    this.equipments = this.equipments.map(equipment => equipmentMap.get(equipment.code) || equipment);
-    fs.writeFileSync(INCIDENTS_FILE, JSON.stringify(this.incidents, null, 2), 'utf8');
-    fs.writeFileSync(EQUIPMENTS_FILE, JSON.stringify(this.equipments, null, 2), 'utf8');
-    ledger.receipts = [...ledger.receipts.filter(item => item.receipt.reference !== result.receipt.reference), result];
-    delete ledger.pending;
-    this.writeCheckoutLedger(ledger);
-  }
-
-  public getCheckout(reference: string): CheckoutResult | undefined {
-    this.ensureLoaded();
-    this.recoverCheckout();
-    return this.readCheckoutLedger().receipts.find(item => item.receipt.reference === reference);
-  }
-
-  public commitCheckout(result: CheckoutResult): CheckoutResult {
-    this.ensureLoaded();
-    this.recoverCheckout();
-    const ledger = this.readCheckoutLedger();
-    const existing = ledger.receipts.find(item => item.receipt.reference === result.receipt.reference);
-    if (existing) return existing;
-    // Write the recovery record before changing incident/equipment files.
-    ledger.pending = result;
-    this.writeCheckoutLedger(ledger);
-    this.recoverCheckout();
-    return result;
-  }
-
-  private persistCourts(): void {
-    try {
-      fs.writeFileSync(COURTS_FILE, JSON.stringify(this.courts, null, 2), 'utf-8');
-    } catch (err) {
-      console.error('persistCourts error:', err);
-    }
-  }
-
-  private persistIncidents(): void {
-    try {
-      fs.writeFileSync(INCIDENTS_FILE, JSON.stringify(this.incidents, null, 2), 'utf-8');
-    } catch (err) {
-      console.error('persistIncidents error:', err);
-    }
-  }
-
-  // ===============================
-  // EQUIPMENT OPERATIONS
-  // ===============================
-  public getAllEquipments(): FacilityEquipment[] {
-    this.ensureLoaded();
-    return [...this.equipments];
-  }
-
-  public getEquipmentById(id: string): FacilityEquipment | null {
-    this.ensureLoaded();
-    const found = this.equipments.find((e) => e.id.toLowerCase() === id.toLowerCase());
-    return found ? { ...found } : null;
-  }
-
-  public getEquipmentByCode(code: string): FacilityEquipment | null {
-    this.ensureLoaded();
-    const found = this.equipments.find((e) => e.code.toLowerCase() === code.toLowerCase());
-    return found ? { ...found } : null;
-  }
-
-  public getNextEquipmentIdAndCode(): { id: string; code: string } {
-    this.ensureLoaded();
-    let maxNum = 0;
-    for (const eq of this.equipments) {
-      const match = eq.code.match(/MATB-(\d+)/i) || eq.id.match(/EQ(\d+)/i);
-      if (match) {
-        const n = parseInt(match[1], 10);
-        if (n > maxNum) maxNum = n;
-      }
-    }
-    const nextNum = maxNum + 1;
-    const padded = nextNum.toString().padStart(2, '0');
-    return {
-      id: `EQ${padded}`,
-      code: `MATB-${padded}`,
-    };
-  }
-
-  public createEquipment(item: FacilityEquipment): FacilityEquipment {
-    this.ensureLoaded();
-    this.equipments.unshift(item);
-    this.persistEquipments();
-    return { ...item };
-  }
-
-  public updateEquipment(idOrCode: string, updates: Partial<FacilityEquipment>): FacilityEquipment | null {
-    this.ensureLoaded();
-    const index = this.equipments.findIndex(
-      (e) => e.id.toLowerCase() === idOrCode.toLowerCase() || e.code.toLowerCase() === idOrCode.toLowerCase()
-    );
-    if (index === -1) return null;
-
-    const current = this.equipments[index];
-    const updated: FacilityEquipment = {
-      ...current,
-      ...updates,
-      id: current.id,
-      code: updates.code || current.code,
-      updatedAt: new Date().toISOString(),
-    };
-    this.equipments[index] = updated;
-    this.persistEquipments();
-    return { ...updated };
-  }
-
-  public deleteEquipment(idOrCode: string): boolean {
-    this.ensureLoaded();
-    const index = this.equipments.findIndex(
-      (e) => e.id.toLowerCase() === idOrCode.toLowerCase() || e.code.toLowerCase() === idOrCode.toLowerCase()
-    );
-    if (index === -1) return false;
-    this.equipments.splice(index, 1);
-    this.persistEquipments();
-    return true;
-  }
-
-  // ===============================
-  // COURT STATUS OPERATIONS (UC-04)
-  // ===============================
-  public getAllCourts(): CourtStatusItem[] {
-    this.ensureLoaded();
-    return [...this.courts];
-  }
-
-  public getCourtById(id: string): CourtStatusItem | null {
-    this.ensureLoaded();
-    const found = this.courts.find((c) => c.id.toLowerCase() === id.toLowerCase());
-    return found ? { ...found } : null;
-  }
-
-  public updateCourtLock(
-    courtId: string,
-    isLocked: boolean,
-    reason?: string,
-    lockedBy = 'Admin'
-  ): CourtStatusItem | null {
-    this.ensureLoaded();
-    const index = this.courts.findIndex((c) => c.id.toLowerCase() === courtId.toLowerCase());
-    if (index === -1) return null;
-
-    const current = this.courts[index];
-    const nowTime = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
-
-    const updated: CourtStatusItem = {
-      ...current,
-      isLocked,
-      lockReason: isLocked ? (reason || 'Bảo trì kỹ thuật') : undefined,
-      lockedAt: isLocked ? `${nowTime} Hôm nay` : undefined,
-      lockedBy: isLocked ? lockedBy : undefined,
-      updatedAt: new Date().toISOString(),
-    };
-
-    this.courts[index] = updated;
-    this.persistCourts();
-    return { ...updated };
-  }
-
-  // ===============================
-  // INCIDENT OPERATIONS (UC-03, UC-05)
-  // ===============================
-  public getAllIncidents(): FacilityIncident[] {
-    this.ensureLoaded();
-    return [...this.incidents];
-  }
-
-  public getIncidentById(id: string): FacilityIncident | null {
-    this.ensureLoaded();
-    const found = this.incidents.find((i) => i.id.toLowerCase() === id.toLowerCase());
-    return found ? { ...found } : null;
-  }
-
-  public getNextIncidentId(): string {
-    this.ensureLoaded();
-    let maxNum = 8900;
-    for (const inc of this.incidents) {
-      const match = inc.id.match(/SC-(\d+)/i);
-      if (match) {
-        const n = parseInt(match[1], 10);
-        if (n > maxNum) maxNum = n;
-      }
-    }
-    const nextNum = maxNum + 1;
-    return `SC-${nextNum}`;
-  }
-
-  public createIncident(incident: FacilityIncident): FacilityIncident {
-    this.ensureLoaded();
-    this.incidents.unshift(incident);
-    this.persistIncidents();
-    return { ...incident };
-  }
-
-  public deleteIncident(id: string): FacilityIncident | null {
-    this.ensureLoaded();
-    const index = this.incidents.findIndex(incident => incident.id.toLowerCase() === id.toLowerCase());
-    if (index < 0) return null;
-    const now = new Date().toISOString();
-    this.incidents[index] = { ...this.incidents[index], deletedAt: now, updatedAt: now };
-    this.persistIncidents();
-    return { ...this.incidents[index] };
-  }
-
-  public updateIncidentStatus(
-    id: string,
-    newStatus: 'cho_xu_ly' | 'dang_sua_chua' | 'da_khac_phuc',
-    technicianNote?: string
-  ): FacilityIncident | null {
-    this.ensureLoaded();
-    const index = this.incidents.findIndex((i) => i.id.toLowerCase() === id.toLowerCase());
-    if (index === -1) return null;
-
-    const current = this.incidents[index];
-    const statusLabels = {
-      cho_xu_ly: 'Chờ xử lý',
-      dang_sua_chua: 'Đang sửa chữa',
-      da_khac_phuc: 'Đã khắc phục',
-    };
-
-    const updated: FacilityIncident = {
-      ...current,
-      status: newStatus,
-      statusLabel: statusLabels[newStatus],
-      isCourtLocked: newStatus === 'da_khac_phuc' ? false : current.isCourtLocked,
-      technicianNote: technicianNote !== undefined ? technicianNote : current.technicianNote,
-      updatedAt: new Date().toISOString(),
-    };
-
-    this.incidents[index] = updated;
-    this.persistIncidents();
-    return { ...updated };
-  }
-
-  public addIncidentTimelineLog(id: string, log: IncidentTimelineLog): FacilityIncident | null {
-    this.ensureLoaded();
-    const index = this.incidents.findIndex((i) => i.id.toLowerCase() === id.toLowerCase());
-    if (index === -1) return null;
-
-    const current = this.incidents[index];
-    const existingLogs = current.timelineLogs || [];
-
-    // Mark previous logs active = false, and prepend or append new log
-    const updatedLogs = [
-      { ...log, active: true },
-      ...existingLogs.map((l) => ({ ...l, active: false })),
-    ];
-
-    const updated: FacilityIncident = {
-      ...current,
-      timelineLogs: updatedLogs,
-      updatedAt: new Date().toISOString(),
-    };
-
-    this.incidents[index] = updated;
-    this.persistIncidents();
-    return { ...updated };
-  }
+  throw Object.assign(new Error(error.message),{status:error.code==='23505'?409:400});
+}
+export function mapCourt(row: any): CourtStatusItem {
+  const code = row.ten_san?.match(/(?:CL|BC|BD)[-_]\d{2}/)?.[0] || row.ma_san;
+  return {...row.thong_tin_bo_sung,id:row.ma_san,code,name:row.ten_san,courtNumber:Number(code.match(/\d+$/)?.[0]||0),
+    sportId:sportId(row.bo_mon?.ten_bo_mon),isLocked:['bao_tri','tam_dong'].includes(row.trang_thai)};
+}
+export function mapEquipment(row: any): FacilityEquipment {
+  const extra = row.thong_tin_bo_sung || {};
+  return {...extra,id:row.ma_thiet_bi,code:row.ma_thiet_bi,name:row.ten_thiet_bi,
+    category:extra.category || 'dung_cu',categoryLabel:extra.categoryLabel || 'Dụng cụ',
+    sportType:extra.sportType || (row.san ? {badminton:'CauLong',volleyball:'BongChuyen',football:'BongDa'}[sportId(row.san.bo_mon?.ten_bo_mon)]:'DungChung'),
+    currentLocation:row.san?.ten_san || 'Kho chung',status:row.trang_thai,statusLabel:statusLabels[row.trang_thai],healthRate:extra.healthRate || 'Đang theo dõi',
+    purchaseDate:displayDate(row.ngay_mua),warrantyExpire:displayDate(row.han_bao_hanh),serialNumber:row.so_seri || '',supplier:row.nha_cung_cap || '',supplierPhone:row.sdt_ncc || ''};
+}
+export function mapIncident(row: any): FacilityIncident {
+  const extra = row.thong_tin_bo_sung || {}, details = row.chi_tiet_su_co || [], first = details[0];
+  const court = row.dat_san?.san || first?.thiet_bi?.san;
+  const status = row.trang_thai_xu_ly==='DA_XU_LY'?'da_khac_phuc':extra.status==='dang_sua_chua'?'dang_sua_chua':'cho_xu_ly';
+  return {...extra,id:row.ma_su_co,bookingCode:row.ma_dat_san || undefined,bookingDate:row.dat_san?.ngay_dat,
+    courtId:court?.ma_san || extra.courtId,courtName:court?.ten_san || extra.courtName || 'Kho chung',
+    equipmentCode:first?.ma_thiet_bi || undefined,equipmentName:first?.thiet_bi?.ten_thiet_bi || first?.bang_gia_den_bu?.ten_vat_tu || extra.equipmentName,
+    compensationItemId:first?.ma_danh_muc_den_bu,compensationPrice:details.reduce((sum:number,d:any)=>sum+Number(d.don_gia_ap_dung)*Number(d.so_luong_hu_hai),0),
+    liability:row.nguyen_nhan,compensationAmount:Number(row.tong_tien_den_bu),
+    compensationPaymentStatus:extra.compensationPaymentStatus || (Number(row.tong_tien_den_bu)===0?'not_required':'pending'),
+    title:extra.title || `Sự cố ${first?.thiet_bi?.ten_thiet_bi || first?.bang_gia_den_bu?.ten_vat_tu || row.ma_su_co}`,
+    description:extra.description || details.map((item:any)=>item.mo_ta_chi_tiet).filter(Boolean).join('\n'),
+    severity:extra.severity || 'trung_binh',severityLabel:extra.severityLabel || 'Trung bình',status,
+    statusLabel:status==='da_khac_phuc'?'Đã khắc phục':status==='dang_sua_chua'?'Đang sửa chữa':'Chờ xử lý',
+    reporterName:row.nhan_vien?.ho_ten || extra.reporterName || '',reporterPhone:row.nhan_vien?.so_dien_thoai || '',
+    reporterRole:row.nhan_vien?.vai_tro==='ADMIN'?'Chủ sân':'Nhân viên',
+    reportedAt:new Date(row.ngay_tao).toLocaleString('vi-VN',{timeZone:'Asia/Ho_Chi_Minh'}),createdAt:row.ngay_tao,
+    damageItems:extra.damageItems || details.map((item:any)=>({id:item.ma_chi_tiet,equipmentCode:item.ma_thiet_bi,
+      title:item.thiet_bi?.ten_thiet_bi || item.bang_gia_den_bu?.ten_vat_tu,description:item.mo_ta_chi_tiet,riskBadge:'Hư hỏng',riskColor:'amber'})),
+    images:extra.images || [],timelineLogs:extra.timelineLogs || []};
 }
 
-export const facilityRepository = new FacilityRepository();
+export class FacilityRepository {
+  async getAllEquipments():Promise<FacilityEquipment[]> {
+    const {data,error}=await supabase.from('thiet_bi').select(equipmentSelect).order('ma_thiet_bi');
+    if(error)databaseError(error);
+    return (data || []).filter((row:any)=>!row.da_xoa).map(mapEquipment);
+  }
+  async getEquipmentById(id:string):Promise<FacilityEquipment|null> {
+    const {data,error}=await supabase.from('thiet_bi').select(equipmentSelect).eq('ma_thiet_bi',id).maybeSingle();
+    if(error)databaseError(error);
+    return data && !data.da_xoa?mapEquipment(data):null;
+  }
+  async getEquipmentByCode(code:string) {return this.getEquipmentById(code);}
+  async saveEquipment(item:FacilityEquipment,id?:string) {
+    const date=(value:string)=>/^\d{2}\/\d{2}\/\d{4}$/.test(value)?value.split('/').reverse().join('-'):value || null;
+    const {data,error}=await supabase.rpc('courtx_save_equipment',{p_item:{...item,purchaseDate:date(item.purchaseDate),warrantyExpire:date(item.warrantyExpire)},p_id:id || null});
+    if(error)databaseError(error);
+    return (await this.getEquipmentById(String(data)))!;
+  }
+  async updateEquipment(id:string,updates:Partial<FacilityEquipment>) {
+    const existing=await this.getEquipmentById(id);
+    return existing?this.saveEquipment({...existing,...updates,id:existing.id,code:existing.code},id):null;
+  }
+  async deleteEquipment(id:string) {
+    const {data,error}=await supabase.from('thiet_bi').update({da_xoa:true}).eq('ma_thiet_bi',id).select('ma_thiet_bi');
+    if(error)databaseError(error);
+    return !!data?.length;
+  }
+  async getAllCourts():Promise<CourtStatusItem[]> {
+    const {data,error}=await supabase.from('san').select('*,bo_mon(*)').order('ma_san');
+    if(error)databaseError(error);
+    return (data || []).map(mapCourt);
+  }
+  async getCourtById(id:string) {return (await this.getAllCourts()).find(row=>row.id===id)||null;}
+  async updateCourtLock(id:string,isLocked:boolean,reason?:string,lockedBy='Admin') {
+    const old=await this.getCourtById(id);
+    if(!old)return null;
+    const {data:active,error:activeError}=await supabase.from('dat_san').select('ma_dat_san').eq('ma_san',id).eq('trang_thai','DANG_SU_DUNG');
+    if(activeError)databaseError(activeError);
+    const {data,error}=await supabase.from('san').update({trang_thai:isLocked?'bao_tri':active?.length?'dang_su_dung':'san_sang',
+      thong_tin_bo_sung:{lockReason:isLocked?reason:null,lockedBy:isLocked?lockedBy:null,lockedAt:isLocked?new Date().toISOString():null}})
+      .eq('ma_san',id).select('*,bo_mon(*)').single();
+    if(error)databaseError(error);
+    return mapCourt(data);
+  }
+  async getAllIncidents():Promise<FacilityIncident[]> {
+    const {data,error}=await supabase.from('bao_cao_su_co').select(incidentSelect).order('ngay_tao',{ascending:false});
+    if(error)databaseError(error);
+    return (data || []).map(mapIncident);
+  }
+  async getIncidentById(id:string):Promise<FacilityIncident|null> {
+    const {data,error}=await supabase.from('bao_cao_su_co').select(incidentSelect).eq('ma_su_co',id).maybeSingle();
+    if(error)databaseError(error);
+    return data?mapIncident(data):null;
+  }
+  async createIncident(report:FacilityIncident) {
+    const {data,error}=await supabase.rpc('courtx_save_incident',{p_report:report});
+    if(error)databaseError(error);
+    return (await this.getIncidentById(String(data)))!;
+  }
+  async patchIncident(id:string,patch:Partial<FacilityIncident>) {
+    const {error}=await supabase.rpc('courtx_patch_incident',{p_id:id,p_patch:patch});
+    if(error)databaseError(error);
+    return this.getIncidentById(id);
+  }
+  async deleteIncident(id:string) {return this.patchIncident(id,{deletedAt:new Date().toISOString()});}
+  async updateIncidentStatus(id:string,status:FacilityIncident['status'],technicianNote?:string) {
+    return this.patchIncident(id,{status,...(technicianNote!==undefined?{technicianNote}:{})});
+  }
+  async addIncidentTimelineLog(id:string,log:IncidentTimelineLog) {
+    const {error}=await supabase.rpc('courtx_patch_incident',{p_id:id,p_patch:{newLog:log}});
+    if(error)databaseError(error);
+    return this.getIncidentById(id);
+  }
+  async getCompensationPrices() {
+    const {data,error}=await supabase.from('bang_gia_den_bu').select('*,bo_mon(ten_bo_mon)').order('ma_danh_muc_den_bu');
+    if(error)databaseError(error);
+    return (data||[]).filter((row:any)=>!row.da_an).map((row:any)=>({id:row.ma_danh_muc_den_bu,name:row.ten_vat_tu,price:Number(row.don_gia_den_bu),
+      sport:row.bo_mon?sportId(row.bo_mon.ten_bo_mon):'common',equipmentId:row.mo_ta_hu_hai?.startsWith('asset:')?row.mo_ta_hu_hai.slice(6):undefined}));
+  }
+  async hideCompensationPrice(id:string) {
+    const {error}=await supabase.from('bang_gia_den_bu').update({da_an:true}).eq('ma_danh_muc_den_bu',id);
+    if(error)databaseError(error);
+  }
+  async expandCheckout(value:any):Promise<CheckoutResult> {
+    const [incidents,equipments]=await Promise.all([this.getAllIncidents(),this.getAllEquipments()]);
+    return {receipt:value.receipt,incidents:incidents.filter(i=>value.incidentIds.includes(i.id)),equipments:equipments.filter(e=>value.equipmentIds.includes(e.id))};
+  }
+  async getCheckout(reference:string):Promise<CheckoutResult|undefined> {
+    const index=reference.indexOf(':');
+    if(index<0)return undefined;
+    const {data,error}=await supabase.from('dat_san').select('ket_qua_checkout').eq('ma_dat_san',reference.slice(index+1)).eq('ngay_dat',reference.slice(0,index)).maybeSingle();
+    if(error)databaseError(error);
+    return data?.ket_qua_checkout?this.expandCheckout(data.ket_qua_checkout):undefined;
+  }
+}
+export const facilityRepository=new FacilityRepository();

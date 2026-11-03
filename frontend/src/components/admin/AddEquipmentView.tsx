@@ -28,7 +28,7 @@ interface AddEquipmentViewProps {
 
 export default function AddEquipmentView({ existingCount, onBack, onAddEquipment }: AddEquipmentViewProps) {
   const nextNum = existingCount + 1;
-  const defaultCode = `MATB-${String(nextNum).padStart(2, '0')}`;
+  const defaultCode = `TB${String(nextNum).padStart(8, '0')}`;
 
   const [name, setName] = useState('');
   const [sportType, setSportType] = useState<'CauLong' | 'BongChuyen' | 'BongDa' | 'DungChung'>('CauLong');
@@ -50,6 +50,7 @@ export default function AddEquipmentView({ existingCount, onBack, onAddEquipment
     e.preventDefault();
     if (isSaving) return;
     if (!name.trim()) { setErrorMessage('Vui lòng nhập tên thiết bị!'); return; }
+    if (!serialNumber.trim()) { setErrorMessage('Vui lòng nhập số Seri / Asset Tag của từng thiết bị!'); return; }
     if (!sportType) { setErrorMessage('Vui lòng chọn bộ môn!'); return; }
     if (!healthRate.trim()) { setErrorMessage('Vui lòng nhập tình trạng thiết bị!'); return; }
     if ((purchaseDate && !isValidDateInput(purchaseDate)) || (warrantyExpire && !isValidDateInput(warrantyExpire))) {

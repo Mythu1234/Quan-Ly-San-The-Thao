@@ -25,21 +25,21 @@ interface FacilityManagementViewProps {
   courts: CourtStatusItem[];
   incidents: FacilityIncident[];
   onAddEquipment: (newEq: FacilityEquipment) => void | Promise<void>;
-  onUpdateEquipmentLocation: (equipmentCode: string, newLocation: string) => void;
+  onUpdateEquipmentLocation: (equipmentCode: string, newLocation: string) => void | Promise<void>;
   onToggleCourtLock: (courtId: string, isLocked: boolean, reason?: string) => void | Promise<void>;
   onDeleteIncident: (id: string) => Promise<void>;
   onSubmitIncident: (newIncident: FacilityIncident, lockCourt: boolean) => void | Promise<void>;
-  onUpdateIncidentStatus: (incidentId: string, newStatus: 'cho_xu_ly' | 'dang_sua_chua' | 'da_khac_phuc', unlockCourt?: boolean) => void;
-  onReturnToWarehouse?: (equipmentCode: string) => void;
+  onUpdateIncidentStatus: (incidentId: string, newStatus: 'cho_xu_ly' | 'dang_sua_chua' | 'da_khac_phuc', unlockCourt?: boolean) => void | Promise<void>;
+  onReturnToWarehouse?: (equipmentCode: string) => void | Promise<void>;
   onAssignBookingToEquipment?: (
     equipmentCode: string,
     courtName: string,
     timeSlot: string,
     bookingCode: string,
     customerName: string
-  ) => void;
-  onCompleteEquipmentWarranty?: (equipmentCode: string, equipmentName?: string) => void;
-  onAddTimelineLog?: (incidentId: string, title: string, description: string, images?: string[]) => void;
+  ) => void | Promise<void>;
+  onCompleteEquipmentWarranty?: (equipmentCode: string, equipmentName?: string) => void | Promise<void>;
+  onAddTimelineLog?: (incidentId: string, title: string, description: string, images?: string[]) => void | Promise<void>;
   isBackendOnline?: boolean;
 }
 
@@ -86,11 +86,13 @@ export default function FacilityManagementView({
 
   // Equipment Relocate Dialog
   const [relocatingEq, setRelocatingEq] = useState<FacilityEquipment | null>(null);
-  const [targetLocation, setTargetLocation] = useState<string>('Sân 01');
+  const [targetLocation, setTargetLocation] = useState<string>('Kho chung');
+  const [operationError,setOperationError]=useState('');
+  const [operationSaving,setOperationSaving]=useState(false);
   const [isAssignBooking, setIsAssignBooking] = useState(false);
-  const [assignBookingCode, setAssignBookingCode] = useState('BK-8491');
-  const [assignTimeSlot, setAssignTimeSlot] = useState('06:00 - 07:30');
-  const [assignCustomer, setAssignCustomer] = useState('Khách đặt sân');
+  const [assignBookingCode, setAssignBookingCode] = useState('');
+  const [assignTimeSlot, setAssignTimeSlot] = useState('');
+  const [assignCustomer, setAssignCustomer] = useState('');
 
   // Toast feedback
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -117,15 +119,15 @@ export default function FacilityManagementView({
   const handleAddNewEquipment = async (newEq: FacilityEquipment) => {
     await onAddEquipment(newEq);
     setSubView('main');
-    showToast(`Đã thêm thiết bị [${newEq.code}] ${newEq.name}!`);
+    showToast(`Đã lưu thiết bị ${newEq.name} vào database.`);
   };
 
   // Court toggle logic
-  const handleCourtSwitchClick = (court: CourtStatusItem) => {
+  const handleCourtSwitchClick = async (court: CourtStatusItem) => {
     if (court.isLocked) {
       // Unlock directly
-      onToggleCourtLock(court.id, false);
-      showToast(`Đã mở lại ${court.name} đón khách!`);
+      try {await onToggleCourtLock(court.id, false);showToast(`Đã mở lại ${court.name} đón khách!`);}
+      catch(error){setOperationError(error instanceof Error?error.message:'Chưa mở được sân.');}
     } else {
       // Open dialog to input reason
       setLockingCourt(court);
@@ -155,37 +157,45 @@ export default function FacilityManagementView({
   };
 
   // Equipment relocation & booking allocation
-  const handleConfirmRelocate = () => {
-    if (!relocatingEq) return;
+  const handleConfirmRelocate = async () => {
+    if (!relocatingEq || operationSaving) return;
+    setOperationSaving(true);setOperationError('');
+    try {
 
     if (targetLocation === 'Kho chung') {
       if (onReturnToWarehouse) {
-        onReturnToWarehouse(relocatingEq.code);
+        await onReturnToWarehouse(relocatingEq.code);
       } else {
-        onUpdateEquipmentLocation(relocatingEq.code, 'Kho chung');
+        await onUpdateEquipmentLocation(relocatingEq.code, 'Kho chung');
       }
       showToast(`Đã thu hồi [${relocatingEq.code}] về Kho chung an toàn!`);
     } else {
       if (isAssignBooking && onAssignBookingToEquipment) {
-        onAssignBookingToEquipment(
+        const selected=bookings.find(booking=>booking.code===assignBookingCode.trim()&&booking.court===targetLocation&&['Đã đặt','Đang sử dụng'].includes(booking.status));
+        if(!selected)throw Error('Chọn mã lượt đặt có thật và thuộc sân đang điều phối.');
+        await onAssignBookingToEquipment(
           relocatingEq.code,
           targetLocation,
-          assignTimeSlot.trim() || '06:00 - 07:30',
-          assignBookingCode.trim() || 'BK-8491',
-          assignCustomer.trim() || 'Khách đặt sân'
+          selected.time,
+          selected.code,
+          selected.customerName
         );
         showToast(`Đã gán [${relocatingEq.code}] vào ${targetLocation} ca ${assignTimeSlot}!`);
       } else {
-        onUpdateEquipmentLocation(relocatingEq.code, targetLocation);
+        await onUpdateEquipmentLocation(relocatingEq.code, targetLocation);
         showToast(`Đã điều phối [${relocatingEq.code}] sang ${targetLocation}!`);
       }
     }
 
     setRelocatingEq(null);
     setIsAssignBooking(false);
+    }catch(error){setOperationError(error instanceof Error?error.message:'Chưa lưu được vị trí thiết bị.');}
+    finally{setOperationSaving(false);}
   };
 
-  const handleCompleteEquipmentWarranty = (equipmentCode: string, equipmentName?: string) => {
+  const handleCompleteEquipmentWarranty = async (equipmentCode: string, equipmentName?: string) => {
+    if(!onCompleteEquipmentWarranty)throw Error('Chưa kết nối thao tác nghiệm thu.');
+    await onCompleteEquipmentWarranty(equipmentCode,equipmentName);
     const today = new Date().toLocaleDateString('vi-VN');
     const formattedDate = `Hôm nay (${today})`;
 
@@ -198,10 +208,6 @@ export default function FacilityManagementView({
         healthRate: 'Tốt (Đã nghiệm thu)',
         lastMaintenance: formattedDate,
       });
-    }
-
-    if (onCompleteEquipmentWarranty) {
-      onCompleteEquipmentWarranty(equipmentCode, equipmentName);
     }
 
     showToast(`Đã nghiệm thu thiết bị [${equipmentCode}] và cập nhật vào Nhật ký xử lý sự cố!`);
@@ -223,14 +229,15 @@ export default function FacilityManagementView({
   }
 
   if (subView === 'incident_detail') {
-    const currentIncident = incidents.find(i => i.id === selectedIncidentId) || incidents[0];
+    const currentIncident = incidents.find(i => i.id === selectedIncidentId && !i.deletedAt);
+    if(!currentIncident)return <div className="space-y-3 p-3"><p className="text-xs text-slate-700">Báo cáo không còn trong danh sách hiện tại.</p><button type="button" onClick={()=>setSubView('main')} className="rounded-lg bg-emerald-700 px-3 py-2 text-xs text-white">Quay lại cơ sở vật chất</button></div>;
     return (
       <IncidentDetailView
         incident={currentIncident}
         equipments={equipments}
         onBack={() => setSubView('main')}
-        onUpdateStatus={(id, st, unlock) => {
-          onUpdateIncidentStatus(id, st, unlock);
+        onUpdateStatus={async (id, st, unlock) => {
+          await onUpdateIncidentStatus(id, st, unlock);
           showToast(`Đã cập nhật trạng thái sự cố #${id}!`);
         }}
         onAddTimelineLog={onAddTimelineLog}
@@ -270,7 +277,7 @@ export default function FacilityManagementView({
           setSubView('main');
           setSelectedEquipmentDetail(null);
           setRelocatingEq(eq);
-          setTargetLocation(eq.currentLocation === 'Kho chung' ? 'Sân 01' : 'Kho chung');
+          setTargetLocation(eq.currentLocation === 'Kho chung' ? courts.find(c=>!c.isLocked)?.name||'Kho chung' : 'Kho chung');
           setIsAssignBooking(false);
         }}
         onReportIncident={() => {
@@ -287,6 +294,7 @@ export default function FacilityManagementView({
   // ==========================================
   return (
     <div className="flex-1 min-h-full space-y-4 bg-white p-4 pb-8 animate-in fade-in duration-200 w-full max-w-full min-w-0">
+      {operationError&&<p role="alert" className="rounded-lg bg-red-50 p-3 text-xs text-red-700">{operationError}</p>}
       {/* Toast Notification */}
       {toastMessage && (
         <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 rounded-2xl bg-emerald-600 text-white border border-emerald-500 px-4 py-2.5 text-xs font-black shadow-2xl shadow-emerald-900/30 flex items-center gap-2 animate-in fade-in slide-in-from-top duration-200 w-[90%] max-w-[360px] justify-center text-center">
@@ -397,6 +405,19 @@ export default function FacilityManagementView({
       </div>
 
       {/* 5. Bảng giá bồi thường thiết bị */}
+      <section className="space-y-2 rounded-xl border border-slate-200 bg-white p-3">
+        <h2 className="text-xs font-bold text-emerald-800">Thiết bị theo số Seri / Asset ID</h2>
+        {equipments.map(equipment=><div key={equipment.id} className="flex items-center justify-between gap-2 border-t border-slate-100 py-2">
+          <div className="min-w-0"><p className="text-xs font-semibold text-slate-900">{equipment.name}</p>
+            <p className="break-words text-[10px] text-slate-500">{equipment.code} · Seri: {equipment.serialNumber||'Chưa ghi nhận'}</p>
+            <p className="text-[10px] text-emerald-800">{equipment.currentLocation} · {equipment.statusLabel}</p></div>
+          <div className="flex shrink-0 flex-col gap-1">
+            <button type="button" onClick={()=>{setSelectedEquipmentDetail(equipment);setSubView('equipment_detail');}} className="rounded-lg border border-slate-200 px-2 py-1 text-[10px] text-slate-700">Chi tiết</button>
+            <button type="button" onClick={()=>{setOperationError('');setRelocatingEq(equipment);setTargetLocation('Kho chung');}} className="rounded-lg bg-emerald-700 px-2 py-1 text-[10px] text-white hover:bg-emerald-800">Điều chuyển</button>
+          </div>
+        </div>)}
+        {!equipments.length&&<p className="text-xs text-slate-500">Chưa có dữ liệu thiết bị từ máy chủ.</p>}
+      </section>
       <CompensationPriceTable
         onAddEquipment={() => setSubView('add_equipment')}
         equipments={equipments}
@@ -502,6 +523,7 @@ export default function FacilityManagementView({
             </div>
 
             <div className="rounded-2xl bg-emerald-50/70 border border-emerald-200 p-3 space-y-1">
+              {operationError&&<p role="alert" className="text-xs text-red-700">{operationError}</p>}
               <div className="text-[10px] font-black text-emerald-700 uppercase">
                 MÃ THIẾT BỊ: {relocatingEq.code}
               </div>
@@ -523,14 +545,7 @@ export default function FacilityManagementView({
                 className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-xs font-bold text-slate-800 outline-none focus:border-emerald-600"
               >
                 <option value="Kho chung">Kho chung nhà thi đấu</option>
-                <option value="Sân 01">Sân 01 (Tiêu chuẩn A)</option>
-                <option value="Sân 02">Sân 02 (Tiêu chuẩn A)</option>
-                <option value="Sân 03">Sân 03 (Trong nhà VIP)</option>
-                <option value="Sân 04">Sân 04 (Tiêu chuẩn B)</option>
-                <option value="Sân 05">Sân 05 (Tiêu chuẩn B)</option>
-                <option value="Sân 06">Sân 06 (Tiêu chuẩn B)</option>
-                <option value="Sân 07">Sân 07 (Tiêu chuẩn A)</option>
-                <option value="Sân 08">Sân 08 (Tiêu chuẩn A)</option>
+                {courts.filter(c=>!c.isLocked).map(court=><option key={court.id} value={court.name}>{court.name}</option>)}
               </select>
             </div>
 
@@ -608,6 +623,7 @@ export default function FacilityManagementView({
               </button>
               <button
                 type="button"
+                disabled={operationSaving}
                 onClick={handleConfirmRelocate}
                 className="rounded-xl bg-emerald-700 hover:bg-emerald-800 py-2.5 text-xs font-black text-white shadow-md shadow-emerald-700/25 cursor-pointer"
               >

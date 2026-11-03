@@ -3,7 +3,6 @@ import { ArrowLeft, CheckCircle2, Plus, Trash2, AlertTriangle, Camera, UserRound
 import type { BookingDetail } from '../../pages/AdminSchedulePage';
 import type { FacilityEquipment, FacilityIncident } from '../../types/admin';
 import type { IncidentReporter } from '../../utils/incidentStorage';
-import { readCheckoutSnapshot } from '../../utils/incidentStorage';
 import { facilityApiService } from '../../services/facilityService';
 import { DATA, useCompensationCatalog } from '../../utils/compensationCatalog';
 import { buildCheckoutReports, calculateCheckoutDamage, checkoutCourtCode, type CheckoutRequest, type CheckoutResult, type DamageDraft } from '../../utils/checkoutSettlement';
@@ -26,23 +25,26 @@ export default function CheckoutSettlementView({booking,date,equipments,incident
     && (!report.bookingDate || report.bookingDate === bookingDate) && report.compensationPaymentStatus !== 'paid' && report.compensationPaymentStatus !== 'not_required');
   const toDraft=(report:FacilityIncident):DamageDraft=>({id:report.id,existingId:report.id,
     itemId:report.compensationItemId || catalog.find(item=>item.equipment?.code === report.equipmentCode)?.id || '',
-    liability:report.liability || 'BAO_HANH_SAN_VAN_DONG',description:report.description,images:report.images || []});
+    equipmentCode:report.equipmentCode,liability:report.liability || 'BAO_HANH_SAN_VAN_DONG',description:report.description,images:report.images || []});
   const [expanded,setExpanded]=useState(linked.length>0);
   const [drafts,setDrafts]=useState<DamageDraft[]>(()=>linked.map(toDraft));
   const [paymentConfirmed,setPaymentConfirmed]=useState(false);
+  const [bankTransactionCode,setBankTransactionCode]=useState('');
   const [saving,setSaving]=useState(false);
   const [reading,setReading]=useState(false);
   const [error,setError]=useState('');
   const [previous,setPrevious]=useState<CheckoutResult|null>(null);
   const [checkingReceipt,setCheckingReceipt]=useState(true);
-  useEffect(()=>{let mounted=true; setCheckingReceipt(true); Promise.all([
-    readCheckoutSnapshot(reference).catch(()=>undefined),facilityApiService.getCheckoutReceipt(reference).catch(()=>undefined),
-  ]).then(([local,remote])=>{if(mounted&&(remote||local))setPrevious(remote||local||null);}).finally(()=>{if(mounted)setCheckingReceipt(false);}); return()=>{mounted=false;};},[reference]);
+  useEffect(()=>{let mounted=true;setCheckingReceipt(true);
+    facilityApiService.getCheckoutReceipt(reference).then(remote=>{if(mounted)setPrevious(remote||null);})
+      .catch(error=>{if(mounted)setError(error instanceof Error?error.message:'Chưa đọc được quyết toán.');})
+      .finally(()=>{if(mounted)setCheckingReceipt(false);});
+    return()=>{mounted=false;};},[reference]);
   useEffect(()=>{if(linked.length){setExpanded(true);setDrafts(current=>[...current,...linked.filter(report=>!current.some(item=>item.existingId===report.id)).map(toDraft)]);}},[incidents]);
   const activeDrafts=expanded?drafts:[];
   const damage=calculateCheckoutDamage(activeDrafts,catalog,incidents);
   const balance=Number(booking.remaining.replace(/\D/g,''))||0;
-  const amountDue=balance+damage;
+  const amountDue=damage;
   const timeParts=booking.time.match(/\d{1,2}:\d{2}/g);
   const toMinutes=(time:string)=>{const [hour,minute]=time.split(':').map(Number);return hour*60+minute;};
   const duration=timeParts?.length===2?toMinutes(timeParts[1])-toMinutes(timeParts[0]):0;
@@ -62,12 +64,14 @@ export default function CheckoutSettlementView({booking,date,equipments,incident
     if(saving||reading||checkingReceipt)return;
     setError('');
     try {
+      if(balance>0)throw Error('Tiền sân phải thanh toán đủ trước khi sử dụng. Checkout chỉ thu bồi thường.');
       if(expanded&&!drafts.length)throw Error('Thêm thiết bị hoặc chọn báo cáo đã có.');
       if(amountDue>0&&!paymentConfirmed)throw Error('Xác nhận đã nhận thanh toán VietQR.');
+      if(amountDue>0&&!bankTransactionCode.trim())throw Error('Nhập mã giao dịch ngân hàng để đối soát bồi thường.');
       const base={reference,bookingCode:booking.code,bookingDate,courtName:booking.court,customerName:booking.customerName,customerPhone:booking.phone,remainingBalance:balance,expectedAmount:amountDue};
       const reports=buildCheckoutReports(activeDrafts,catalog,incidents,base,currentUser);
       setSaving(true);
-      await onComplete({...base,paymentConfirmed,reports});
+      await onComplete({...base,paymentConfirmed,reports,bankTransactionCode:bankTransactionCode.trim()});
       onFinished();
     }catch(failure){setError(failure instanceof Error?failure.message:'Chưa hoàn tất được trả sân.');}finally{setSaving(false);}
   };
@@ -109,7 +113,8 @@ export default function CheckoutSettlementView({booking,date,equipments,incident
           return <div key={draft.id} className="space-y-2 rounded-lg border border-slate-200 p-2.5">
             <div className="flex items-center justify-between gap-2"><span className="text-[11px] font-semibold text-slate-700">{original?`Báo cáo ${original.id}`:'Sự cố mới'}</span>{!linked.some(report=>report.id===draft.existingId)&&<button type="button" title="Bỏ sự cố" onClick={()=>{setDrafts(current=>current.filter(item=>item.id!==draft.id));setPaymentConfirmed(false);}} className="text-red-700"><Trash2 className="h-3.5 w-3.5"/></button>}</div>
             <label className="block text-[11px] text-slate-600">Thiết bị <span className="text-red-600">*</span><select disabled={!!original?.compensationItemId} value={draft.itemId} onChange={event=>update(draft.id,{itemId:event.target.value})} className={`${inputClass} mt-1`}><option value="">Chọn từ bảng giá bồi thường</option>{Object.entries(DATA).map(([sport,info])=><optgroup key={sport} label={info.label}>{(original?catalog:liveCatalog).filter(item=>item.sport===sport).map(item=><option key={item.id} value={item.id}>{item.name}{item.equipment?` · ${item.equipment.code}`:''} · {money(original?.compensationPrice ?? item.price)}</option>)}</optgroup>)}</select></label>
-            <label className="block text-[11px] text-slate-600">Trách nhiệm<select value={draft.liability} onChange={event=>update(draft.id,{liability:event.target.value as DamageDraft['liability']})} className={`${inputClass} mt-1`}><option value="DO_KHACH_LAM_HONG">Do khách làm hỏng / làm mất</option><option value="BAO_HANH_SAN_VAN_DONG">Sân chịu: hao mòn / bảo hành</option></select></label>
+            {!original&&<label className="block text-[11px] text-slate-600">Thiết bị cụ thể (nếu có)<select value={draft.equipmentCode||''} onChange={event=>update(draft.id,{equipmentCode:event.target.value})} className={`${inputClass} mt-1`}><option value="">Chọn Seri / Asset ID</option>{equipments.filter(item=>checkoutCourtCode(item.currentLocation)===checkoutCourtCode(booking.court)).map(item=><option key={item.code} value={item.code}>{item.name} · {item.serialNumber||item.code}</option>)}</select></label>}
+            <label className="block text-[11px] text-slate-600">Trách nhiệm<select disabled={!!original} value={draft.liability} onChange={event=>update(draft.id,{liability:event.target.value as DamageDraft['liability']})} className={`${inputClass} mt-1`}><option value="DO_KHACH_LAM_HONG">Do khách làm hỏng / làm mất</option><option value="BAO_HANH_SAN_VAN_DONG">Sân chịu: hao mòn / bảo hành</option></select></label>
             <textarea rows={2} readOnly={!!original} value={draft.description} onChange={event=>update(draft.id,{description:event.target.value})} placeholder="Mô tả hư hỏng (bắt buộc)" className={`${inputClass} resize-none`}/>
             {!original&&<label className="inline-flex cursor-pointer items-center gap-1 text-[11px] font-semibold text-emerald-800"><Camera className="h-3.5 w-3.5"/>Thêm ảnh (có thể bổ sung sau)<input type="file" accept="image/jpeg,image/png,image/webp" onChange={event=>upload(draft.id,event.target.files?.[0])} className="sr-only"/></label>}
             {draft.images[0]&&<img src={draft.images[0]} alt="Ảnh sự cố" className="max-h-24 rounded-lg object-contain"/>}
@@ -127,7 +132,7 @@ export default function CheckoutSettlementView({booking,date,equipments,incident
       {damage>0&&<div className="flex justify-between text-red-700"><span>Bồi thường thiết bị</span><strong>{money(damage)}</strong></div>}
       <div className="flex items-center justify-between gap-2 border-t border-slate-100 pt-2"><span className="font-bold text-emerald-800">Cần thu thêm</span><strong className={`text-lg ${amountDue>0?'text-red-700':'text-emerald-800'}`}>{money(amountDue)}</strong></div>
     </section>
-    {amountDue>0&&<section className="space-y-2 rounded-xl border border-black/15 p-3"><h3 className="text-xs font-bold text-emerald-800">Thanh toán qua VietQR</h3><img src="/images/QR.png" alt="VietQR chuyển khoản" className="mx-auto w-36 rounded-xl"/><p className="text-center text-xs font-semibold text-slate-800">Số tiền: {money(amountDue)}</p><p className="text-center text-[11px] text-slate-600">Nội dung: CK {booking.code}</p><label className="flex items-center gap-2 text-xs text-emerald-800"><input type="checkbox" checked={paymentConfirmed} onChange={event=>setPaymentConfirmed(event.target.checked)} disabled={saving} className="accent-emerald-700"/>Đã kiểm tra nhận đủ {money(amountDue)} qua VietQR</label></section>}
-    <button type="button" onClick={confirm} disabled={checkingReceipt||saving||reading||(amountDue>0&&!paymentConfirmed)} className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-700 py-3 text-xs font-bold text-white hover:bg-emerald-800 disabled:opacity-60"><CheckCircle2 className="h-4 w-4"/>{saving?'Đang lưu...':checkingReceipt?'Đang kiểm tra lượt trả sân...':'Xác nhận Check-out'}</button>
+    {amountDue>0&&<section className="space-y-2 rounded-xl border border-black/15 p-3"><h3 className="text-xs font-bold text-emerald-800">Thanh toán qua VietQR</h3><img src="/images/QR.png" alt="VietQR chuyển khoản" className="mx-auto w-36 rounded-xl"/><p className="text-center text-xs font-semibold text-slate-800">Số tiền: {money(amountDue)}</p><p className="text-center text-[11px] text-slate-600">Nội dung: CK {booking.code}</p><label className="block text-[11px] text-slate-700">Mã giao dịch ngân hàng<input value={bankTransactionCode} onChange={event=>setBankTransactionCode(event.target.value)} disabled={saving} placeholder="Mã giao dịch trên ứng dụng ngân hàng" className={`${inputClass} mt-1`}/></label><label className="flex items-center gap-2 text-xs text-emerald-800"><input type="checkbox" checked={paymentConfirmed} onChange={event=>setPaymentConfirmed(event.target.checked)} disabled={saving} className="accent-emerald-700"/>Đã kiểm tra nhận đủ {money(amountDue)} qua VietQR</label></section>}
+    <button type="button" onClick={confirm} disabled={checkingReceipt||saving||reading||balance>0||(amountDue>0&&(!paymentConfirmed||!bankTransactionCode.trim()))} className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-700 py-3 text-xs font-bold text-white hover:bg-emerald-800 disabled:opacity-60"><CheckCircle2 className="h-4 w-4"/>{saving?'Đang lưu...':checkingReceipt?'Đang kiểm tra lượt trả sân...':'Xác nhận Check-out'}</button>
   </div>;
 }

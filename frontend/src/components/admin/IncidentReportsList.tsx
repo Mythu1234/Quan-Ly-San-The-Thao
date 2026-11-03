@@ -21,7 +21,7 @@ export default function IncidentReportsList({ incidents, onView, onDelete, onCre
     setSaving(true);
     setError('');
     try { await onDelete(deleting.id); setDeleting(null); }
-    catch { setError('Chưa xóa được báo cáo. Vui lòng thử lại.'); }
+    catch (failure) { setError(failure instanceof Error?failure.message:'Chưa xóa được báo cáo. Vui lòng thử lại.'); }
     finally { setSaving(false); }
   };
   return <section id="recent-incidents" className="scroll-mt-3 space-y-3">

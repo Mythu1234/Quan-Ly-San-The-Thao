@@ -1,483 +1,101 @@
-import {
-  FacilityEquipment,
-  CourtStatusItem,
-  FacilityIncident,
-  CreateEquipmentDTO,
-  UpdateEquipmentDTO,
-  CreateIncidentDTO,
-  FacilityDashboardStats,
-  EquipmentCategory,
-} from '../types/facility.js';
-import { facilityRepository } from '../repositories/facilityRepository.js';
+import type { FacilityEquipment, CreateEquipmentDTO, UpdateEquipmentDTO, CreateIncidentDTO, FacilityIncident } from '../types/facility.js';
+import { facilityRepository as repository } from '../repositories/facilityRepository.js';
 
+const labels:Record<string,string>={tru_luoi:'Trụ & Lưới',tham_san:'Mặt thảm',chieu_sang:'Chiếu sáng',dung_cu:'Dụng cụ',ve_sinh:'Vệ sinh'};
+function validatePrices(dto:UpdateEquipmentDTO) {
+  for(const price of [dto.purchasePrice,dto.compensationPrice]) if(price!==undefined && (!Number.isSafeInteger(price)||price<0)) throw Error('Giá thiết bị phải là số nguyên không âm.');
+}
 export class FacilityService {
-  private categoryLabels: Record<EquipmentCategory, string> = {
-    tru_luoi: 'Trụ & Lưới',
-    tham_san: 'Mặt thảm',
-    chieu_sang: 'Chiếu sáng',
-    dung_cu: 'Dụng cụ',
-    ve_sinh: 'Vệ sinh',
-  };
-
-  // ==========================================
-  // DASHBOARD KPI STATS (UC-06)
-  // ==========================================
-  public getDashboardStats(): FacilityDashboardStats {
-    const equipments = facilityRepository.getAllEquipments();
-    const courts = facilityRepository.getAllCourts();
-    const incidents = facilityRepository.getAllIncidents().filter(incident => !incident.deletedAt);
-
-    const readyEquipments = equipments.filter((e) => e.status === 'san_sang').length;
-    const inUseEquipments = equipments.filter((e) => e.status === 'dang_su_dung').length;
-    const maintenanceEquipments = equipments.filter((e) => e.status === 'bao_tri' || e.status === 'hong').length;
-
-    const lockedCourts = courts.filter((c) => c.isLocked).length;
-    const openCourts = courts.length - lockedCourts;
-
-    const urgentIncidents = incidents.filter(
-      (i) => i.severity === 'khan_cap' && i.status !== 'da_khac_phuc'
-    ).length;
-    const pendingIncidents = incidents.filter((i) => i.status !== 'da_khac_phuc').length;
-
-    return {
-      totalEquipments: equipments.length,
-      readyEquipments,
-      inUseEquipments,
-      maintenanceEquipments,
-      totalCourts: courts.length,
-      lockedCourts,
-      openCourts,
-      totalIncidents: incidents.length,
-      urgentIncidents,
-      pendingIncidents,
-    };
+  async getDashboardStats() {
+    const [equipments,courts,all]=await Promise.all([repository.getAllEquipments(),repository.getAllCourts(),repository.getAllIncidents()]);
+    const incidents=all.filter(i=>!i.deletedAt);
+    return {totalEquipments:equipments.length,readyEquipments:equipments.filter(e=>e.status==='san_sang').length,
+      inUseEquipments:equipments.filter(e=>e.status==='dang_su_dung').length,maintenanceEquipments:equipments.filter(e=>['hong','bao_tri'].includes(e.status)).length,
+      totalCourts:courts.length,lockedCourts:courts.filter(c=>c.isLocked).length,openCourts:courts.filter(c=>!c.isLocked).length,
+      totalIncidents:incidents.length,urgentIncidents:incidents.filter(i=>i.severity==='khan_cap'&&i.status!=='da_khac_phuc').length,
+      pendingIncidents:incidents.filter(i=>i.status!=='da_khac_phuc').length};
   }
-
-  // ==========================================
-  // EQUIPMENT OPERATIONS (UC-07)
-  // ==========================================
-  public listEquipments(filters?: {
-    location?: string;
-    category?: string;
-    status?: string;
-    search?: string;
-  }): FacilityEquipment[] {
-    let list = facilityRepository.getAllEquipments();
-
-    if (filters) {
-      const { location, category, status, search } = filters;
-
-      if (location && location !== 'ALL') {
-        list = list.filter((e) => e.currentLocation.toLowerCase() === location.toLowerCase());
-      }
-
-      if (category && category !== 'ALL') {
-        list = list.filter((e) => e.category === category);
-      }
-
-      if (status && status !== 'ALL') {
-        list = list.filter((e) => e.status === status);
-      }
-
-      if (search && search.trim()) {
-        const q = search.trim().toLowerCase();
-        list = list.filter(
-          (e) =>
-            e.name.toLowerCase().includes(q) ||
-            e.code.toLowerCase().includes(q) ||
-            e.categoryLabel.toLowerCase().includes(q) ||
-            e.currentLocation.toLowerCase().includes(q)
-        );
-      }
-    }
-
-    return list;
+  async listEquipments(filters:{location?:string;category?:string;status?:string;search?:string}={}) {
+    return (await repository.getAllEquipments()).filter(e=>(!filters.location||filters.location==='ALL'||e.currentLocation===filters.location)
+      &&(!filters.category||filters.category==='ALL'||e.category===filters.category)&&(!filters.status||filters.status==='ALL'||e.status===filters.status)
+      &&(!filters.search||[e.name,e.code,e.serialNumber,e.currentLocation].join(' ').toLowerCase().includes(filters.search.trim().toLowerCase())));
   }
-
-  public getEquipment(idOrCode: string): FacilityEquipment {
-    const item = facilityRepository.getEquipmentById(idOrCode) || facilityRepository.getEquipmentByCode(idOrCode);
-    if (!item) {
-      throw new Error(`Không tìm thấy trang thiết bị với mã: ${idOrCode}`);
-    }
+  async getEquipment(id:string) {
+    const item=await repository.getEquipmentById(id);
+    if(!item)throw Error('Không tìm thấy thiết bị.');
     return item;
   }
-
-  public createEquipment(dto: CreateEquipmentDTO): FacilityEquipment {
-    for (const value of [dto.purchasePrice, dto.compensationPrice]) {
-      if (value !== undefined && (!Number.isSafeInteger(value) || value < 0)) {
-        throw new Error('Giá thiết bị phải là số nguyên không âm!');
-      }
-    }
-    if (!dto.name || !dto.name.trim()) {
-      throw new Error('Tên trang thiết bị không được để trống!');
-    }
-
-    const { id, code } = facilityRepository.getNextEquipmentIdAndCode();
-    const finalCode = dto.code?.trim() || code;
-
-    // Check if code already exists
-    const existing = facilityRepository.getEquipmentByCode(finalCode);
-    if (existing) {
-      throw new Error(`Mã thiết bị "${finalCode}" đã tồn tại trên hệ thống!`);
-    }
-
-    const now = new Date();
-    const dateFormatted = `${now.getDate().toString().padStart(2, '0')}/${(now.getMonth() + 1)
-      .toString()
-      .padStart(2, '0')}/${now.getFullYear()}`;
-
-    const isWarehouse = dto.currentLocation.toLowerCase().includes('kho');
-    const status = isWarehouse ? 'san_sang' : 'dang_su_dung';
-    const statusLabel = isWarehouse ? 'Sẵn sàng' : 'Đang sử dụng';
-
-    const newEquipment: FacilityEquipment = {
-      id,
-      code: finalCode,
-      name: dto.name.trim(),
-      category: dto.category,
-      categoryLabel: this.categoryLabels[dto.category] || 'Dụng cụ',
-      sportType: dto.sportType || 'CauLong',
-      currentLocation: dto.currentLocation || 'Kho chung',
-      status,
-      statusLabel,
-      healthRate: dto.healthRate || 'Mới 100%',
-      purchaseDate: dto.purchaseDate ?? dateFormatted,
-      purchasePrice: dto.purchasePrice,
-      compensationPrice: dto.compensationPrice,
-      warrantyExpire: dto.warrantyExpire?.trim() || '',
-      supplier: dto.supplier?.trim() || undefined,
-      supplierPhone: dto.supplierPhone?.trim() || undefined,
-      warrantyAddress: dto.warrantyAddress?.trim() || undefined,
-      serialNumber: dto.serialNumber?.trim() || undefined,
-      notes: dto.notes?.trim() || undefined,
-      createdAt: now.toISOString(),
-      updatedAt: now.toISOString(),
-    };
-
-    return facilityRepository.createEquipment(newEquipment);
+  async createEquipment(dto:CreateEquipmentDTO) {
+    validatePrices(dto);
+    if(!dto.name?.trim()||!dto.serialNumber?.trim())throw Error('Nhập tên và số Seri / Asset Tag của thiết bị.');
+    const equipment:FacilityEquipment={...dto,id:'',code:'',name:dto.name.trim(),category:dto.category||'dung_cu',categoryLabel:labels[dto.category]||'Dụng cụ',
+      sportType:dto.sportType||'DungChung',currentLocation:dto.currentLocation||'Kho chung',status:'san_sang',statusLabel:'Sẵn sàng',
+      healthRate:dto.healthRate||'Mới 100%',purchaseDate:dto.purchaseDate||'',warrantyExpire:dto.warrantyExpire||''};
+    return repository.saveEquipment(equipment);
   }
-
-  public updateEquipment(idOrCode: string, dto: UpdateEquipmentDTO): FacilityEquipment {
-    for (const value of [dto.purchasePrice, dto.compensationPrice]) {
-      if (value !== undefined && (!Number.isSafeInteger(value) || value < 0)) {
-        throw new Error('Giá thiết bị phải là số nguyên không âm!');
-      }
-    }
-    const existing = this.getEquipment(idOrCode);
-
-    const updates: Partial<FacilityEquipment> = {};
-    if (dto.name !== undefined) updates.name = dto.name.trim();
-    if (dto.category !== undefined) {
-      updates.category = dto.category;
-      updates.categoryLabel = this.categoryLabels[dto.category] || 'Dụng cụ';
-    }
-    if (dto.sportType !== undefined) updates.sportType = dto.sportType;
-    if (dto.currentLocation !== undefined) updates.currentLocation = dto.currentLocation;
-    if (dto.status !== undefined) updates.status = dto.status;
-    if (dto.statusLabel !== undefined) updates.statusLabel = dto.statusLabel;
-    if (dto.healthRate !== undefined) updates.healthRate = dto.healthRate;
-    if (dto.purchaseDate !== undefined) updates.purchaseDate = dto.purchaseDate;
-    if (dto.purchasePrice !== undefined) updates.purchasePrice = dto.purchasePrice;
-    if (dto.compensationPrice !== undefined) updates.compensationPrice = dto.compensationPrice;
-    if (dto.notes !== undefined) updates.notes = dto.notes;
-    if (dto.lastMaintenance !== undefined) updates.lastMaintenance = dto.lastMaintenance;
-    if (dto.warrantyExpire !== undefined) updates.warrantyExpire = dto.warrantyExpire;
-    if (dto.supplier !== undefined) updates.supplier = dto.supplier;
-    if (dto.supplierPhone !== undefined) updates.supplierPhone = dto.supplierPhone;
-    if (dto.warrantyAddress !== undefined) updates.warrantyAddress = dto.warrantyAddress.trim();
-    if (dto.serialNumber !== undefined) updates.serialNumber = dto.serialNumber;
-
-    if (dto.assignedBookingCode !== undefined) updates.assignedBookingCode = dto.assignedBookingCode;
-    if (dto.assignedTimeSlot !== undefined) updates.assignedTimeSlot = dto.assignedTimeSlot;
-    if (dto.assignedCustomer !== undefined) updates.assignedCustomer = dto.assignedCustomer;
-    if (dto.assignedCourt !== undefined) updates.assignedCourt = dto.assignedCourt;
-
-    const updated = facilityRepository.updateEquipment(existing.id, updates);
-    if (!updated) {
-      throw new Error(`Cập nhật trang thiết bị ${idOrCode} thất bại.`);
-    }
-    return updated;
+  async updateEquipment(id:string,dto:UpdateEquipmentDTO) {
+    validatePrices(dto);
+    const old=await this.getEquipment(id);
+    const saved=await repository.updateEquipment(old.id,{...dto,...(dto.category?{categoryLabel:labels[dto.category]}:{})});
+    if(!saved)throw Error('Chưa cập nhật được thiết bị.');
+    return saved;
   }
-
-  public relocateEquipment(
-    code: string,
-    targetLocation: string,
-    bookingDetails?: {
-      bookingCode?: string;
-      timeSlot?: string;
-      customerName?: string;
-    }
-  ): FacilityEquipment {
-    const isWarehouse = targetLocation.toLowerCase().includes('kho');
-
-    const updates: Partial<FacilityEquipment> = {
-      currentLocation: targetLocation,
-      status: isWarehouse ? 'san_sang' : 'dang_su_dung',
-      statusLabel: isWarehouse ? 'Sẵn sàng' : 'Đang sử dụng',
-      lastMaintenance: new Date().toLocaleDateString('vi-VN'),
-    };
-
-    if (isWarehouse) {
-      updates.healthRate = 'Sẵn sàng điều phối';
-      updates.assignedBookingCode = undefined;
-      updates.assignedTimeSlot = undefined;
-      updates.assignedCustomer = undefined;
-      updates.assignedCourt = undefined;
-    } else if (bookingDetails?.bookingCode) {
-      updates.assignedBookingCode = bookingDetails.bookingCode;
-      updates.assignedTimeSlot = bookingDetails.timeSlot;
-      updates.assignedCustomer = bookingDetails.customerName;
-      updates.assignedCourt = targetLocation;
-    }
-
-    const result = facilityRepository.updateEquipment(code, updates);
-    if (!result) {
-      throw new Error(`Không thể điều chuyển thiết bị ${code}.`);
-    }
-    return result;
+  async relocateEquipment(code:string,targetLocation:string,bookingDetails?:{bookingCode?:string;timeSlot?:string;customerName?:string}) {
+    const old=await this.getEquipment(code);
+    const warehouse=targetLocation.toLowerCase().includes('kho');
+    const damaged=['hong','bao_tri'].includes(old.status);
+    if(!warehouse&&damaged)throw Error('Thiết bị hỏng hoặc bảo trì chưa thể điều phối ra sân.');
+    return this.updateEquipment(code,{currentLocation:targetLocation,status:damaged?old.status:warehouse?'san_sang':'dang_su_dung',
+      assignedBookingCode:warehouse?'':bookingDetails?.bookingCode||'',assignedCourt:warehouse?'':targetLocation,
+      assignedTimeSlot:warehouse?'':bookingDetails?.timeSlot||'',assignedCustomer:warehouse?'':bookingDetails?.customerName||''});
   }
-
-  public returnToWarehouse(code: string): FacilityEquipment {
-    return this.relocateEquipment(code, 'Kho chung');
+  async returnToWarehouse(code:string) {return this.relocateEquipment(code,'Kho chung');}
+  async checkoutCourtEquipments(_courtName:string):Promise<FacilityEquipment[]> {
+    throw Error('Vui lòng thực hiện quyết toán Checkout theo lượt đặt để thu hồi thiết bị.');
   }
-
-  public checkoutCourtEquipments(courtName: string): FacilityEquipment[] {
-    const all = facilityRepository.getAllEquipments();
-    const updatedList: FacilityEquipment[] = [];
-
-    for (const eq of all) {
-      if (eq.currentLocation === courtName || eq.assignedCourt === courtName) {
-        const returned = this.returnToWarehouse(eq.code);
-        updatedList.push(returned);
-      }
-    }
-    return updatedList;
+  async deleteEquipment(id:string) {
+    const old=await this.getEquipment(id);
+    if(old.status==='dang_su_dung')throw Error('Thu hồi thiết bị trước khi ngừng sử dụng.');
+    return repository.deleteEquipment(id);
   }
-
-  public deleteEquipment(idOrCode: string): boolean {
-    const existing = this.getEquipment(idOrCode);
-    const success = facilityRepository.deleteEquipment(existing.id);
-    if (!success) {
-      throw new Error(`Xóa thiết bị ${idOrCode} thất bại.`);
-    }
-    return true;
+  async listCourts() {return repository.getAllCourts();}
+  async toggleCourtLock(id:string,isLocked:boolean,reason?:string,lockedBy?:string) {
+    const row=await repository.updateCourtLock(id,isLocked,reason,lockedBy);
+    if(!row)throw Error('Không tìm thấy sân.');
+    return row;
   }
-
-  // ==========================================
-  // COURT STATUS OPERATIONS (UC-04)
-  // ==========================================
-  public listCourts(): CourtStatusItem[] {
-    return facilityRepository.getAllCourts();
+  async listIncidents(filters:{status?:string;severity?:string;courtId?:string}={}) {
+    return (await repository.getAllIncidents()).filter(i=>!i.deletedAt&&(!filters.status||filters.status==='ALL'||i.status===filters.status)
+      &&(!filters.severity||filters.severity==='ALL'||i.severity===filters.severity)&&(!filters.courtId||filters.courtId==='ALL'||i.courtId===filters.courtId));
   }
-
-  public toggleCourtLock(
-    courtId: string,
-    isLocked: boolean,
-    reason?: string,
-    lockedBy?: string
-  ): CourtStatusItem {
-    const court = facilityRepository.getCourtById(courtId);
-    if (!court) {
-      throw new Error(`Không tìm thấy sân với mã: ${courtId}`);
-    }
-
-    const updated = facilityRepository.updateCourtLock(
-      courtId,
-      isLocked,
-      isLocked ? (reason || 'Bảo trì kỹ thuật (Master Lock)') : undefined,
-      lockedBy || 'Admin'
-    );
-
-    if (!updated) {
-      throw new Error(`Không thể chuyển trạng thái khóa sân ${courtId}`);
-    }
-
-    return updated;
-  }
-
-  // ==========================================
-  // INCIDENT OPERATIONS (UC-03, UC-05)
-  // ==========================================
-  public listIncidents(filters?: {
-    status?: string;
-    severity?: string;
-    courtId?: string;
-  }): FacilityIncident[] {
-    let list = facilityRepository.getAllIncidents();
-
-    if (filters) {
-      const { status, severity, courtId } = filters;
-      if (status && status !== 'ALL') {
-        list = list.filter((i) => i.status === status);
-      }
-      if (severity && severity !== 'ALL') {
-        list = list.filter((i) => i.severity === severity);
-      }
-      if (courtId && courtId !== 'ALL') {
-        list = list.filter((i) => i.courtId?.toLowerCase() === courtId.toLowerCase());
-      }
-    }
-
-    return list;
-  }
-
-  public getIncident(id: string): FacilityIncident {
-    const incident = facilityRepository.getIncidentById(id);
-    if (!incident) {
-      throw new Error(`Không tìm thấy phiếu báo cáo sự cố: ${id}`);
-    }
+  async getIncident(id:string) {
+    const incident=await repository.getIncidentById(id);
+    if(!incident||incident.deletedAt)throw Error('Không tìm thấy báo cáo sự cố.');
     return incident;
   }
-
-  public deleteIncident(id: string): FacilityIncident {
-    const deleted = facilityRepository.deleteIncident(id);
-    if (!deleted) throw new Error('Không tìm thấy báo cáo sự cố.');
-    return deleted;
+  async deleteIncident(id:string) {
+    const old=await this.getIncident(id);
+    if(old.compensationPaymentStatus==='paid'||old.checkoutReference)throw Error('Báo cáo đã quyết toán phải được giữ để đối soát.');
+    return repository.deleteIncident(id);
   }
-
-  public createIncident(dto: CreateIncidentDTO): { incident: FacilityIncident; courtLocked: boolean } {
-    if (!dto.title || !dto.title.trim()) {
-      throw new Error('Vui lòng nhập tiêu đề sự cố!');
-    }
-    if (!dto.courtName || !dto.courtName.trim()) {
-      throw new Error('Vui lòng chọn sân xảy ra sự cố!');
-    }
-
-    const nextId = facilityRepository.getNextIncidentId();
-    const now = new Date();
-    const timeStr = now.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
-    const dateStr = `${now.getDate().toString().padStart(2, '0')}/${(now.getMonth() + 1)
-      .toString()
-      .padStart(2, '0')}/${now.getFullYear()}`;
-    const reportedAt = `${timeStr} • ${dateStr}`;
-
-    const severityLabels = {
-      khan_cap: 'Khẩn cấp',
-      trung_binh: 'Trung bình',
-      thap: 'Thấp',
-    };
-
-    const initialTimelineLogs = [
-      {
-        id: `REPORT-${nextId}`,
-        time: timeStr,
-        title: dto.title.trim(),
-        description: dto.description?.trim() || '',
-        images: dto.images?.length ? dto.images : dto.imageUrl ? [dto.imageUrl] : [],
-        active: true,
-      },
-    ];
-
-    const damageItems = dto.damageItems && dto.damageItems.length > 0
-      ? dto.damageItems
-      : dto.imageUrl
-      ? [
-          {
-            id: `DM-${Date.now()}`,
-            equipmentCode: dto.equipmentCode,
-            title: dto.title.trim(),
-            riskBadge: severityLabels[dto.severity] || 'Khẩn cấp',
-            riskColor: (dto.severity === 'khan_cap' ? 'rose' : dto.severity === 'trung_binh' ? 'blue' : 'amber') as any,
-            description: dto.description?.trim() || 'Hiện trường hỏng hóc thực tế',
-            imageLabel: 'Ảnh chụp hiện trường sự cố',
-            imageUrl: dto.imageUrl,
-          },
-        ]
-      : [];
-
-    const newIncident: FacilityIncident = {
-      bookingCode:dto.bookingCode?.trim(), bookingDate:dto.bookingDate, liability:dto.liability,
-      compensationPaymentStatus:'pending',
-      id: nextId,
-      courtId: dto.courtId,
-      courtName: dto.courtName,
-      courtZone: dto.courtZone || 'Khu A',
-      courtSubtype: dto.courtSubtype || 'Sân Cầu Lông Đa Năng',
-      equipmentCode: dto.equipmentCode,
-      equipmentName: dto.equipmentName,
-      compensationItemId: dto.compensationItemId,
-      compensationPrice: dto.compensationPrice,
-      title: dto.title.trim(),
-      description: dto.description?.trim() || 'Cần kiểm tra kỹ thuật tại chỗ',
-      severity: dto.severity,
-      severityLabel: severityLabels[dto.severity] || 'Trung bình',
-      status: 'cho_xu_ly',
-      statusLabel: 'Chờ xử lý',
-      reportedAt,
-      reporterName: dto.reporterName,
-      reporterRole: dto.reporterRole || 'Nhân viên vận hành',
-      reporterPhone: dto.reporterPhone,
-      damageItems,
-      timelineLogs: initialTimelineLogs,
-      technicianNote: dto.technicianNote,
-      imageUrl: dto.imageUrl,
-      images: dto.images || (dto.imageUrl ? [dto.imageUrl] : []),
-      createdAt: now.toISOString(),
-      updatedAt: now.toISOString(),
-    };
-
-    const created = facilityRepository.createIncident(newIncident);
-    return {
-      incident: created,
-      courtLocked: false,
-    };
+  async createIncident(dto:CreateIncidentDTO) {
+    const now=new Date().toISOString();
+    const report:FacilityIncident={...dto,id:dto.id||'',title:dto.title?.trim(),description:dto.description?.trim(),
+      severity:dto.severity||'trung_binh',severityLabel:{khan_cap:'Khẩn cấp',trung_binh:'Trung bình',thap:'Thấp'}[dto.severity]||'Trung bình',
+      status:'cho_xu_ly',statusLabel:'Chờ xử lý',reportedAt:now,createdAt:now,updatedAt:now,reporterName:dto.reporterName};
+    return {incident:await repository.createIncident(report),courtLocked:false};
   }
-
-  public updateIncidentStatus(
-    id: string,
-    newStatus: 'cho_xu_ly' | 'dang_sua_chua' | 'da_khac_phuc',
-    unlockCourt = false,
-    technicianNote?: string
-  ): { incident: FacilityIncident; courtUnlocked: boolean } {
-    const existing = this.getIncident(id);
-
-    const updated = facilityRepository.updateIncidentStatus(id, newStatus, technicianNote);
-    if (!updated) {
-      throw new Error(`Cập nhật trạng thái sự cố ${id} thất bại.`);
-    }
-
-    let courtWasUnlocked = false;
-
-    // UC-05: Nghiệm thu & Mở lại sân
-    if (newStatus === 'da_khac_phuc' && unlockCourt && existing.courtId) {
-      facilityRepository.updateCourtLock(existing.courtId, false);
-      courtWasUnlocked = true;
-
-      const nowTime = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
-      facilityRepository.addIncidentTimelineLog(id, {
-        id: `TL-${Date.now()}`,
-        time: nowTime,
-        title: 'Nghiệm thu hoàn tất & Mở lại sân',
-        description: `Ban quản lý đã kiểm tra hiện trường, các hạng mục hỏng hóc đã khắc phục đạt chuẩn. Sân ${existing.courtName} được mở lại phục vụ khách.`,
-        active: true,
-      });
-    }
-
-    return {
-      incident: facilityRepository.getIncidentById(id) || updated,
-      courtUnlocked: courtWasUnlocked,
-    };
+  async updateIncidentStatus(id:string,status:FacilityIncident['status'],unlockCourt=false,technicianNote?:string) {
+    if(!['cho_xu_ly','dang_sua_chua','da_khac_phuc'].includes(status))throw Error('Trạng thái sự cố không hợp lệ.');
+    const old=await this.getIncident(id);
+    await repository.updateIncidentStatus(id,status,technicianNote);
+    if(unlockCourt&&status==='da_khac_phuc'&&old.courtId)await this.toggleCourtLock(old.courtId,false);
+    return {incident:(await this.getIncident(id)),courtUnlocked:unlockCourt&&status==='da_khac_phuc'};
   }
-
-  public addTimelineLog(incidentId: string, title: string, description: string, images: string[] = []): FacilityIncident {
-    this.getIncident(incidentId);
-
-    const nowTime = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
-    const log = {
-      id: `TL-${Date.now()}`,
-      time: nowTime,
-      title: title.trim(),
-      description: description.trim(),
-      images,
-      active: true,
-    };
-
-    const updated = facilityRepository.addIncidentTimelineLog(incidentId, log);
-    if (!updated) {
-      throw new Error(`Thêm nhật ký tiến độ sự cố ${incidentId} thất bại.`);
-    }
-    return updated;
+  async addTimelineLog(id:string,title:string,description:string,images:string[]=[]) {
+    await this.getIncident(id);
+    if(!title?.trim())throw Error('Nhập tiêu đề nhật ký.');
+    return repository.addIncidentTimelineLog(id,{id:crypto.randomUUID(),time:new Date().toISOString(),title:title.trim(),description:description?.trim()||'',images,active:true});
   }
 }
-
-export const facilityService = new FacilityService();
+export const facilityService=new FacilityService();

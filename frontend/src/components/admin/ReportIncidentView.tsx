@@ -24,6 +24,7 @@ const severities = [
 export default function ReportIncidentView({ currentUser, equipments, courts, onBack, onSubmitIncident }: ReportIncidentViewProps) {
   const [courtId, setCourtId] = useState(courts[0]?.id || '');
   const [compensationItemId, setCompensationItemId] = useState('');
+  const [assetId,setAssetId]=useState('');
   const compensationItems = useCompensationCatalog(equipments);
   const [severity, setSeverity] = useState<FacilityIncident['severity']>('khan_cap');
   const [title, setTitle] = useState('');
@@ -58,7 +59,7 @@ export default function ReportIncidentView({ currentUser, equipments, courts, on
     if (saving || readingPhoto) return;
     const court = courts.find(item => item.id === courtId);
     const priceItem = compensationItems.find(item => item.id === compensationItemId);
-    const equipment = priceItem?.equipment;
+    const equipment = equipments.find(item=>item.code===assetId) || priceItem?.equipment;
     const warehouse = courtId === 'KHO_CHUNG';
     if ((!court && !warehouse) || !priceItem || !title.trim() || !description.trim() || !photo || !currentUser.name.trim()) {
       setError('Vui lòng chọn sân, thiết bị và nhập đủ tiêu đề, mô tả, ảnh.');
@@ -85,7 +86,7 @@ export default function ReportIncidentView({ currentUser, equipments, courts, on
     setError('');
     setSaving(true);
     try { await onSubmitIncident(incident, false); }
-    catch { setError('Chưa lưu được báo cáo. Vui lòng thử lại.'); }
+    catch (failure) { setError(failure instanceof Error?failure.message:'Chưa lưu được báo cáo. Vui lòng thử lại.'); }
     finally { setSaving(false); }
   };
 
@@ -96,6 +97,12 @@ export default function ReportIncidentView({ currentUser, equipments, courts, on
         <h1 className="text-lg font-bold text-slate-900">Báo cáo sự cố</h1>
       </div>
       <form onSubmit={handleSubmit} className="space-y-3">
+        <label className="block text-[11px] text-slate-700">Thiết bị cụ thể (Seri / Asset ID, nếu có)
+          <select value={assetId} onChange={event=>setAssetId(event.target.value)} className={`${fieldClass} mt-1`}>
+            <option value="">Chọn thiết bị để cập nhật tình trạng hỏng</option>
+            {equipments.filter(item=>item.currentLocation===(courts.find(c=>c.id===courtId)?.name||'Kho chung')).map(item=><option key={item.code} value={item.code}>{item.name} · {item.serialNumber||item.code}</option>)}
+          </select>
+        </label>
         {error && <p role="alert" className="flex items-center gap-2 rounded-lg bg-red-50 p-2 text-xs text-red-700"><AlertTriangle className="h-4 w-4 shrink-0" />{error}</p>}
         <fieldset disabled={saving} className="space-y-3 rounded-xl border border-black/15 p-3">
           <div className="grid gap-3 sm:grid-cols-2">

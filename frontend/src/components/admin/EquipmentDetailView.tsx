@@ -18,9 +18,9 @@ import type { FacilityEquipment } from '../../types/admin';
 interface EquipmentDetailViewProps {
   equipment: FacilityEquipment;
   onBack: () => void;
-  onRelocate: (eq: FacilityEquipment) => void;
-  onReportIncident: (eq: FacilityEquipment) => void;
-  onCompleteMaintenance?: (eq: FacilityEquipment) => void;
+  onRelocate: (eq: FacilityEquipment) => void | Promise<void>;
+  onReportIncident: (eq: FacilityEquipment) => void | Promise<void>;
+  onCompleteMaintenance?: (eq: FacilityEquipment) => void | Promise<void>;
 }
 
 export default function EquipmentDetailView({
@@ -33,7 +33,11 @@ export default function EquipmentDetailView({
   const [currentEq, setCurrentEq] = useState<FacilityEquipment>(equipment);
   const [maintainedSuccess, setMaintainedSuccess] = useState(false);
 
-  const handleAcceptance = () => {
+  const [saving,setSaving]=useState(false);
+  const [saveError,setSaveError]=useState('');
+  const handleAcceptance = async () => {
+    if(saving||!onCompleteMaintenance)return;
+    setSaving(true);setSaveError('');
     const today = new Date().toLocaleDateString('vi-VN');
     const formattedDate = `Hôm nay (${today})`;
     const updated: FacilityEquipment = {
@@ -43,11 +47,9 @@ export default function EquipmentDetailView({
       healthRate: 'Tốt (Đã nghiệm thu bảo hành)',
       lastMaintenance: formattedDate,
     };
-    setCurrentEq(updated);
-    setMaintainedSuccess(true);
-    if (onCompleteMaintenance) {
-      onCompleteMaintenance(updated);
-    }
+    try {await onCompleteMaintenance(updated);setCurrentEq(updated);setMaintainedSuccess(true);}
+    catch(error){setSaveError(error instanceof Error?error.message:'Chưa nghiệm thu được thiết bị.');}
+    finally{setSaving(false);}
   };
   const getEquipmentIcon = (category: string) => {
     switch (category) {
@@ -81,6 +83,7 @@ export default function EquipmentDetailView({
 
   return (
     <div className="flex-1 space-y-4 p-4 pb-28 animate-in fade-in duration-200 w-full max-w-full min-w-0">
+      {saveError&&<p role="alert" className="rounded-lg bg-red-50 p-3 text-xs text-red-700">{saveError}</p>}
       {/* 🟢 Top Badge & Navigation */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
@@ -316,7 +319,7 @@ export default function EquipmentDetailView({
         {/* Nút Nghiệm thu / Đã bảo hành xong */}
         <button
           type="button"
-          disabled={currentEq.status === 'san_sang' && maintainedSuccess}
+          disabled={saving || (currentEq.status === 'san_sang' && maintainedSuccess)}
           onClick={handleAcceptance}
           className={`w-full flex items-center justify-center gap-2 rounded-2xl py-3.5 text-xs font-black transition active:scale-95 cursor-pointer shadow-md ${
             currentEq.status === 'san_sang' && maintainedSuccess

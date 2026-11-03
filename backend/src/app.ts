@@ -3,6 +3,7 @@ import cors from 'cors';
 import employeeRoutes from './routes/employeeRoutes.js';
 import facilityRoutes from './routes/facilityRoutes.js';
 import shiftRoutes from './routes/shiftRoutes.js';
+import bookingRoutes from './routes/bookingRoutes.js';
 
 export const app = express();
 
@@ -35,6 +36,7 @@ app.get('/api/health', (_req: Request, res: Response) => {
 
 // API Routes
 app.use('/api/employees', employeeRoutes);
+app.use('/api/bookings', bookingRoutes);
 app.use('/api/facilities', facilityRoutes);
 app.use('/api/shifts', shiftRoutes);
 app.use('/api', facilityRoutes);

@@ -10,27 +10,27 @@ import {
 export class FacilityController {
   public async getCheckoutReceipt(req:Request,res:Response):Promise<void> {
     try {
-      const receipt=getCheckoutReceipt(String(req.params.reference));
+      const receipt=await getCheckoutReceipt(String(req.params.reference));
       if(!receipt){res.status(404).json({success:false});return;}
       res.json({success:true,data:receipt});
-    } catch { res.status(500).json({success:false,message:'Chưa đọc được quyết toán trả sân.'}); }
+    } catch (error:any) { res.status(error.status||500).json({success:false,message:error.message||'Chưa đọc được quyết toán trả sân.'}); }
   }
   public async completeCheckout(req: Request, res: Response): Promise<void> {
-    try { res.json({ success: true, data: completeCheckout(req.body) }); }
-    catch (error: any) { res.status(400).json({ success: false, message:error.message || 'Không hoàn tất được trả sân.' }); }
+    try { res.json({ success: true, data: await completeCheckout(req.body) }); }
+    catch (error: any) { res.status(error.status || 400).json({ success: false, message:error.message || 'Không hoàn tất được trả sân.' }); }
   }
   // ==========================================
   // DASHBOARD KPI (UC-06)
   // ==========================================
   public async getDashboardStats(_req: Request, res: Response): Promise<void> {
     try {
-      const stats = facilityService.getDashboardStats();
+      const stats = await facilityService.getDashboardStats();
       res.status(200).json({
         success: true,
         data: stats,
       });
     } catch (err: any) {
-      res.status(500).json({
+      res.status(err.status || 500).json({
         success: false,
         message: err.message || 'Lỗi khi lấy dữ liệu tổng quan cơ sở vật chất',
       });
@@ -49,14 +49,14 @@ export class FacilityController {
         search: typeof req.query.search === 'string' ? req.query.search : undefined,
       };
 
-      const list = facilityService.listEquipments(filters);
+      const list = await facilityService.listEquipments(filters);
       res.status(200).json({
         success: true,
         total: list.length,
         data: list,
       });
     } catch (err: any) {
-      res.status(500).json({
+      res.status(err.status || 500).json({
         success: false,
         message: err.message || 'Lỗi khi lấy danh sách trang thiết bị',
       });
@@ -66,13 +66,13 @@ export class FacilityController {
   public async getEquipmentById(req: Request, res: Response): Promise<void> {
     try {
       const id = String(req.params.id);
-      const item = facilityService.getEquipment(id);
+      const item = await facilityService.getEquipment(id);
       res.status(200).json({
         success: true,
         data: item,
       });
     } catch (err: any) {
-      res.status(404).json({
+      res.status(err.status || 404).json({
         success: false,
         message: err.message || 'Không tìm thấy trang thiết bị',
       });
@@ -82,14 +82,14 @@ export class FacilityController {
   public async createEquipment(req: Request, res: Response): Promise<void> {
     try {
       const dto: CreateEquipmentDTO = req.body;
-      const created = facilityService.createEquipment(dto);
+      const created = await facilityService.createEquipment(dto);
       res.status(201).json({
         success: true,
         message: `Thêm thiết bị [${created.code}] ${created.name} thành công!`,
         data: created,
       });
     } catch (err: any) {
-      res.status(400).json({
+      res.status(err.status || 400).json({
         success: false,
         message: err.message || 'Dữ liệu thêm thiết bị không hợp lệ',
       });
@@ -100,14 +100,14 @@ export class FacilityController {
     try {
       const id = String(req.params.id);
       const dto: UpdateEquipmentDTO = req.body;
-      const updated = facilityService.updateEquipment(id, dto);
+      const updated = await facilityService.updateEquipment(id, dto);
       res.status(200).json({
         success: true,
         message: `Cập nhật thiết bị ${updated.code} thành công!`,
         data: updated,
       });
     } catch (err: any) {
-      res.status(400).json({
+      res.status(err.status || 400).json({
         success: false,
         message: err.message || 'Lỗi khi cập nhật thiết bị',
       });
@@ -124,7 +124,7 @@ export class FacilityController {
         return;
       }
 
-      const updated = facilityService.relocateEquipment(code, targetLocation, {
+      const updated = await facilityService.relocateEquipment(code, targetLocation, {
         bookingCode,
         timeSlot,
         customerName,
@@ -136,7 +136,7 @@ export class FacilityController {
         data: updated,
       });
     } catch (err: any) {
-      res.status(400).json({
+      res.status(err.status || 400).json({
         success: false,
         message: err.message || 'Lỗi khi điều chuyển thiết bị',
       });
@@ -146,14 +146,14 @@ export class FacilityController {
   public async returnToWarehouse(req: Request, res: Response): Promise<void> {
     try {
       const code = String(req.params.code);
-      const updated = facilityService.returnToWarehouse(code);
+      const updated = await facilityService.returnToWarehouse(code);
       res.status(200).json({
         success: true,
         message: `Đã thu hồi thiết bị [${updated.code}] về Kho chung thành công!`,
         data: updated,
       });
     } catch (err: any) {
-      res.status(400).json({
+      res.status(err.status || 400).json({
         success: false,
         message: err.message || 'Lỗi khi thu hồi thiết bị về kho',
       });
@@ -168,14 +168,14 @@ export class FacilityController {
         return;
       }
 
-      const returned = facilityService.checkoutCourtEquipments(courtName);
+      const returned = await facilityService.checkoutCourtEquipments(courtName);
       res.status(200).json({
         success: true,
         message: `Đã tự động thu hồi ${returned.length} thiết bị của ${courtName} về Kho chung!`,
         data: returned,
       });
     } catch (err: any) {
-      res.status(400).json({
+      res.status(err.status || 400).json({
         success: false,
         message: err.message || 'Lỗi khi checkout thiết bị sân',
       });
@@ -185,13 +185,13 @@ export class FacilityController {
   public async deleteEquipment(req: Request, res: Response): Promise<void> {
     try {
       const id = String(req.params.id);
-      facilityService.deleteEquipment(id);
+      await facilityService.deleteEquipment(id);
       res.status(200).json({
         success: true,
         message: `Đã xóa trang thiết bị ${id} thành công!`,
       });
     } catch (err: any) {
-      res.status(400).json({
+      res.status(err.status || 400).json({
         success: false,
         message: err.message || 'Lỗi khi xóa trang thiết bị',
       });
@@ -203,14 +203,14 @@ export class FacilityController {
   // ==========================================
   public async getCourts(_req: Request, res: Response): Promise<void> {
     try {
-      const courts = facilityService.listCourts();
+      const courts = await facilityService.listCourts();
       res.status(200).json({
         success: true,
         total: courts.length,
         data: courts,
       });
     } catch (err: any) {
-      res.status(500).json({
+      res.status(err.status || 500).json({
         success: false,
         message: err.message || 'Lỗi khi lấy trạng thái các sân',
       });
@@ -227,7 +227,7 @@ export class FacilityController {
         return;
       }
 
-      const updated = facilityService.toggleCourtLock(id, isLocked, reason, lockedBy);
+      const updated = await facilityService.toggleCourtLock(id, isLocked, reason, lockedBy);
       const actionText = isLocked ? `Khóa bảo trì (Master Lock) ${updated.name}` : `Mở lại ${updated.name} đón khách`;
 
       res.status(200).json({
@@ -236,7 +236,7 @@ export class FacilityController {
         data: updated,
       });
     } catch (err: any) {
-      res.status(400).json({
+      res.status(err.status || 400).json({
         success: false,
         message: err.message || 'Lỗi khi chuyển trạng thái khóa sân',
       });
@@ -254,14 +254,14 @@ export class FacilityController {
         courtId: typeof req.query.courtId === 'string' ? req.query.courtId : undefined,
       };
 
-      const list = facilityService.listIncidents(filters);
+      const list = await facilityService.listIncidents(filters);
       res.status(200).json({
         success: true,
         total: list.length,
         data: list,
       });
     } catch (err: any) {
-      res.status(500).json({
+      res.status(err.status || 500).json({
         success: false,
         message: err.message || 'Lỗi khi lấy danh sách sự cố hỏng hóc',
       });
@@ -271,13 +271,13 @@ export class FacilityController {
   public async getIncidentById(req: Request, res: Response): Promise<void> {
     try {
       const id = String(req.params.id);
-      const item = facilityService.getIncident(id);
+      const item = await facilityService.getIncident(id);
       res.status(200).json({
         success: true,
         data: item,
       });
     } catch (err: any) {
-      res.status(404).json({
+      res.status(err.status || 404).json({
         success: false,
         message: err.message || 'Không tìm thấy phiếu báo cáo sự cố',
       });
@@ -287,7 +287,7 @@ export class FacilityController {
   public async createIncident(req: Request, res: Response): Promise<void> {
     try {
       const dto: CreateIncidentDTO = req.body;
-      const result = facilityService.createIncident(dto);
+      const result = await facilityService.createIncident(dto);
 
       const lockNote = result.courtLocked ? ' (Đã tự động kích hoạt Master Lock khóa bảo trì sân)' : '';
 
@@ -298,7 +298,7 @@ export class FacilityController {
         courtLocked: result.courtLocked,
       });
     } catch (err: any) {
-      res.status(400).json({
+      res.status(err.status || 400).json({
         success: false,
         message: err.message || 'Dữ liệu báo cáo sự cố không hợp lệ',
       });
@@ -307,10 +307,10 @@ export class FacilityController {
 
   public async deleteIncident(req: Request, res: Response): Promise<void> {
     try {
-      const deleted = facilityService.deleteIncident(String(req.params.id));
+      const deleted = await facilityService.deleteIncident(String(req.params.id));
       res.json({ success: true, data: deleted });
     } catch (error: any) {
-      res.status(404).json({ success: false, message: error.message || 'Không xóa được báo cáo sự cố.' });
+      res.status(error.status || 404).json({ success: false, message: error.message || 'Không xóa được báo cáo sự cố.' });
     }
   }
 
@@ -327,7 +327,7 @@ export class FacilityController {
         return;
       }
 
-      const result = facilityService.updateIncidentStatus(
+      const result = await facilityService.updateIncidentStatus(
         id,
         status,
         unlockCourt === true,
@@ -343,7 +343,7 @@ export class FacilityController {
         courtUnlocked: result.courtUnlocked,
       });
     } catch (err: any) {
-      res.status(400).json({
+      res.status(err.status || 400).json({
         success: false,
         message: err.message || 'Lỗi khi cập nhật trạng thái sự cố',
       });
@@ -364,14 +364,14 @@ export class FacilityController {
         return;
       }
 
-      const updated = facilityService.addTimelineLog(id, title, description || '', images || []);
+      const updated = await facilityService.addTimelineLog(id, title, description || '', images || []);
       res.status(200).json({
         success: true,
         message: 'Đã thêm nhật ký tiến độ sự cố thành công!',
         data: updated,
       });
     } catch (err: any) {
-      res.status(400).json({
+      res.status(err.status || 400).json({
         success: false,
         message: err.message || 'Lỗi khi thêm nhật ký sự cố',
       });
