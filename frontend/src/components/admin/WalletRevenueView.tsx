@@ -23,6 +23,7 @@ import type { Transaction } from '../../types/admin';
 interface WalletRevenueViewProps {
   transactions: Transaction[];
   onProcessRefund: (txId: string, bankRef: string) => void;
+  isLoading?: boolean;
 }
 
 type StatusFilter = 'all' | Transaction['status'];
@@ -151,7 +152,7 @@ function StatusPill({ status, compact = false }: { status: Transaction['status']
   );
 }
 
-export default function WalletRevenueView({ transactions, onProcessRefund }: WalletRevenueViewProps) {
+export default function WalletRevenueView({ transactions, onProcessRefund, isLoading = false }: WalletRevenueViewProps) {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [sportFilter, setSportFilter] = useState('all');
   const [reportPeriod, setReportPeriod] = useState<ReportPeriod>('day');
@@ -965,6 +966,18 @@ function DetailRow({
   value: string;
   wide?: boolean;
 }) {
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center h-60 gap-4 text-slate-400">
+        <svg className="animate-spin h-8 w-8 text-emerald-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+        </svg>
+        <p className="text-sm font-medium">Đang tải dữ liệu thống kê…</p>
+      </div>
+    );
+  }
+
   return (
     <div className={`flex min-w-0 items-start gap-2 rounded-xl border border-slate-100 bg-slate-50/70 p-2.5 ${wide ? 'sm:col-span-2' : ''}`}>
       <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-white text-slate-500 shadow-sm ring-1 ring-slate-200/70 [&>svg]:h-3.5 [&>svg]:w-3.5">

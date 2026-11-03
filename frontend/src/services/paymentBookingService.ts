@@ -340,9 +340,20 @@ export const paymentBookingService = {
         const endTime = (ds?.gio_ket_thuc || '09:00').slice(0, 5);
         const timeSlot = `${startTime} - ${endTime}`;
 
-        const dateStr = item.thoi_gian_thanh_toan
-          ? new Date(item.thoi_gian_thanh_toan).toLocaleDateString('vi-VN')
-          : ds?.ngay_dat || '01/10/2026';
+        // Format: "dd/mm/yyyy HH:mm" to match WalletRevenueView's parseTransactionDate
+        let dateStr = '01/10/2026 08:00';
+        if (item.thoi_gian_thanh_toan) {
+          const d = new Date(item.thoi_gian_thanh_toan);
+          const dd = String(d.getDate()).padStart(2, '0');
+          const mm = String(d.getMonth() + 1).padStart(2, '0');
+          const yyyy = d.getFullYear();
+          const hh = String(d.getHours()).padStart(2, '0');
+          const min = String(d.getMinutes()).padStart(2, '0');
+          dateStr = `${dd}/${mm}/${yyyy} ${hh}:${min}`;
+        } else if (ds?.ngay_dat) {
+          const parts = (ds.ngay_dat as string).split('-');
+          if (parts.length === 3) dateStr = `${parts[2]}/${parts[1]}/${parts[0]} 08:00`;
+        }
 
         return {
           id: item.ma_thanh_toan,

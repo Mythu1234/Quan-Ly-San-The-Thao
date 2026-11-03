@@ -24,8 +24,8 @@ import EditStaffView from '../components/admin/EditStaffView';
 import WalletRevenueView from '../components/admin/WalletRevenueView';
 import FacilityManagementView from '../components/admin/FacilityManagementView';
 import type { Employee, Transaction } from '../types/admin';
-import { INITIAL_TRANSACTIONS } from '../types/admin';
 import { employeeApiService } from '../services/employeeService';
+import { paymentBookingService } from '../services/paymentBookingService';
 
 export default function AdminDashboard({ onLogout, currentUser }: { onLogout: () => void; currentUser: IncidentReporter }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -35,7 +35,8 @@ export default function AdminDashboard({ onLogout, currentUser }: { onLogout: ()
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [staffError,setStaffError]=useState('');
   const currentEmployee=employees.find(employee=>currentUser.id?employee.id===currentUser.id:employee.phone===currentUser.phone);
-  const [transactions, setTransactions] = useState<Transaction[]>(INITIAL_TRANSACTIONS);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [transactionsLoading, setTransactionsLoading] = useState(true);
   const [staffSubView, setStaffSubView] = useState<'list' | 'add' | 'detail' | 'edit'>('list');
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
 
@@ -64,6 +65,27 @@ export default function AdminDashboard({ onLogout, currentUser }: { onLogout: ()
     }).catch(error=>{if(mounted)setStaffError(error instanceof Error?error.message:'Chưa tải được nhân viên.');});};
     refresh();const timer=setInterval(refresh,15000);window.addEventListener('focus',refresh);
     return () => { mounted = false;clearInterval(timer);window.removeEventListener('focus',refresh); };
+  }, []);
+
+  // Load real transactions from Supabase for Thống kê đặt sân
+  useEffect(() => {
+    let mounted = true;
+    const loadTransactions = async () => {
+      setTransactionsLoading(true);
+      try {
+        const data = await paymentBookingService.fetchAllTransactions();
+        if (mounted) setTransactions(data);
+      } catch {
+        // fallback: keep current state
+      } finally {
+        if (mounted) setTransactionsLoading(false);
+      }
+    };
+    void loadTransactions();
+    // Refresh every 30s to catch new bookings
+    const timer = setInterval(() => { void loadTransactions(); }, 30000);
+    window.addEventListener('focus', () => { void loadTransactions(); });
+    return () => { mounted = false; clearInterval(timer); };
   }, []);
 
   // Staff handlers connected to backend
@@ -337,6 +359,7 @@ export default function AdminDashboard({ onLogout, currentUser }: { onLogout: ()
             <WalletRevenueView
               transactions={transactions}
               onProcessRefund={handleProcessRefund}
+              isLoading={transactionsLoading}
             />
           </div>
         )}
