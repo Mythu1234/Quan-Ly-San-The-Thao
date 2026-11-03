@@ -17,7 +17,7 @@ const response=(status,body)=>new Response(JSON.stringify(body),{status,headers:
 async function main() {
   const api=load('src/services/apiClient.ts');
   const {facilityApiService:facility}=load('src/services/facilityService.ts',{'./apiClient':api});
-  const {bookingApiService:booking}=load('src/services/bookingService.ts',{'./apiClient':api});
+  const {bookingApiService:booking}=load('src/services/bookingService.ts',{'./apiClient':api,'../lib/supabaseClient':{supabase:{}}});
   fetchImpl=async(url,options)=>{
     assert.equal(url,'/api/bookings/lookup');assert.equal(options.method,'POST');
     assert.equal(JSON.parse(options.body).query,'DS00000001');

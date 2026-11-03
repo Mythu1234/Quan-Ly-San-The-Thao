@@ -6,8 +6,8 @@ Tất cả các logic về:
 - Đơn giá thuê sân (Cầu lông 120k, Bóng chuyền 150k, Bóng đá 200k) và lưu đơn giá lịch sử tại thời điểm đặt
 - Danh mục sân: 5 sân Cầu lông (CL-01 -> CL-05), 5 sân Bóng chuyền (BC-01 -> BC-05), 4 sân Bóng đá mini (BD-01 -> BD-04)
 - KHÔNG ÁP DỤNG GÓI VIP THÁNG / HỘI VIÊN TRONG PHẠM VI DỰ ÁN
-- KHÔNG ÁP DỤNG PHỤ PHÍ QUÁ GIỜ: Hết giờ + tối đa 10 phút ân hạn là bắt buộc Checkout bàn giao sân
-- LÚC CHECKOUT: Chỉ phát sinh thanh toán nếu có biên bản bồi thường hư hại CSVC do khách làm hỏng
+- TUYỆT ĐỐI KHÔNG TÍNH PHỤ PHÍ / PHỤ THU QUÁ GIỜ: Thanh toán 100% tiền sân ngay lúc đặt; Muốn gia hạn giờ thì bắt buộc phải đặt một lượt đặt sân mới độc lập
+- LÚC CHECKOUT: CHỈ THU TIỀN ĐỀN BÙ KHI CÓ HƯ HỎNG trang thiết bị CSVC do khách làm hỏng (theo Bảng giá bồi thường niêm yết, mặc định = 0 VNĐ nếu không hư hỏng)
 - KHÔNG ÁP DỤNG HÓA ĐƠN VAT / MÃ SỐ THUẾ: Thanh toán 100% qua VietQR, chỉ lưu mã đối soát giao dịch ngân hàng, không quản lý hóa đơn VAT
 - KHÁCH VÃNG LAI KHÔNG CẦN EMAIL / MẬT KHẨU: Định danh bằng Số điện thoại (bắt buộc) và Họ tên; Email là tùy chọn (nullable). Tách biệt thực thể Khách hàng với Tài khoản Nhân sự nội bộ (ADMIN, STAFF)
 - Quản lý thiết bị từng chiếc (Asset Serial) gắn trực tiếp với từng sân; lưu thông tin Nhà cung cấp trực tiếp tại thiết bị (không quản lý bảng bảo hành sửa chữa riêng)
@@ -121,16 +121,21 @@ Các thông tin này là cơ sở cốt lõi để lập trình logic xử lý, 
 
 ---
 
-## 7. QUY ĐỊNH HẾT GIỜ, ÂN HẠN 10 PHÚT & THỦ TỤC CHECKOUT (NO OVERTIME SURCHARGE)
+## 7. QUY ĐỊNH HẾT GIỜ, ÂN HẠN 10 PHÚT & THỦ TỤC CHECKOUT (NO OVERTIME SURCHARGE - CHỈ ĐỀN BÙ KHI CÓ HƯ HỎNG)
 
-* **Không áp dụng phụ phí chơi quá giờ:** Hệ thống KHÔNG tính phụ phí lố giờ để đảm bảo không làm gián đoạn lịch chơi của lượt khách tiếp theo đã đặt trước.
+* **TUYỆT ĐỐI KHÔNG TÍNH PHỤ PHÍ / PHỤ THU THÊM GIỜ:**
+  * Hệ thống **KHÔNG CÓ NGHIỆP VỤ TÍNH PHỤ PHÍ / PHỤ THU QUÁ GIỜ** dưới bất kỳ hình thức nào.
+  * Toàn bộ tiền thuê sân bắt buộc phải được thanh toán **100% qua VietQR ngay tại thời điểm đặt sân**.
+* **Quy tắc gia hạn giờ chơi (Bắt buộc đặt sân khác/mới):**
+  * Hệ thống **KHÔNG hỗ trợ gia hạn thêm giờ trực tiếp trên ca đang thi đấu** hoặc thu thêm tiền giờ tại chỗ.
+  * Nếu khách hàng có nhu cầu chơi tiếp, khách hàng **bắt buộc phải đặt một lượt đặt sân mới độc lập** (nếu sân hiện tại hoặc sân khác còn khung giờ trống) theo đúng quy trình đặt sân tiêu chuẩn.
 * **Quy tắc ân hạn 10 phút & Bắt buộc Check-out:** Sau khi hết giờ thuê sân, khách hàng có thời gian ân hạn **tối đa 10 phút** để dọn dẹp tư trang cá nhân và bắt buộc phải thực hiện thủ tục Check-out để bàn giao lại mặt sân cho ca tiếp theo.
-* **Quy định thanh toán lúc Check-out:**
-  * Khách hàng đã thanh toán 100% tiền thuê sân lúc đặt chỗ qua VietQR.
-  * Lúc Check-out, hệ thống **CHỈ PHÁT SINH THANH TOÁN THU TIỀN NẾU CÓ BỒI THƯỜNG THIỆT HẠI CSVC** do khách gây ra (căn cứ theo Biên bản sự cố và Bảng giá đền bù niêm yết).
-  * Nếu không phát sinh sự cố hư hại CSVC, nhân viên thực hiện thao tác Check-out hoàn tất lượt đặt, không phát sinh thêm bất kỳ giao dịch thanh toán nào:
-    $$\text{Tổng tiền thu lúc Checkout} = \text{Phí bồi thường sự cố CSVC (nếu có)}$$
-    $$\text{Tổng thanh toán lượt đặt} = \text{Tiền thuê sân (đã trả 100% lúc đặt)} + \text{Phí bồi thường CSVC (nếu có)}$$
+* **Quy định thanh toán lúc Check-out (CHỈ ĐỀN BÙ KHI CÓ HƯ HỎNG):**
+  * Tiền thuê sân đã được thanh toán 100% trước đó khi đặt chỗ qua VietQR (`Tiền sân còn lại = 0 VNĐ`).
+  * Lúc Check-out, hệ thống **CHỈ PHÁT SINH THANH TOÁN THU TIỀN KHI VÀ CHỈ KHI CÓ BỒI THƯỜNG HƯ HỎNG TRANG THIẾT BỊ CSVC** do khách gây ra (căn cứ theo Biên bản sự cố và Bảng giá đền bù niêm yết).
+  * Nếu không phát sinh sự cố hư hại thiết bị, nhân viên thực hiện thao tác Check-out hoàn tất lượt đặt ngay lập tức với số tiền cần thu là **0 VNĐ**:
+    $$\text{Tổng tiền thu lúc Checkout} = \text{Phí bồi thường sự cố CSVC do khách làm hỏng (nếu có, mặc định = 0 VNĐ)}$$
+    $$\text{Tổng thanh toán lượt đặt} = \text{Tiền thuê sân (đã thanh toán 100% lúc đặt)} + \text{Phí bồi thường CSVC (nếu có)}$$
 
 ---
 

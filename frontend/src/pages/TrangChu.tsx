@@ -914,6 +914,31 @@ export default function TrangChu() {
     if (!confirmed) return;
     setShowPayment(false);
     setIsSubmitted(true);
+
+    // Đồng bộ đơn đặt mới lên Cơ sở dữ liệu Supabase Online
+    try {
+      const dYear = scheduleDateObj.getFullYear();
+      const dMonth = (scheduleDateObj.getMonth() + 1).toString().padStart(2, '0');
+      const dDay = scheduleDateObj.getDate().toString().padStart(2, '0');
+      const formattedDate = `${dYear}-${dMonth}-${dDay}`;
+
+      const sMins = parseTimeToMinutes(selectedStartTime);
+      const eMins = sMins + selectedDuration;
+      const eH = Math.floor(eMins / 60).toString().padStart(2, '0');
+      const eM = (eMins % 60).toString().padStart(2, '0');
+
+      bookingApiService.createBooking({
+        courtCode: selectedCourt,
+        bookingDate: formattedDate,
+        startTime: selectedStartTime,
+        endTime: `${eH}:${eM}`,
+        customerName: customerName.trim(),
+        customerPhone: customerPhone.trim(),
+        totalAmount: totalPrice,
+      }).catch((err) => console.warn('Supabase createBooking warning:', err));
+    } catch (err) {
+      console.warn('Lỗi ghi đơn lên Supabase:', err);
+    }
   };
 
   const handleLookupSearch = async (event: React.FormEvent) => {
