@@ -3,12 +3,17 @@
 CRITICAL DIRECTIVE FOR ALL AI ASSISTANTS & DEVELOPERS:
 BẮT BUỘC PHẢI ĐỌC TÀI LIỆU NÀY TRƯỚC KHI BẮT ĐẦU BẤT KỲ TÁC VỤ NÀO!
 Tất cả các logic về:
-- Đơn giá thuê sân (Cầu lông 120k, Bóng chuyền 150k, Bóng đá 200k)
+- Đơn giá thuê sân (Cầu lông 120k, Bóng chuyền 150k, Bóng đá 200k) và lưu đơn giá lịch sử tại thời điểm đặt
 - Danh mục sân: 5 sân Cầu lông (CL-01 -> CL-05), 5 sân Bóng chuyền (BC-01 -> BC-05), 4 sân Bóng đá mini (BD-01 -> BD-04)
 - KHÔNG ÁP DỤNG GÓI VIP THÁNG / HỘI VIÊN TRONG PHẠM VI DỰ ÁN
-- Quản lý thiết bị từng chiếc (Asset Serial), tự động thu hồi khi Checkout
-- Báo cáo sự cố CSVC: Phân loại Do khách làm hỏng (đền bù theo Bảng giá niêm yết) hoặc Bảo hành của sân vận động
+- KHÔNG ÁP DỤNG PHỤ PHÍ QUÁ GIỜ: Hết giờ + tối đa 10 phút ân hạn là bắt buộc Checkout bàn giao sân
+- LÚC CHECKOUT: Chỉ phát sinh thanh toán nếu có biên bản bồi thường hư hại CSVC do khách làm hỏng
+- KHÔNG ÁP DỤNG HÓA ĐƠN VAT / MÃ SỐ THUẾ: Thanh toán 100% qua VietQR, chỉ lưu mã đối soát giao dịch ngân hàng, không quản lý hóa đơn VAT
+- KHÁCH VÃNG LAI KHÔNG CẦN EMAIL / MẬT KHẨU: Định danh bằng Số điện thoại (bắt buộc) và Họ tên; Email là tùy chọn (nullable). Tách biệt thực thể Khách hàng với Tài khoản Nhân sự nội bộ (ADMIN, STAFF)
+- Quản lý thiết bị từng chiếc (Asset Serial) gắn trực tiếp với từng sân; lưu thông tin Nhà cung cấp trực tiếp tại thiết bị (không quản lý bảng bảo hành sửa chữa riêng)
+- Báo cáo sự cố CSVC: Phân loại Do khách làm hỏng (đền bù theo Bảng giá niêm yết thu lúc Checkout) hoặc Bảo hành của sân vận động (sân tự liên hệ NCC, khách không chịu phí)
 - Quản lý nhân sự và tài khoản nhân viên (Soft delete, tự đổi mật khẩu)
+- QUY ƯỚC ĐỊNH DẠNG MÃ (STANDARDIZED ID FORMAT): Thống nhất toàn hệ thống dạng [Tiền tố 2-3 ký tự] + [8 chữ số] (Ví dụ: TB00000001, NV00000001, KH00000001, SAN00000001, DS00000001, TT00000001, HT00000001, SC00000001, DB00000001, BM00000001)
 - KHÔNG CÓ NGHIỆP VỤ CA TRỰC TRONG PHẠM VI DỰ ÁN
 PHẢI TUÂN THỦ 100% CÁC QUY TẮC TRONG TÀI LIỆU NÀY. KHÔNG ĐƯỢC TỰ Ý THAY ĐỔI.
 ================================================================================
@@ -70,15 +75,21 @@ Các thông tin này là cơ sở cốt lõi để lập trình logic xử lý, 
 
 ---
 
-## 4. PHẠM VI KHÁCH HÀNG & YÊU CẦU ĐẶT SÂN
+## 4. PHẠM VI KHÁCH HÀNG & THÔNG TIN ĐẶT SÂN
 
-* Form tiếp nhận đặt sân tại quầy dùng một luồng đặt sân thông thường, không phân loại khách thành “trải nghiệm” hoặc “sự kiện”. Nhân viên ghi nhận khách, môn/sân, ngày đặt, giờ bắt đầu và thời lượng.
-* Yêu cầu sự kiện/chuỗi ngày trên website (nếu có) được xử lý ở luồng riêng, không phải loại đặt sân tại quầy.
-* Dữ liệu yêu cầu VIP cũ (nếu có) không hiển thị trong danh sách yêu cầu đặt sân.
+1. **Khách vãng lai & Thông tin định danh:**
+   * Khách đặt sân tại quầy hoặc qua hotline/Zalo (khách vãng lai) chỉ cần cung cấp **Họ và tên** và **Số điện thoại** (`so_dien_thoai` bắt buộc - NOT NULL) để làm mã định danh nhận diện và đối soát khi nhận sân.
+   * **Không yêu cầu Email & Mật khẩu đối với khách vãng lai:** Khách vãng lai không bắt buộc phải có Email (`email` là trường tùy chọn - NULLABLE) và không cần tạo tài khoản/mật khẩu đăng nhập.
+2. **Khách hàng trực tuyến (Online):**
+   * Khách đặt sân qua website có thể cung cấp thêm Email (tùy chọn) để nhận thông báo xác nhận và lịch sử đặt chỗ.
+3. **Quy trình tiếp nhận đặt sân tại quầy:**
+   * Form tiếp nhận đặt sân tại quầy dùng một luồng đặt sân thông thường, không phân loại khách thành “trải nghiệm” hoặc “sự kiện”. Nhân viên ghi nhận thông tin khách (Tên, SĐT), chọn môn/sân, ngày đặt, giờ bắt đầu và thời lượng.
+   * Yêu cầu sự kiện/chuỗi ngày trên website (nếu có) được xử lý ở luồng riêng, không phải loại đặt sân tại quầy.
+   * Dữ liệu yêu cầu VIP cũ (nếu có) không hiển thị trong danh sách yêu cầu đặt sân.
 
 ---
 
-## 5. QUY ĐỊNH THANH TOÁN, THEO DÕI THANH TOÁN & HÓA ĐƠN ĐIỆN TỬ
+## 5. QUY ĐỊNH THANH TOÁN 100% QUA VIETQR (KHÔNG QUẢN LÝ HÓA ĐƠN VAT)
 
 1. **Hình thức thanh toán:**
    * Khách đặt sân thông thường thanh toán đủ 100% ngay lúc đặt chỗ qua mã QR VietQR của sân. Không áp dụng đặt cọc, tiền mặt hoặc quẹt thẻ POS.
@@ -88,9 +99,10 @@ Các thông tin này là cơ sở cốt lõi để lập trình logic xử lý, 
    * Tại mọi thời điểm, hệ thống tự động xác định số tiền khách còn phải nộp:
      $$\text{Số tiền còn lại} = \text{Tổng tiền phải trả} - \text{Tổng số tiền đã thanh toán qua các đợt}$$
 
-3. **Quy định Hóa đơn điện tử:**
-   * Không thiết kế bảng Hóa đơn riêng biệt gây dư thừa. Thông tin xuất hóa đơn điện tử được tích hợp trực tiếp vào mỗi lần thanh toán (`thanh_toan`).
-   * Khi khách hàng doanh nghiệp yêu cầu hóa đơn cho đợt thanh toán, nhân viên ghi nhận `so_hoa_don` điện tử (từ hệ thống xuất HĐĐT liên kết) và `ngay_xuat_hoa_don`. Khách lẻ không lấy hóa đơn thì giá trị này để trống (`NULL`).
+3. **Loại bỏ Hóa đơn VAT & Mã số thuế khỏi phạm vi dự án:**
+   * Hệ thống **KHÔNG quản lý hóa đơn VAT (`so_hoa_don_vat`) và Mã số thuế (`ma_so_thue`)**. Giao dịch thanh toán được quản lý tinh gọn theo Biên lai/Mã giao dịch đối soát VietQR ngân hàng (`ma_giao_dich_ngan_hang`).
+   * Không thiết kế bảng Hóa đơn riêng gây dư thừa. Mỗi lần khách thanh toán (tiền thuê sân hoặc tiền đền bù hư hại CSVC lúc checkout) được ghi nhận 1 bản ghi vào bảng `thanh_toan`.
+
 4. **Vé đặt sân:**
    * Không sử dụng bảng Vé điện tử riêng. Mã đặt sân (`ma_dat_san`) kiêm luôn vai trò của Mã vé điện tử để khách quét QR đối soát và làm thủ tục Check-in/Check-out.
 
@@ -99,22 +111,26 @@ Các thông tin này là cơ sở cốt lõi để lập trình logic xử lý, 
 ## 6. CHÍNH SÁCH HỦY ĐẶT SÂN & HOÀN TIỀN (CANCELLATION & REFUND)
 
 1. **Khách hàng tự hủy trên hệ thống:**
-   * **Hủy trước $\ge$ 24 giờ:** Khách hàng được phép tự thao tác bấm "Hủy vé" trực tuyến trên hệ thống. Đơn chuyển sang trạng thái "Đã hủy - Chờ duyệt hoàn tiền", hoàn trả 100% số tiền đã thanh toán. Chủ sân xử lý đối soát và chuyển khoản hoàn tiền trong vòng 24 giờ.
-   * **Hủy trong vòng < 24 giờ trước giờ chơi:** Hệ thống khóa chức năng tự hủy trực tuyến. Khách hàng bắt buộc phải liên hệ trực tiếp với Chủ sân để xử lý ngoại lệ thủ công.
+   * Khách hàng chọn "Hủy" trên đơn đặt sân đã xác thực. Hệ thống kiểm tra đơn còn hiệu lực và thời điểm bắt đầu lượt đặt sân.
+   * **Hủy trước giờ sử dụng ít nhất 24 giờ:** Hệ thống xác định khách đủ điều kiện hoàn tiền, tính số tiền hoàn theo chính sách hoàn tiền hiện hành (mặc định hoàn 100% số tiền đã thanh toán), xử lý hoàn tiền, hủy đơn, giải phóng khung giờ trên lịch sân và gửi xác nhận hủy cho khách.
+   * **Hủy trước giờ sử dụng dưới 24 giờ:** Hệ thống thông báo khách không đủ điều kiện hoàn tiền và hỏi khách có tiếp tục hủy sân không. Nếu khách đồng ý, hệ thống hủy đơn, không hoàn tiền, giải phóng khung giờ trên lịch sân và gửi xác nhận hủy. Nếu khách không đồng ý, hệ thống giữ nguyên lịch đặt sân.
+   * Mỗi lần xử lý hủy phải lưu thời điểm hủy, người thực hiện, kết quả kiểm tra điều kiện, số tiền hoàn (nếu có), trạng thái hoàn tiền và trạng thái cuối cùng của đơn để phục vụ tra cứu, đối soát.
 2. **Quyền hạn Nhân viên / Chủ sân chủ động hủy sân:**
    * Nhân viên hoặc Chủ sân có toàn quyền **chủ động hủy lịch đặt sân của khách** trong các trường hợp bất khả kháng: Sự cố hỏng hóc khẩn cấp (cháy đèn chiếu sáng, rách thảm sân, gãy khung thành, mất điện lưới...) hoặc phục vụ bảo trì đột xuất.
    * Khi nhân viên hủy sân, bắt buộc phải ghi rõ `ly_do_huy` trên hệ thống. Hệ thống tự động giải phóng sân, gửi thông báo xin lỗi đến khách hàng và tạo lệnh hoàn tiền 100% cho khách.
 
 ---
 
-## 7. QUY TẮC XỬ LÝ CHƠI LỐ GIỜ (OVERTIME) & CHECKOUT
+## 7. QUY ĐỊNH HẾT GIỜ, ÂN HẠN 10 PHÚT & THỦ TỤC CHECKOUT (NO OVERTIME SURCHARGE)
 
-* **Quy tắc ân hạn (Grace Period):** Khách hàng được phép trễ **tối đa 10 phút** sau khi hết giờ thuê (thời gian này dành cho việc dọn dẹp đồ đạc và nhân viên nhắc nhở).
-* **Quy tắc tính Phụ phí thêm giờ (Overtime Surcharge):**
-  * Nếu khách chơi quá 10 phút, hệ thống bắt đầu tính phụ phí lố giờ, **tính cộng dồn toàn bộ thời gian trễ** (bao gồm cả 10 phút ân hạn ban đầu).
-  * Tiền phụ phí làm tròn theo block 15 phút hoặc 30 phút dựa theo đơn giá theo giờ của bộ môn đang chơi.
-* **Tổng kết thu tiền lúc Checkout:**
-  $$\text{Tổng tiền thu lúc Checkout} = \text{Khoản thanh toán còn thiếu (nếu có)} + \text{Phụ phí chơi thêm giờ} + \text{Phí bồi thường sự cố (nếu có)}$$
+* **Không áp dụng phụ phí chơi quá giờ:** Hệ thống KHÔNG tính phụ phí lố giờ để đảm bảo không làm gián đoạn lịch chơi của lượt khách tiếp theo đã đặt trước.
+* **Quy tắc ân hạn 10 phút & Bắt buộc Check-out:** Sau khi hết giờ thuê sân, khách hàng có thời gian ân hạn **tối đa 10 phút** để dọn dẹp tư trang cá nhân và bắt buộc phải thực hiện thủ tục Check-out để bàn giao lại mặt sân cho ca tiếp theo.
+* **Quy định thanh toán lúc Check-out:**
+  * Khách hàng đã thanh toán 100% tiền thuê sân lúc đặt chỗ qua VietQR.
+  * Lúc Check-out, hệ thống **CHỈ PHÁT SINH THANH TOÁN THU TIỀN NẾU CÓ BỒI THƯỜNG THIỆT HẠI CSVC** do khách gây ra (căn cứ theo Biên bản sự cố và Bảng giá đền bù niêm yết).
+  * Nếu không phát sinh sự cố hư hại CSVC, nhân viên thực hiện thao tác Check-out hoàn tất lượt đặt, không phát sinh thêm bất kỳ giao dịch thanh toán nào:
+    $$\text{Tổng tiền thu lúc Checkout} = \text{Phí bồi thường sự cố CSVC (nếu có)}$$
+    $$\text{Tổng thanh toán lượt đặt} = \text{Tiền thuê sân (đã trả 100% lúc đặt)} + \text{Phí bồi thường CSVC (nếu có)}$$
 
 ---
 
@@ -123,28 +139,30 @@ Các thông tin này là cơ sở cốt lõi để lập trình logic xử lý, 
 1. **Quản lý theo từng cá thể tài sản (Asset Tracking):**
    * Tuyệt đối **không ghi số lượng tổng gộp** (Ví dụ: Không ghi "Vợt: 10 cái").
    * Mỗi tài sản là một bản ghi độc lập, có **Mã thiết bị** và **Mã Seri / Asset Tag** riêng biệt để phục vụ dán mã QR kiểm kê và theo dõi bảo hành.
-2. **Theo dõi Bảo hành & Bảo dưỡng:**
-   * Mỗi thiết bị lưu trữ đầy đủ: Ngày đưa vào sử dụng, Thời hạn bảo hành, Ngày bảo trì gần nhất.
+2. **Thông tin Nhà cung cấp & Bảo hành (Lưu trực tiếp tại thiết bị):**
+   * Mỗi thiết bị lưu trữ trực tiếp: Tên nhà cung cấp (`nha_cung_cap`), Hotline nhà cung cấp (`sdt_ncc`), Ngày đưa vào sử dụng và Thời hạn bảo hành (`han_bao_hanh`).
+   * Hệ thống **không thiết kế bảng phiếu bảo hành/sửa chữa riêng** để tinh gọn quy trình; khi có sự cố cần bảo hành, nhân viên tra cứu trực tiếp thông tin NCC từ thiết bị.
 3. **Trạng thái thiết bị:**
-   * `san_sang`: Thiết bị lưu kho trong tình trạng hoàn hảo, sẵn sàng mang ra sử dụng.
-   * `dang_su_dung`: Thiết bị đang được lắp đặt hoặc phục vụ khách trên sân.
-   * `bao_tri`: Thiết bị đang trong quá trình bảo dưỡng định kỳ hoặc gửi đi bảo hành.
+   * `san_sang`: Thiết bị trong tình trạng hoàn hảo, sẵn sàng phục vụ.
+   * `dang_su_dung`: Thiết bị đang phục vụ khách trên sân.
+   * `bao_tri`: Thiết bị đang trong quá trình bảo dưỡng hoặc gửi NCC bảo hành.
    * `hong`: Thiết bị gặp sự cố hư hại, không thể sử dụng.
-4. **Phân loại theo Bộ môn & Phân bổ vị trí:**
-   * Thiết bị theo bộ môn: Lưới/cột bóng chuyền $\rightarrow$ Môn Bóng chuyền; Cột/lưới cầu lông $\rightarrow$ Môn Cầu lông; Khung thành/bóng đá $\rightarrow$ Môn Bóng đá.
-   * Thiết bị dùng chung: Dàn đèn LED, ghế trọng tài, máy lau sàn, bảng điểm điện tử $\rightarrow$ `ma_bo_mon = NULL`.
-   * Vị trí: Thiết bị cố định gắn với sân cụ thể (`ma_san`), thiết bị cơ động lưu tại Kho dùng chung (`ma_san = NULL`).
-5. **Ghi nhận Sự cố hư hỏng & Phân loại Trách nhiệm (Incident Reporting & Liability):**
-   * Khi phát sinh hư hại trang thiết bị hoặc mặt sân, nhân viên lập phiếu báo cáo sự cố (`bao_cao_su_co`) gắn trực tiếp với `ma_thiet_bi` hoặc `ma_san`.
+4. **Phân bổ vị trí thiết bị cố định theo sân (Option B):**
+   * Thiết bị được gán cố định với từng sân cụ thể (`ma_san`) (ví dụ: Bộ trụ lưới CL-01 gắn với Sân CL-01; Thảm vinyl gắn với Sân BC-02...).
+   * Thiết bị dùng chung (Dàn đèn LED trần, Ghế trọng tài, Máy lau sàn) có `ma_san = NULL` (lưu tại khu vực dùng chung / Kho chung).
+   * Không sử dụng bảng trung gian cấp phát mượn/trả di động riêng lẻ theo từng ca chơi.
+5. **Ghi nhận Sự cố hư hỏng & Phân loại Trách nhiệm (Master - Detail Incident Reporting):**
+   * Khi phát sinh hư hại trang thiết bị hoặc mặt sân, nhân viên lập biên bản sự cố tổng (`bao_cao_su_co`) và danh sách các món hư hại (`chi_tiet_su_co`).
+   * **Bảo toàn đơn giá đền bù lịch sử:** Bảng `chi_tiet_su_co` lưu vết `don_gia_ap_dung` tại thời điểm xảy ra sự cố và `so_luong_hu_hai` để tính `thanh_tien`, đảm bảo khi bảng giá niêm yết thay đổi thì biên bản cũ không bị sai lệch số tiền phạt.
    * **Bắt buộc phân loại nguyên nhân / trách nhiệm hư hỏng gồm 2 trường hợp:**
      * **Trường hợp 1: Do khách làm hỏng (`DO_KHACH_LAM_HONG`):**
-       - Khách hàng sử dụng sai cách, va đập mạnh làm gãy cột lưới, rách lưới, ném vỡ bóng đèn, rách mặt thảm sàn hoặc làm mất bóng thi đấu...
+       - Khách hàng sử dụng sai cách, va đập mạnh làm gãy cột lưới, rách lưới, vỡ bóng đèn, rách mặt thảm sàn hoặc làm mất bóng thi đấu...
        - Hệ thống tự động tính tiền bồi thường căn cứ theo **Bảng giá bồi thường trang thiết bị hư hỏng niêm yết**.
-       - Số tiền đền bù được tự động cộng vào hóa đơn thanh toán lúc **Check-out** sân của khách hàng vi phạm.
+       - Số tiền đền bù được tự động đưa vào mục thanh toán bồi thường lúc **Check-out** sân của khách hàng vi phạm.
      * **Trường hợp 2: Bảo hành của sân vận động / Hao mòn tự nhiên (`BAO_HANH_SAN_VAN_DONG`):**
        - Sự cố phát sinh do khấu hao tự nhiên, lỗi linh kiện nhà sản xuất, chập điện giàn đèn trần hoặc hết hạn bảo dưỡng.
        - Sân vận động tự chi trả 100% chi phí sửa chữa. Khách hàng **không phải thanh toán bất kỳ khoản bồi thường nào**.
-       - Phiếu sự cố được kích hoạt chuyển sang quy trình bảo hành/sửa chữa thiết bị (`bao_hanh_thiet_bi`).
+       - Nhân viên cập nhật trạng thái thiết bị sang `hong` hoặc `bao_tri` và tra cứu thông tin NCC lưu tại thiết bị để liên hệ xử lý.
 6. **Bảng giá niêm yết bồi thường vật tư / trang thiết bị hư hại (Damage Compensation Price List):**
    Hệ thống quy định bảng giá bồi thường chuẩn hóa công khai để áp dụng thu tiền minh bạch khi khách làm hỏng:
 
@@ -165,10 +183,10 @@ Các thông tin này là cơ sở cốt lõi để lập trình logic xử lý, 
    | 13 | **Bóng đèn LED chiếu sáng trần** | Dùng chung | **500.000 VNĐ / bóng** | Vỡ chao đèn, hỏng mắt chip LED do bóng đập |
    | 14 | **Mặt thảm vinyl sàn thi đấu** | Dùng chung | **600.000 VNĐ / m²** | Thủng rách thảm, trầy xước sâu, tàn thuốc lá |
 
-7. **Cơ chế Tự động thu hồi thiết bị khi Check-out sân (Automatic Equipment Recall):**
-   * Khi khách đặt sân và nhận thiết bị phục vụ trận đấu (cột lưới, bóng, bảng điểm...), các thiết bị này được gán vào sân và khung giờ tương ứng.
-   * Khi nhân viên/chủ sân thực hiện thao tác **Check-out sân** (hoàn tất trận đấu và thanh toán hóa đơn), hệ thống **tự động thu hồi toàn bộ thiết bị đang gắn với sân đó về Kho chung**, chuyển trạng thái về `san_sang`.
-   * Giao diện quản lý CSVC **không có nút thu hồi thủ công từng thiết bị riêng lẻ**, đảm bảo dữ liệu vòng đời thiết bị được đồng bộ tự động và thống nhất 100% với chu trình đặt & trả sân.
+7. **Kiểm tra tình trạng thiết bị khi Check-out sân:**
+   * Khi nhân viên thực hiện thao tác **Check-out sân**, nhân viên kiểm tra hiện trạng thiết bị và mặt sân.
+   * Nếu thiết bị trong tình trạng nguyên vẹn: Duy trì trạng thái `san_sang`.
+   * Nếu thiết bị bị hư hại (có lập biên bản sự cố): Chuyển trạng thái sang `hong` hoặc `bao_tri`, tuyệt đối không tự động đưa về `san_sang`.
 
 ---
 
@@ -187,16 +205,15 @@ Các thông tin này là cơ sở cốt lõi để lập trình logic xử lý, 
 
 ## 10. MÔ HÌNH TÁC NHÂN (ACTORS) & PHÂN QUYỀN VAI TRÒ (ROLES)
 
-Hệ thống thiết lập bảng vai trò (`vai_tro`) chuẩn hóa với 3 nhóm tác nhân chính:
+Hệ thống phân định rành mạch giữa **Tài khoản người dùng nội bộ** (nhân sự vận hành có tài khoản đăng nhập) và **Khách hàng** (người đặt sân):
 
-1. **Chủ sân (Admin / Owner - `ADMIN`):**
-   * Quản trị toàn bộ hệ thống: Cấu hình giá thuê sân, **Thêm / Sửa / Xóa sân**, quản lý trang thiết bị CSVC, quản lý nhân viên và tài khoản, phê duyệt hoàn tiền, xem báo cáo doanh thu tài chính tổng hợp.
-2. **Nhân viên (Staff / Employee - `STAFF`):**
-   * Check-in / Check-out cho khách, tính phụ phí thêm giờ lúc thanh toán.
-   * Tiếp nhận đặt sân thông thường tại quầy theo ngày, giờ và thời lượng khách chọn.
-   * Chủ động hủy sân khi phát sinh sự cố cơ sở vật chất đột xuất.
-   * Báo cáo sự cố hỏng hóc trang thiết bị, cập nhật nhật ký bảo trì.
-3. **Khách hàng (Customer - `CUSTOMER`):**
-   * Đăng ký tài khoản, tra cứu tình trạng sân trống theo thời gian thực.
-   * Đặt sân trực tuyến, thanh toán đủ 100% qua mã QR VietQR của sân; không áp dụng đặt cọc hay các gói VIP tháng.
-   * Xem lịch sử đặt chỗ, chủ động hủy vé trước 24 giờ.
+1. **Phân quyền Tài khoản Nội bộ (RBAC - Quản lý nhân sự):**
+   * Bảng tài khoản nội bộ chỉ bao gồm 2 vai trò quản trị:
+     * **Chủ sân (Admin / Owner - `ADMIN`):** Quản trị toàn bộ hệ thống: Cấu hình giá thuê sân, **Thêm / Sửa / Xóa sân**, quản lý trang thiết bị CSVC, quản lý nhân sự & tài khoản nhân viên, theo dõi giao dịch và báo cáo doanh thu tài chính tổng hợp.
+     * **Nhân viên (Staff / Employee - `STAFF`):** Tiếp nhận đặt sân tại quầy cho khách vãng lai; Check-in / Check-out cho khách, kiểm tra trang thiết bị và lập biên bản đền bù sự cố (nếu có) lúc Checkout (không tính phụ phí quá giờ); chủ động hủy sân khi có sự cố bất khả kháng; ghi nhận sự cố thiết bị sân và tra cứu thông tin NCC để xử lý bảo trì.
+   * *Quy tắc phân quyền:* Khi Admin tạo tài khoản nhân sự mới, vai trò mặc định là `STAFF`. Bảng tài khoản nội bộ **KHÔNG chứa vai trò `CUSTOMER`**.
+
+2. **Khách hàng (Customer):**
+   * Lưu trữ trong bảng hồ sơ khách hàng độc lập (`khach_hang`), định danh bằng Số điện thoại (`so_dien_thoai` NOT NULL).
+   * **Khách vãng lai:** Được nhân viên ghi nhận nhanh tại quầy (chỉ cần Họ tên + SĐT, không cần email, không có mật khẩu hay tài khoản hệ thống).
+   * **Khách đặt trực tuyến (Online):** Tra cứu tình trạng sân trống theo thời gian thực trên website, đặt sân và thanh toán 100% qua VietQR, có thể nhập email để nhận thông báo, chủ động hủy vé trước 24 giờ để nhận hoàn tiền.

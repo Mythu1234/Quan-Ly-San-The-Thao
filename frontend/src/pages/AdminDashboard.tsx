@@ -44,7 +44,15 @@ export default function AdminDashboard({ onLogout, currentUser }: { onLogout: ()
   const handleTabChange = (tabId: 'lich_san' | 'nhan_vien' | 'vi_thu' | 'co_so_vat_chat') => {
     setActiveTab(tabId);
     setSidebarOpen(false);
-    if (tabId === 'nhan_vien') setStaffSubView('list');
+    if (tabId === 'nhan_vien') {
+      setStaffSubView('list');
+      employeeApiService.getEmployees().then((res) => {
+        if (res.employees && res.employees.length > 0) {
+          setEmployees(res.employees);
+          setIsBackendOnline(true);
+        }
+      }).catch((err) => console.warn('Could not refresh staff list:', err));
+    }
   };
 
   // State for backend connectivity status
@@ -105,10 +113,13 @@ export default function AdminDashboard({ onLogout, currentUser }: { onLogout: ()
         confirmText: 'Đóng',
       });
     } catch (err: any) {
-      console.warn('Backend update failed, applying locally:', err);
-      setEmployees((prev) => prev.map((e) => (e.id === updatedEmp.id ? updatedEmp : e)));
-      setSelectedEmployee(updatedEmp);
-      setStaffSubView('detail');
+      console.warn('Backend update failed:', err);
+      setPopup({
+        type: 'danger',
+        title: 'Không thể cập nhật nhân viên',
+        message: err.message || 'Lỗi khi cập nhật thông tin nhân viên vào cơ sở dữ liệu!',
+        confirmText: 'Đóng',
+      });
     }
   };
 
@@ -134,10 +145,13 @@ export default function AdminDashboard({ onLogout, currentUser }: { onLogout: ()
         confirmText: 'Đóng',
       });
     } catch (err: any) {
-      console.warn('Backend create failed, saving locally:', err);
-      const newEmp: Employee = { ...emp, id: emp.id || `NV-0${Math.floor(Math.random() * 100) + 50}` };
-      setEmployees((prev) => [newEmp, ...prev]);
-      setStaffSubView('list');
+      console.error('Backend create failed:', err);
+      setPopup({
+        type: 'danger',
+        title: 'Không thể thêm nhân viên',
+        message: err.message || 'Lỗi khi lưu nhân viên vào cơ sở dữ liệu. Vui lòng kiểm tra lại số điện thoại hoặc email!',
+        confirmText: 'Đã hiểu',
+      });
     }
   };
 

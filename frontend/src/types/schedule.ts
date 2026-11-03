@@ -17,6 +17,7 @@ export type BookingDetail = {
   paidAmount: string;
   remaining: string;
   status: string;
+  hoursUntilStart?: number;
 };
 
 export const INITIAL_ADMIN_BOOKINGS: BookingDetail[] = [
@@ -61,6 +62,7 @@ export const INITIAL_ADMIN_BOOKINGS: BookingDetail[] = [
   },
   {
     code: 'BK-6184',
+    hoursUntilStart: 36,
     customerName: 'Ngọc Mai',
     phone: '0908.224.118',
     court: 'Sân CL-02',
@@ -80,6 +82,7 @@ export const INITIAL_ADMIN_BOOKINGS: BookingDetail[] = [
   },
   {
     code: 'BK-7740',
+    hoursUntilStart: 8,
     customerName: 'Minh Trí',
     phone: '0912.440.526',
     court: 'Sân CL-03',
