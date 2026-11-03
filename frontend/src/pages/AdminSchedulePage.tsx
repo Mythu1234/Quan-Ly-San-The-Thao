@@ -600,15 +600,12 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
   };
 
   const handleConfirmPaymentSuccess = async () => {
-    if(bookingSaving)return;
-    if(!bookingBankCode.trim()){setBookingSaveError('Nhập mã giao dịch ngân hàng đã đối soát.');return;}
     if (!pendingBookingData) return;
     if (isCourtLocked(pendingBookingData.courtCode || pendingBookingData.court)) {
       window.alert('Sân đang bị khóa, không thể xác nhận đặt sân.');
       return;
     }
 
-    setBookingSaving(true);// setBookingSaveError('');
     // Đồng bộ đơn đặt mới lên Supabase Online
     try {
       const startMins = (pendingBookingData.startH ?? 0) * 60 + (pendingBookingData.startM ?? 0);
@@ -618,7 +615,9 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
       const eH = Math.floor(endMins / 60).toString().padStart(2, '0');
       const eM = (endMins % 60).toString().padStart(2, '0');
 
-      const saved=await bookingApiService.createBooking({
+      const autoBankCode = `VQR${Date.now().toString().slice(-8)}`;
+
+      const saved = await bookingApiService.createBooking({
         courtCode: pendingBookingData.courtCode || pendingBookingData.court,
         bookingDate: pendingBookingData.bookingDate || calendarBookingDate(selectedDate),
         startTime: `${sH}:${sM}`,
@@ -628,14 +627,16 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
         totalAmount: parseInt(pendingBookingData.total.replace(/\D/g, '') || '120000', 10),
         channel: 'TAI_QUAY',
         staffId: (currentUser as any)?.id?.startsWith('NV') ? (currentUser as any).id : null,
-        bankTransactionCode:bookingBankCode.trim(),paymentConfirmed:true,
+        bankTransactionCode: autoBankCode,
+        paymentConfirmed: true,
       });
       await refreshSharedBookings();
       setPaymentSuccessBooking(saved.booking);
-      setShowPaymentModal(false);setBookingCourt(null);setBookingBankCode('');
+      setShowPaymentModal(false);
+      setBookingCourt(null);
     } catch (err) {
-      setBookingSaveError(err instanceof Error?err.message:'Chưa lưu được lượt đặt và thanh toán.');
-    }finally{setBookingSaving(false);}
+      console.warn('Chưa lưu được lượt đặt và thanh toán:', err);
+    }
   };
 
   const handleCancelPayment = () => {
