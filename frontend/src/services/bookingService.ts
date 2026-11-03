@@ -375,8 +375,10 @@ class BookingApiService {
         courtId = courtData.ma_san;
       }
 
-      // 3. Tạo mã đặt sân mới
-      const newBookingId = `DS${Date.now().toString().slice(-8)}`;
+      // 3. Tạo mã đặt sân và thanh toán CÙNG CHUNG MÃ SỐ ĐỒNG BỘ
+      const sharedSeq = Date.now().toString().slice(-8);
+      const newBookingId = `DS${sharedSeq}`;
+      const newPaymentId = `TT${sharedSeq}`;
 
       // 4. Lưu đơn vào dat_san
       const { error: insertErr } = await supabase.from('dat_san').insert({
@@ -396,8 +398,7 @@ class BookingApiService {
       if (insertErr) {
         console.warn('Supabase createBooking insert warning:', insertErr);
       } else {
-        // 5. Lưu bản ghi thanh toán VietQR 100% vào bảng thanh_toan
-        const newPaymentId = `TT${Date.now().toString().slice(-8)}`;
+        // 5. Lưu bản ghi thanh toán VietQR 100% vào bảng thanh_toan (dùng cùng sharedSeq)
         try {
           await supabase.from('thanh_toan').insert({
             ma_thanh_toan: newPaymentId,

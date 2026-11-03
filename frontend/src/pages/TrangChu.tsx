@@ -1,5 +1,6 @@
 import AdminDashboard from './AdminDashboard';
 import { bookingApiService } from '../services/bookingService';
+import { paymentBookingService } from '../services/paymentBookingService';
 import CustomerSchedule, { STANDARD_15_BOOKINGS } from '../components/CustomerSchedule';
 import QrCodeArtwork from '../components/QrCodeArtwork';
 import EmployeeDashboard from './employee/EmployeeDashboard';
@@ -87,6 +88,7 @@ export default function TrangChu() {
   // Order Submission State
   const [showBookingPopup, setShowBookingPopup] = useState<boolean>(false);
   const [showPayment, setShowPayment] = useState<boolean>(false);
+  const [paymentCd, setPaymentCd] = useState<number>(5);
   const [isSubmitted, setIsSubmitted] = useState<boolean>(false);
   const [showOTP, setShowOTP] = useState<boolean>(false);
   const [showLogin, setShowLogin] = useState<boolean>(false);
@@ -305,7 +307,9 @@ export default function TrangChu() {
   const [otpPhone, setOtpPhone] = useState<string>('');
   const [popup, setPopup] = useState<any>(null);
   const showAlert = (title: string, message: string) => setPopup({ type: 'alert', title, message });
-  const [orderCode] = useState<string>('CX-88291');
+  const [orderCode, setOrderCode] = useState<string>('DS00000000');
+  const [paymentCode, setPaymentCode] = useState<string>('TT00000000');
+  const [showReceipt, setShowReceipt] = useState<boolean>(false);
 
   // Lookup Search State
   const [lookupQuery, setLookupQuery] = useState<string>('');
@@ -942,14 +946,11 @@ export default function TrangChu() {
   };
 
   const confirmPaymentReceived = () => {
-    const confirmed = window.confirm(
-      'Chỉ xác nhận sau khi chủ sân hoặc nhân viên đã kiểm tra và thấy tiền thực nhận trong tài khoản ngân hàng. Tiếp tục?',
-    );
-    if (!confirmed) return;
     setShowPayment(false);
+    setPaymentCd(5);
     setIsSubmitted(true);
 
-    // Đồng bộ đơn đặt mới lên Cơ sở dữ liệu Supabase Online
+    // Dong bo don dat moi len Supabase Online qua paymentBookingService
     try {
       const dYear = scheduleDateObj.getFullYear();
       const dMonth = (scheduleDateObj.getMonth() + 1).toString().padStart(2, '0');
@@ -961,19 +962,40 @@ export default function TrangChu() {
       const eH = Math.floor(eMins / 60).toString().padStart(2, '0');
       const eM = (eMins % 60).toString().padStart(2, '0');
 
-      bookingApiService.createBooking({
-        courtCode: selectedCourt,
-        bookingDate: formattedDate,
-        startTime: selectedStartTime,
-        endTime: `${eH}:${eM}`,
+      paymentBookingService.recordSuccessfulBookingPayment({
         customerName: customerName.trim(),
         customerPhone: customerPhone.trim(),
-        totalAmount: totalPrice,
-      }).catch((err) => console.warn('Supabase createBooking warning:', err));
+        courtName: selectedCourt,
+        bookingDate: formattedDate,
+        timeSlot: `${selectedStartTime} - ${eH}:${eM}`,
+        totalPrice,
+        channel: 'ONLINE',
+      }).then((res: { success: boolean; bookingCode?: string; paymentCode?: string }) => {
+        if (res.success) {
+          if (res.bookingCode) setOrderCode(res.bookingCode);
+          if (res.paymentCode) setPaymentCode(res.paymentCode);
+          console.log('Supabase luu thanh cong:', res);
+        }
+      }).catch((err: unknown) => console.warn('Supabase recordPayment warning:', err));
     } catch (err) {
-      console.warn('Lỗi ghi đơn lên Supabase:', err);
+      console.warn('Loi ghi don len Supabase:', err);
     }
   };
+
+  // Countdown 5 giay tu dong xac nhan khi mo modal thanh toan khach hang
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!showPayment) {
+      setPaymentCd(5);
+      return;
+    }
+    if (paymentCd <= 0) {
+      confirmPaymentReceived();
+      return;
+    }
+    const t = setTimeout(() => setPaymentCd((c) => c - 1), 1000);
+    return () => clearTimeout(t);
+  }, [showPayment, paymentCd]);
 
   const handleLookupSearch = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -3234,22 +3256,21 @@ export default function TrangChu() {
               </div>
             </div>
 
-            <div className="mt-6 flex flex-col items-center gap-2">
+            <div className="mt-6 flex flex-col items-center gap-3 w-full">
               <div className="relative flex h-10 w-10 items-center justify-center">
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
                 <span className="relative inline-flex h-6 w-6 rounded-full bg-emerald-500 items-center justify-center">
                   <span className="h-2 w-2 bg-white rounded-full"></span>
                 </span>
               </div>
-              <p className="text-xs font-bold text-emerald-700">Chờ chủ sân/nhân viên đối soát</p>
-              <p className="max-w-xs text-center text-[10px] leading-4 text-slate-500">
-                Chỉ xác nhận sau khi kiểm tra thấy tiền đã vào tài khoản ngân hàng.
+              <p className="text-sm font-semibold text-emerald-700 text-center">
+                Đang chờ ghi nhận thanh toán qua VietQR…
               </p>
+
             </div>
 
-            <div className="w-full mt-6 grid grid-cols-1 gap-2 sm:grid-cols-2 sm:gap-3">
-              <button onClick={() => setShowPayment(false)} type="button" className="rounded-xl border border-slate-200 py-3 text-xs font-bold text-slate-600 hover:bg-slate-50 cursor-pointer active:scale-95">Hủy giao dịch</button>
-              <button onClick={confirmPaymentReceived} type="button" className="rounded-xl bg-emerald-800 py-3 text-xs font-bold text-white hover:bg-emerald-900 cursor-pointer active:scale-95">Xác nhận đã nhận tiền</button>
+            <div className="w-full mt-4">
+              <button onClick={() => { setShowPayment(false); setPaymentCd(5); }} type="button" className="w-full rounded-xl border border-slate-200 py-3 text-xs font-bold text-slate-600 hover:bg-slate-50 cursor-pointer active:scale-95">Hủy giao dịch</button>
             </div>
           </div>
         </div>
@@ -3270,6 +3291,9 @@ export default function TrangChu() {
               <p className="mt-1 text-xs text-slate-600">
                 Mã đơn của bạn là <span className="font-mono font-bold text-emerald-600">{orderCode}</span>
               </p>
+              <p className="text-[11px] text-slate-500 mt-0.5">
+                Mã thanh toán: <span className="font-mono font-bold text-blue-700">{paymentCode}</span>
+              </p>
             </div>
 
             <div className="rounded-2xl bg-slate-50 p-4 text-left text-xs space-y-2 border border-slate-200">
@@ -3286,13 +3310,110 @@ export default function TrangChu() {
               Thông tin xác nhận & vé QR đã được hệ thống gửi qua Zalo/SMS tới số <strong className="text-slate-900">{customerPhone}</strong>.
             </p>
 
-            <button
-              type="button"
-              onClick={() => setIsSubmitted(false)}
-              className="w-full rounded-xl bg-emerald-500 py-3 text-xs font-black uppercase tracking-wider text-white hover:bg-emerald-600"
-            >
-              HOÀN TẤT & QUAY LẠI
-            </button>
+            <div className="w-full rounded-xl bg-amber-50 border border-amber-200 px-3 py-2 text-[11px] text-amber-700 text-center">
+              ⚠ Lưu ý: Vui lòng in hoặc chụp lại biên nhận để nhận sân.
+            </div>
+
+            <div className="flex gap-2 w-full">
+              <button
+                type="button"
+                onClick={() => setShowReceipt(true)}
+                className="flex-1 flex items-center justify-center gap-1.5 rounded-xl border border-emerald-600 py-3 text-xs font-bold text-emerald-700 hover:bg-emerald-50 cursor-pointer active:scale-95"
+              >
+                📋 BIÊN NHẬN
+              </button>
+              <button
+                type="button"
+                onClick={() => { setIsSubmitted(false); setShowReceipt(false); }}
+                className="flex-1 rounded-xl bg-emerald-500 py-3 text-xs font-black uppercase tracking-wider text-white hover:bg-emerald-600"
+              >
+                HOÀN TẤT
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ======================================================== */}
+      {/* 📋 MODAL BIÊN NHẬN ĐẶT SÂN (KHÁCH HÀNG)                  */}
+      {/* ======================================================== */}
+      {showReceipt && isSubmitted && (
+        <div className="fixed top-0 bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md border-x border-slate-200 z-[200] flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm animate-fade-in">
+          <div className="w-full max-w-sm rounded-3xl bg-white shadow-2xl overflow-hidden">
+            {/* Header */}
+            <div className="bg-emerald-700 px-5 py-4 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="text-lg">📋</span>
+                <div>
+                  <p className="text-xs font-black text-white uppercase tracking-wider">BIÊN NHẬN ĐẶT SÂN</p>
+                  <p className="text-[10px] text-emerald-200">CourtX Arena · Hóa đơn điện tử</p>
+                </div>
+              </div>
+              <button type="button" onClick={() => setShowReceipt(false)} className="text-white/70 hover:text-white text-lg font-bold">✕</button>
+            </div>
+
+            {/* Body */}
+            <div className="px-5 py-4 space-y-3 text-xs">
+              <div className="flex justify-between items-center">
+                <span className="text-slate-500">Mã biên nhận (Vé):</span>
+                <span className="font-mono font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">{orderCode}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-slate-500">Mã thanh toán:</span>
+                <span className="font-mono font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">{paymentCode}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-slate-500">Khách hàng:</span>
+                <span className="font-bold text-slate-900">{customerName}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-slate-500">Số điện thoại:</span>
+                <span className="font-medium text-slate-700">{customerPhone}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-slate-500">Bộ môn & Sân:</span>
+                <span className="font-bold text-slate-900">{currentSport?.name || ''} · {selectedCourt}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-slate-500">Thời gian:</span>
+                <span className="font-bold text-slate-900">{selectedDate} · {selectedSlot}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-slate-500">Phương thức:</span>
+                <span className="font-bold text-emerald-700">VietQR (100%)</span>
+              </div>
+              <div className="flex justify-between items-center border-t border-slate-200 pt-3">
+                <span className="font-bold text-slate-800">Tổng tiền thanh toán:</span>
+                <span className="font-black text-emerald-600 text-sm">{totalPrice.toLocaleString('vi-VN')}đ</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-slate-500">Trạng thái:</span>
+                <span className="font-bold text-emerald-600 flex items-center gap-1">✓ Đã thanh toán</span>
+              </div>
+            </div>
+
+            {/* Note */}
+            <div className="mx-5 mb-4 rounded-xl bg-amber-50 border border-amber-200 px-3 py-2 text-[11px] text-amber-700 text-center">
+              ⚠ Lưu ý: Vui lòng in hoặc chụp lại biên nhận để nhận sân.
+            </div>
+
+            {/* Footer */}
+            <div className="px-5 pb-5 flex gap-2">
+              <button
+                type="button"
+                onClick={() => window.print()}
+                className="flex-1 flex items-center justify-center gap-1.5 rounded-xl border border-slate-300 py-3 text-xs font-bold text-slate-700 hover:bg-slate-50 cursor-pointer active:scale-95"
+              >
+                🖨 In biên nhận
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowReceipt(false)}
+                className="flex-1 rounded-xl bg-emerald-700 py-3 text-xs font-black text-white hover:bg-emerald-800 cursor-pointer active:scale-95"
+              >
+                Đóng
+              </button>
+            </div>
           </div>
         </div>
       )}
