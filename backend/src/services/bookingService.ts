@@ -5,12 +5,13 @@ import {rentalPayment,reconcileConfirmedRental} from './rentalPayment.js';
 const statuses:Record<string,string>={CHO_THANH_TOAN:'Chờ thanh toán',DA_THANH_TOAN:'Đã đặt',DANG_SU_DUNG:'Đang sử dụng',HOAN_TAT:'Đã kết thúc',DA_HUY:'Đã hủy'};
 const money=(value:number)=>`${value.toLocaleString('vi-VN')} VND`;
 export async function listBookings() {
-  const {data,error}=await supabase.from('dat_san').select('ma_dat_san,ngay_dat,gio_bat_dau,gio_ket_thuc,trang_thai,tong_tien_san,khach_hang(ho_ten,so_dien_thoai),san(ma_san,ten_san,bo_mon(ten_bo_mon)),thanh_toan(ma_thanh_toan,so_tien,trang_thai,loai_giao_dich)').order('ngay_dat');
+  const {data,error}=await supabase.from('dat_san').select('ma_dat_san,ngay_dat,gio_bat_dau,gio_ket_thuc,trang_thai,tong_tien_san,thoi_gian_checkin,thoi_gian_checkout,khach_hang(ho_ten,so_dien_thoai),san(ma_san,ten_san,bo_mon(ten_bo_mon)),thanh_toan(ma_thanh_toan,so_tien,trang_thai,loai_giao_dich)').order('ngay_dat');
   if(error)databaseError(error);
   return (data||[]).map((row:any)=>{
     const total=Number(row.tong_tien_san),{paid,remaining}=rentalPayment(row);
     const start=row.gio_bat_dau.slice(0,5),end=row.gio_ket_thuc.slice(0,5),sport=row.san.bo_mon.ten_bo_mon;
     return {code:row.ma_dat_san,paymentCode:(row.thanh_toan||[]).find((payment:any)=>payment.trang_thai==='THANH_CONG'&&payment.loai_giao_dich==='THANH_TOAN_DAT_SAN')?.ma_thanh_toan,bookingDate:row.ngay_dat,customerName:row.khach_hang.ho_ten,phone:row.khach_hang.so_dien_thoai,
+      checkInAt:row.thoi_gian_checkin,checkOutAt:row.thoi_gian_checkout,
       court:row.san.ten_san,courtId:row.san.ma_san,courtCode:row.san.ten_san.match(/(?:CL|BC|BD)-\d{2}/)?.[0],sport,
       sportId:/chuyền/i.test(sport)?'volleyball':/đá/i.test(sport)?'football':'badminton',
       time:`${start} - ${end}`,startH:Number(start.slice(0,2)),startM:Number(start.slice(3)),endH:Number(end.slice(0,2)),endM:Number(end.slice(3)),
