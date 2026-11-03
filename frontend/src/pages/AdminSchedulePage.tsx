@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState, useEffect } from 'react';
 import {
   AlertTriangle, ArrowLeft, ArrowRightLeft, Ban, Calendar, CalendarClock,
-  Check, CheckCircle2, RefreshCw, ChevronDown, ChevronLeft, ChevronRight, CircleX,
+  Check, CheckCircle2, RefreshCw, ChevronDown, ChevronLeft, ChevronRight, CircleX, XCircle,
   Clock3, Cloud, CreditCard, Info, LayoutGrid, MapPin, Phone,
   Printer, ReceiptText, ShieldCheck, Undo2, UserRound, X, Zap
 } from 'lucide-react';
@@ -78,6 +78,8 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
   const [checkoutBooking, setCheckoutBooking] = useState<BookingDetail | null>(null);
   const [cancelBooking, setCancelBooking] = useState<BookingDetail | null>(null);
   const [cancelReviewBooking, setCancelReviewBooking] = useState<BookingDetail | null>(null);
+  const [showCancelledListModal, setShowCancelledListModal] = useState<boolean>(false);
+
   const [showPendingCancelList, setShowPendingCancelList] = useState(false);
   const [cancelReviewBackTarget, setCancelReviewBackTarget] = useState<'timeline' | 'pendingList'>('timeline');
   const [cancelReason, setCancelReason] = useState('Khách bận đột xuất công tác liên tỉnh, gọi báo xin hủy lịch đặt sân tối nay.');
@@ -162,6 +164,14 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
     return () => { isMounted = false; };
   }, [selectedDate, setAdminBookings]);
   const adminBookings = allBookings.filter(booking => booking.bookingDate === calendarBookingDate(selectedDate));
+
+  // Danh sách các đơn đã hủy trong ngày đang chọn
+  const cancelledBookings = useMemo(() => {
+    const curDateStr = calendarBookingDate(selectedDate);
+    return adminBookings.filter(
+      (b) => (b.bookingDate === curDateStr || !b.bookingDate) && (b.status === 'Đã hủy' || b.status === 'DA_HUY')
+    );
+  }, [adminBookings, selectedDate]);
 
   // Booking Modal State (Đặt sân tại quầy trực tiếp trên lịch)
   const [bookingCourt, setBookingCourt] = useState<AdminCourtItem | null>(null);
@@ -1775,6 +1785,16 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
                 <span className="w-2.5 h-2.5 rounded bg-amber-100 border border-amber-400"></span> 
                 Có thể đặt
               </span>
+              {cancelledBookings.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setShowCancelledListModal(true)}
+                  className="flex items-center gap-1 rounded-full bg-red-50 text-red-700 px-2 py-0.5 text-[9px] font-black border border-red-200 hover:bg-red-100 transition cursor-pointer"
+                  title="Nhấn để xem danh sách các đơn đã hủy trong ngày"
+                >
+                  <XCircle className="w-3 h-3" /> Đã hủy ({cancelledBookings.length})
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -1849,7 +1869,7 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
                     )}
 
                     {group.courts.map((court) => {
-                      const courtBookings = adminBookings.filter((b) => b.courtCode === court.code);
+                      const courtBookings = adminBookings.filter((b) => b.courtCode === court.code && b.status !== 'Đã hủy' && b.status !== 'DA_HUY');
 
                       return (
                         <div
@@ -2025,6 +2045,82 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
       </div>
 
 
+
+      {/* Modal hiển thị danh sách đơn đã hủy trong ngày */}
+      {showCancelledListModal && (
+        <div className="fixed inset-0 z-[150] flex items-center justify-center bg-slate-950/50 backdrop-blur-xs p-4 animate-fade-in">
+          <div className="w-full max-w-lg rounded-3xl bg-white p-5 shadow-2xl ring-1 ring-slate-100 max-h-[85vh] flex flex-col">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div>
+                <h3 className="text-sm font-black text-slate-900 flex items-center gap-1.5">
+                  <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-red-100 text-red-700">
+                    <XCircle className="h-4 w-4" />
+                  </span>
+                  Danh sách đơn đã hủy ({cancelledBookings.length})
+                </h3>
+                <p className="text-[11px] font-bold text-slate-500 mt-0.5">
+                  Ngày {calendarBookingDate(selectedDate)} • Sân đã được giải phóng để nhận khách mới
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowCancelledListModal(false)}
+                className="rounded-xl p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 cursor-pointer"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto divide-y divide-slate-100 my-2 pr-1">
+              {cancelledBookings.map((b) => (
+                <div key={b.code} className="py-3 flex items-center justify-between gap-3 hover:bg-slate-50/60 rounded-xl px-2 transition">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-xs font-black text-slate-900">{b.code}</span>
+                      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-700">{b.court}</span>
+                      <span className="rounded-full bg-red-100 text-red-700 px-2 py-0.5 text-[10px] font-black uppercase">ĐÃ HỦY</span>
+                    </div>
+                    <p className="text-xs font-bold text-slate-800 mt-1">
+                      {b.customerName} • <span className="text-slate-500 font-normal">{b.phone}</span>
+                    </p>
+                    <p className="text-[11px] font-semibold text-slate-500">
+                      Khung giờ: <strong className="text-slate-700">{b.time}</strong> • Tổng: <strong>{b.total}</strong>
+                    </p>
+                  </div>
+
+                  <div className="shrink-0 text-right">
+                    <span className={`inline-block px-2.5 py-1 rounded-lg text-[10px] font-black ${
+                      b.paymentStatus === 'Đã hoàn tiền' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-amber-50 text-amber-700 border border-amber-200'
+                    }`}>
+                      {b.paymentStatus || 'Đã hủy'}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowCancelledListModal(false);
+                        setSelectedBooking(b);
+                      }}
+                      className="block text-[11px] font-bold text-emerald-700 hover:underline mt-1.5 cursor-pointer ml-auto"
+                    >
+                      Xem chi tiết →
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="pt-3 border-t border-slate-100 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setShowCancelledListModal(false)}
+                className="rounded-xl bg-slate-100 px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-200 cursor-pointer"
+              >
+                Đóng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {selectedBooking && (
         <div className="absolute inset-0 z-[120] flex flex-col justify-end bg-slate-950/45 backdrop-blur-[2px]">
