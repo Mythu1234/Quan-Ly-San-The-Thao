@@ -1586,8 +1586,13 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
           <div className="flex items-center justify-between bg-slate-50 rounded-xl p-1.5 border border-slate-200 relative">
             <button 
               type="button"
+              disabled={isPastDate(new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate() - 1), currentTime)}
               onClick={(e) => { e.stopPropagation(); handlePrevDay(); }} 
-              className="w-7 h-7 flex items-center justify-center text-slate-500 bg-white rounded-lg shadow-xs active:scale-95 z-20 cursor-pointer"
+              className={`w-7 h-7 flex items-center justify-center rounded-lg shadow-xs z-20 transition ${
+                isPastDate(new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate() - 1), currentTime)
+                  ? 'text-slate-300 bg-slate-100 opacity-40 cursor-not-allowed pointer-events-none'
+                  : 'text-slate-500 bg-white active:scale-95 cursor-pointer hover:bg-slate-50'
+              }`}
               title="Ngày trước"
             >
               <ChevronLeft className="w-4 h-4"/>
@@ -1661,6 +1666,17 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
                                      selectedDate.getMonth() === item.dateObj.getMonth() &&
                                      selectedDate.getDate() === item.dateObj.getDate();
                   const isTodayDay = isToday(item.dateObj);
+
+                  if (item.isPast) {
+                    return (
+                      <div
+                        key={idx}
+                        className="h-9 w-full rounded-xl flex flex-col items-center justify-center font-bold text-xs text-slate-300 opacity-20 select-none cursor-not-allowed bg-slate-50/50 pointer-events-none"
+                      >
+                        <span>{item.dayNumber}</span>
+                      </div>
+                    );
+                  }
 
                   return (
                     <button
@@ -1935,6 +1951,23 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
                                 );
                               }
 
+                              // Nếu ngày là Hôm nay và giờ này đã qua -> ẩn chữ TRỐNG, không cho bấm
+                              const currentNowMins = currentTime.getHours() * 60 + currentTime.getMinutes();
+                              const isPastSlot60 = isToday(selectedDate) && (cellStart + 60 <= currentNowMins);
+
+                              if (isPastSlot60) {
+                                return (
+                                  <div
+                                    key={time}
+                                    style={{ width: `${slotWidth}px` }}
+                                    className="shrink-0 border-r border-slate-200/50 bg-slate-100/50 flex items-center justify-center select-none cursor-default"
+                                    title={`${court.name}: Khung giờ ${time} đã qua`}
+                                  >
+                                    <span className="h-2 w-px bg-slate-200" />
+                                  </div>
+                                );
+                              }
+
                               return (
                                 <div
                                   key={time}
@@ -1957,6 +1990,23 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
                                     key={time}
                                     style={{ width: `${slotWidth}px` }}
                                     className="shrink-0 border-r border-slate-200/50 bg-slate-100/70 flex items-center justify-center select-none"
+                                  >
+                                    <span className="h-2 w-px bg-slate-200" />
+                                  </div>
+                                );
+                              }
+
+                              // Nếu ngày là Hôm nay và giờ này đã qua -> ẩn chữ TRỐNG, không cho bấm
+                              const currentNowMins = currentTime.getHours() * 60 + currentTime.getMinutes();
+                              const isPastSlot30 = isToday(selectedDate) && (cellStart + 30 <= currentNowMins);
+
+                              if (isPastSlot30) {
+                                return (
+                                  <div
+                                    key={time}
+                                    style={{ width: `${slotWidth}px` }}
+                                    className="shrink-0 border-r border-slate-200/50 bg-slate-100/50 flex items-center justify-center select-none cursor-default"
+                                    title={`${court.name}: Khung giờ ${time} đã qua`}
                                   >
                                     <span className="h-2 w-px bg-slate-200" />
                                   </div>
