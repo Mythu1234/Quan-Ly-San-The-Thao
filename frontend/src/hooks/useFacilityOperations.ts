@@ -15,9 +15,14 @@ export default function useFacilityOperations() {
   const refreshFacility=async()=>{
     const version=++revision.current;
     try {
-      const data=await api.loadAllFacilityData();
+      const results=await Promise.allSettled([api.getEquipments(),api.getCourts(),api.getIncidents()]);
       if(version!==revision.current)return;
-      setEquipments(data.equipments);setIncidents(data.incidents);setCourtStatuses(data.courts);setFacilityError('');
+      const [equipmentResult,courtResult,incidentResult]=results;
+      if(equipmentResult.status==='fulfilled')setEquipments(equipmentResult.value);
+      if(courtResult.status==='fulfilled')setCourtStatuses(courtResult.value);
+      if(incidentResult.status==='fulfilled')setIncidents(incidentResult.value);
+      const failed=results.find(result=>result.status==='rejected');
+      setFacilityError(failed?.status==='rejected'?(failed.reason instanceof Error?failed.reason.message:'Chưa tải đủ dữ liệu.'): '');
     }catch(error){if(version===revision.current)setFacilityError(error instanceof Error?error.message:'Chưa tải được dữ liệu.');}
   };
   useEffect(()=>{

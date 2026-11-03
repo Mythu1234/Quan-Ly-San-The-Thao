@@ -18,7 +18,7 @@ const reporter={name:'Nhân viên',role:'Nhân viên',phone:'0912345678'};
 const jsx={jsx:(type,props)=>({type,props}),jsxs:(type,props)=>({type,props})};
 const ui=load('frontend/src/components/admin/CheckoutSettlementView.tsx',{
  react:{useState:value=>[typeof value==='function'?value():value,()=>{}],useEffect:()=>{}},'react/jsx-runtime':jsx,
- 'lucide-react':{},'../../utils/incidentStorage':{},'../../services/facilityService':{},
+ 'lucide-react':{},'../../utils/incidentStorage':{},'../../services/facilityService':{},'./IncidentSelect':{default:()=>null},
  '../../utils/compensationCatalog':{DATA:{badminton:{label:'Cầu lông'}},useCompensationCatalog:()=>catalog},'../../utils/checkoutSettlement':helpers,
 });
 const tree=ui.default({booking:{code:'BK-test',court:'Sân CL-01',time:'08:00 - 09:00',remaining:'0 VND',total:'120.000 VND',paidAmount:'120.000 VND',customerName:'Khách',phone:'0900000000'},date:new Date(2026,10,2),equipments:[],incidents:[],currentUser:reporter,onBack:()=>{},onComplete:()=>{},onFinished:()=>{}});

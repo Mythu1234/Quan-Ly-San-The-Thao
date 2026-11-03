@@ -822,6 +822,8 @@ export type EquipmentStatus = 'san_sang' | 'dang_su_dung' | 'bao_tri' | 'hong';
 export type EquipmentSportType = 'CauLong' | 'BongChuyen' | 'BongDa' | 'DungChung' | 'Pickleball';
 
 export interface FacilityEquipment {
+  isCatalogItem?: boolean;
+  compensationItemId?: string;
   id: string;               // EQ01, EQ02...
   code: string;             // MATB-01, MATB-02... (Mã thiết bị dán nhãn cố định)
   name: string;             // Bộ trụ & Lưới Yonex Pro, Thảm sàn Vinyl...
@@ -833,7 +835,7 @@ export interface FacilityEquipment {
   statusLabel: string;      // Sẵn sàng, Đang sử dụng, Bảo trì, Hỏng
   healthRate: string;       // Mới 95%, Tốt, Cần bảo trì ngay, Đạt 500 Lux...
   purchaseDate: string;     // Ngày nhập
-  purchasePrice?: number;   // Giá mua (VNĐ)
+  purchasePrice?: number | null;   // Giá mua (VNĐ); null khi chưa nhập
   compensationPrice?: number; // Giá bồi thường niêm yết (VNĐ)
   warrantyExpire: string;   // Hạn bảo hành
   supplier?: string;        // Hãng / Nhà cung cấp bảo hành

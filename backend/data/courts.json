@@ -50,5 +50,118 @@
     "courtNumber": 8,
     "name": "Sân 08 (Tiêu chuẩn A)",
     "isLocked": false
+  },
+  {
+    "id": "SAN-CL-01",
+    "code": "CL-01",
+    "courtNumber": 1,
+    "name": "Sân CL-01",
+    "sportId": "badminton",
+    "isLocked": false
+  },
+  {
+    "id": "SAN-CL-02",
+    "code": "CL-02",
+    "courtNumber": 2,
+    "name": "Sân CL-02",
+    "sportId": "badminton",
+    "isLocked": false
+  },
+  {
+    "id": "SAN-CL-03",
+    "code": "CL-03",
+    "courtNumber": 3,
+    "name": "Sân CL-03",
+    "sportId": "badminton",
+    "isLocked": true,
+    "lockReason": "Hư lưới"
+  },
+  {
+    "id": "SAN-CL-04",
+    "code": "CL-04",
+    "courtNumber": 4,
+    "name": "Sân CL-04",
+    "sportId": "badminton",
+    "isLocked": false
+  },
+  {
+    "id": "SAN-CL-05",
+    "code": "CL-05",
+    "courtNumber": 5,
+    "name": "Sân CL-05",
+    "sportId": "badminton",
+    "isLocked": false
+  },
+  {
+    "id": "SAN-BC-01",
+    "code": "BC-01",
+    "courtNumber": 1,
+    "name": "Sân BC-01",
+    "sportId": "volleyball",
+    "isLocked": false
+  },
+  {
+    "id": "SAN-BC-02",
+    "code": "BC-02",
+    "courtNumber": 2,
+    "name": "Sân BC-02",
+    "sportId": "volleyball",
+    "isLocked": false
+  },
+  {
+    "id": "SAN-BC-03",
+    "code": "BC-03",
+    "courtNumber": 3,
+    "name": "Sân BC-03",
+    "sportId": "volleyball",
+    "isLocked": false
+  },
+  {
+    "id": "SAN-BC-04",
+    "code": "BC-04",
+    "courtNumber": 4,
+    "name": "Sân BC-04",
+    "sportId": "volleyball",
+    "isLocked": false
+  },
+  {
+    "id": "SAN-BC-05",
+    "code": "BC-05",
+    "courtNumber": 5,
+    "name": "Sân BC-05",
+    "sportId": "volleyball",
+    "isLocked": false
+  },
+  {
+    "id": "SAN-BD-01",
+    "code": "BD-01",
+    "courtNumber": 1,
+    "name": "Sân BD-01",
+    "sportId": "football",
+    "isLocked": false
+  },
+  {
+    "id": "SAN-BD-02",
+    "code": "BD-02",
+    "courtNumber": 2,
+    "name": "Sân BD-02",
+    "sportId": "football",
+    "isLocked": false
+  },
+  {
+    "id": "SAN-BD-03",
+    "code": "BD-03",
+    "courtNumber": 3,
+    "name": "Sân BD-03",
+    "sportId": "football",
+    "isLocked": false
+  },
+  {
+    "id": "SAN-BD-04",
+    "code": "BD-04",
+    "courtNumber": 4,
+    "name": "Sân BD-04",
+    "sportId": "football",
+    "isLocked": false
   }
 ]

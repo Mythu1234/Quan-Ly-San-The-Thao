@@ -1,6 +1,9 @@
-import { useEffect, useRef } from 'react';
-import { X, Wrench, ShieldCheck, Tag } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { X, Wrench, ShieldCheck, Tag, Pencil } from 'lucide-react';
 import type { FacilityEquipment } from '../../types/admin';
+import AddEquipmentView from './AddEquipmentView';
+import {facilityApiService} from '../../services/facilityService';
+import {refreshCompensationCatalog} from '../../utils/compensationCatalog';
 
 interface EquipmentDetailsDialogProps {
   name: string;
@@ -8,13 +11,14 @@ interface EquipmentDetailsDialogProps {
   compensationPrice: number;
   equipment?: FacilityEquipment;
   onClose: () => void;
+  onUpdated?: (equipment: FacilityEquipment) => void;
 }
 
 const sportLabels: Record<string, string> = {
   CauLong: 'Cầu lông', BongChuyen: 'Bóng chuyền', BongDa: 'Bóng đá', DungChung: 'Thiết bị chung',
 };
 const displayText = (value?: string) => value?.trim() || 'Chưa cập nhật';
-const displayMoney = (value?: number) => value !== undefined ? `${value.toLocaleString('vi-VN')} VNĐ` : 'Chưa cập nhật';
+const displayMoney = (value?: number | null) => value != null ? `${value.toLocaleString('vi-VN')} VNĐ` : 'Chưa cập nhật';
 
 function DetailField({ label, value }: { label: string; value?: string }) {
   return <div className="min-w-0 space-y-1">
@@ -23,16 +27,20 @@ function DetailField({ label, value }: { label: string; value?: string }) {
   </div>;
 }
 
-export default function EquipmentDetailsDialog({ name, sportLabel, compensationPrice, equipment, onClose }: EquipmentDetailsDialogProps) {
+export default function EquipmentDetailsDialog({ name, sportLabel, compensationPrice, equipment: initialEquipment, onClose, onUpdated }: EquipmentDetailsDialogProps) {
+  const [equipment,setEquipment]=useState(initialEquipment);
+  const [editing,setEditing]=useState(false);
+  const [saving,setSaving]=useState(false);
+  const close=()=>{if(saving)return;if(editing)setEditing(false);else onClose();};
   const dialogRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     const previousFocus = document.activeElement;
     closeRef.current?.focus();
     const handleKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
+      if (event.key === 'Escape') {if(!saving){if(editing)setEditing(false);else onClose();}}
       if (event.key === 'Tab') {
-        const controls = dialogRef.current?.querySelectorAll<HTMLElement>('button, a[href], [tabindex="0"]');
+        const controls = dialogRef.current?.querySelectorAll<HTMLElement>('button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex="0"]');
         if (!controls?.length) return;
         const first = controls[0];
         const last = controls[controls.length - 1];
@@ -45,21 +53,28 @@ export default function EquipmentDetailsDialog({ name, sportLabel, compensationP
       document.removeEventListener('keydown', handleKey);
       if (previousFocus instanceof HTMLElement) previousFocus.focus();
     };
-  }, [onClose]);
+  }, [onClose,editing,saving]);
 
   return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-950/40 p-3 backdrop-blur-sm" onClick={(event) => { if (event.target === event.currentTarget) onClose(); }}>
+    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-950/40 p-3 backdrop-blur-sm" onClick={(event) => { if (event.target === event.currentTarget) close(); }}>
       <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="equipment-details-title" className="flex max-h-[90dvh] w-full max-w-md flex-col overflow-hidden rounded-2xl border border-black/15 bg-white shadow-xl">
         <header className="flex shrink-0 items-center gap-2.5 border-b border-black/10 px-4 py-3">
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-emerald-200 text-emerald-800"><Wrench className="h-4 w-4" /></div>
           <div className="min-w-0 flex-1">
-            <h2 id="equipment-details-title" className="text-sm font-bold text-slate-900">Chi tiết thiết bị</h2>
+            <h2 id="equipment-details-title" className="text-sm font-bold text-slate-900">{editing?'Chỉnh sửa thiết bị':'Chi tiết thiết bị'}</h2>
             <p className="mt-0.5 text-[10px] text-slate-500">{equipment?.code || 'Bảng giá niêm yết'}</p>
           </div>
-          <button ref={closeRef} type="button" onClick={onClose} aria-label="Đóng chi tiết" className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-600 transition hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-emerald-700"><X className="h-4 w-4" /></button>
+          <button ref={closeRef} type="button" disabled={saving} onClick={close} aria-label={editing?'Hủy chỉnh sửa':'Đóng chi tiết'} className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-600 transition hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-emerald-700 disabled:opacity-50"><X className="h-4 w-4" /></button>
         </header>
 
         <div className="space-y-3 overflow-y-auto p-4">
+          {editing&&equipment?<AddEquipmentView key={equipment.id} embedded initialEquipment={equipment} existingCount={0}
+            onSavingChange={setSaving} onBack={()=>setEditing(false)} onAddEquipment={async value=>{
+              const saved=await facilityApiService.updateEquipment(equipment.id,value);
+              setEquipment(saved);setEditing(false);onUpdated?.(saved);
+              window.dispatchEvent(new Event('courtx:facility-changed'));
+              await refreshCompensationCatalog().catch(console.error);
+            }}/>:<>
           <section className="space-y-3 rounded-xl border border-black/15 p-3">
             <div>
               <p className="text-[10px] text-slate-600">Tên thiết bị</p>
@@ -95,7 +110,11 @@ export default function EquipmentDetailsDialog({ name, sportLabel, compensationP
             <h3 className="text-[11px] font-bold text-emerald-800">Ghi chú</h3>
             <p className="mt-2 whitespace-pre-wrap break-words text-xs leading-relaxed text-slate-700">{displayText(equipment?.notes)}</p>
           </section>
+          </>}
         </div>
+        {!editing&&equipment&&<footer className="shrink-0 border-t border-slate-100 bg-white p-3">
+          <button type="button" disabled={saving} onClick={()=>setEditing(true)} className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-700 px-3 py-2.5 text-xs font-bold text-white transition hover:bg-emerald-800 disabled:opacity-50"><Pencil className="h-4 w-4"/>Chỉnh sửa thiết bị</button>
+        </footer>}
       </div>
     </div>
   );

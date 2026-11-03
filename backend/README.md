@@ -61,6 +61,31 @@ Các chức năng nhân viên và các luồng đặt/hủy/điều chuyển l�
 
 ## Kiểm thử
 
+Danh mục bồi thường dùng chung lưu tại `thiet_bi`: tên ở `ten_thiet_bi`, bộ môn và giá ở
+`thong_tin_bo_sung.sportType` / `thong_tin_bo_sung.compensationPrice`, nhận diện bằng `isCatalogItem`.
+`bang_gia_den_bu` giữ mã tương thích cho sự cố và đơn giá lịch sử; tạo mới thiết bị và giá
+được lưu cùng giao dịch RPC. Danh mục không phải một thiết bị vật lý dùng chung để đổi trạng thái hỏng trên mọi sân.
+Script `scripts/sync-equipment-catalog.mjs` mặc định chỉ rà soát; `--apply` hợp nhất danh mục,
+lưu bản sao cục bộ, bảo toàn chi tiết sự cố trước khi xóa thiết bị cũ. Không chạy trên database khác khi chưa rà soát.
+`node scripts/verify-equipment-catalog.mjs` kiểm tra database/API và đơn giá lịch sử so với bản sao.
+
+Sau khi đồng bộ danh mục, chạy toàn bộ `migrations/20261103_remove_equipment_court.sql`
+trong Supabase SQL Editor bằng role `postgres`. File thay các RPC phụ thuộc và xóa duy nhất
+`thiet_bi.ma_san` trong một giao dịch, giữ `dat_san.ma_san` và thông tin sân trên từng sự cố.
+Không xóa riêng cột này hoặc chạy lại migration facility cũ sau bước này; các hàm cũ vẫn tham chiếu cột sân thiết bị.
+
+Chạy tiếp `migrations/20261103_equipment_prices_and_codes.sql` bằng role `postgres` để thêm
+`thiet_bi.gia_mua`, `thiet_bi.gia_boi_thuong`, chuyển các giá đã biết và chuẩn hóa mã từ `TB00000001`.
+Giá mua chưa nhập giữ `NULL`. Migration cập nhật khóa ngoại, mã liên kết trong bảng giá,
+báo cáo và quyết toán theo hai bước tránh trùng mã; giữ nguyên bản chụp lịch sử gốc.
+Trigger đồng bộ giá từ form hoặc Table Editor với metadata và bảng giá tương thích,
+không thay đổi `chi_tiet_su_co.don_gia_ap_dung` của báo cáo cũ.
+
+Chạy `migrations/20261104_incident_processing_status.sql` bằng role `postgres` để tách
+tiến độ xử lý khỏi trách nhiệm chi phí. Trạng thái là `CHO_XU_LY`, `DANG_SUA_CHUA`,
+`DA_XU_LY`; sân chịu thì tiền thu khách bằng 0 và `compensationPaymentStatus=not_required`.
+Chạy toàn bộ file, gồm bước commit bổ sung enum trước khi dùng giá trị mới.
+
 ```powershell
 npm.cmd run build
 node --test tests/facility-database.test.mjs

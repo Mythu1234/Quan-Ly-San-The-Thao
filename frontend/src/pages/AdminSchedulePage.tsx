@@ -212,8 +212,8 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
   // Filtered Courts
   const displayedCourts = useMemo(() => {
     const base = courtView === 'all' ? STANDARD_ADMIN_COURTS : STANDARD_ADMIN_COURTS.filter((c) => c.sportId === courtView);
-    return base.filter(c => !isCourtLocked(c.code));
-  }, [courtView, courtStatuses, sharedCourtStatuses]);
+    return calendarBookingDate(selectedDate)<calendarBookingDate(currentTime)?base:base.filter(c => !isCourtLocked(c.code));
+  }, [courtView, courtStatuses, sharedCourtStatuses, selectedDate, currentTime]);
 
   // Group displayed courts by Sport for clear visual separation
   const sportGroups = useMemo(() => {
@@ -263,9 +263,6 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
   const handlePrevDay = () => {
     const d = new Date(selectedDate);
     d.setDate(d.getDate() - 1);
-    if (isPastDate(d, currentTime)) {
-      return; // Không cho lùi về ngày quá khứ
-    }
     setSelectedDate(d);
   };
 
@@ -354,10 +351,6 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
   }, [calendarMonth]);
 
   const handleSelectCalendarDay = (dateObj: Date) => {
-    if (isPastDate(dateObj, currentTime)) {
-      window.alert('Không thể chọn ngày trong quá khứ! Vui lòng chọn ngày hôm nay hoặc tương lai.');
-      return;
-    }
     setSelectedDate(dateObj);
     setIsDatePickerOpen(false);
   };
@@ -1601,13 +1594,8 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
           <div className="flex items-center justify-between bg-slate-50 rounded-xl p-1.5 border border-slate-200 relative">
             <button 
               type="button"
-              disabled={isPastDate(new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate() - 1), currentTime)}
               onClick={(e) => { e.stopPropagation(); handlePrevDay(); }} 
-              className={`w-7 h-7 flex items-center justify-center rounded-lg shadow-xs z-20 transition ${
-                isPastDate(new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate() - 1), currentTime)
-                  ? 'text-slate-300 bg-slate-100 opacity-40 cursor-not-allowed pointer-events-none'
-                  : 'text-slate-500 bg-white active:scale-95 cursor-pointer hover:bg-slate-50'
-              }`}
+              className="w-7 h-7 flex items-center justify-center rounded-lg shadow-xs z-20 transition text-slate-500 bg-white active:scale-95 cursor-pointer hover:bg-slate-50"
               title="Ngày trước"
             >
               <ChevronLeft className="w-4 h-4"/>
@@ -1681,17 +1669,6 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
                                      selectedDate.getMonth() === item.dateObj.getMonth() &&
                                      selectedDate.getDate() === item.dateObj.getDate();
                   const isTodayDay = isToday(item.dateObj);
-
-                  if (item.isPast) {
-                    return (
-                      <div
-                        key={idx}
-                        className="h-9 w-full rounded-xl flex flex-col items-center justify-center font-bold text-xs text-slate-300 opacity-20 select-none cursor-not-allowed bg-slate-50/50 pointer-events-none"
-                      >
-                        <span>{item.dayNumber}</span>
-                      </div>
-                    );
-                  }
 
                   return (
                     <button
@@ -1911,6 +1888,7 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
                           {/* Background Time Slot Cells */}
                           {timelineTimes.map((time) => {
                             const cellStart = parseTimeToMinutes(time);
+                            if(isPastDate(selectedDate,currentTime))return <div key={time} style={{width:`${slotWidth}px`}} className="shrink-0 border-r border-slate-200/50 bg-slate-100/50" title={`${court.name}: Ngày đã qua, chỉ xem lịch sử`}/>;
                             if (intervalMode === 60) {
                               const bFirst = isSlotCovered(court.code, cellStart, cellStart + 30);
                               const bSecond = isSlotCovered(court.code, cellStart + 30, cellStart + 60);
@@ -2076,24 +2054,26 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
                               );
                             }
 
+                            const completed=b.status==='Đã kết thúc'||b.status==='Hoàn tất';
                             return (
                               <button
                                 type="button"
                                 key={b.code}
                                 onClick={() => openBooking(b)}
-                                title={`${b.customerName} (${b.court}) • ${b.time} • Đã đặt`}
+                                title={`${b.customerName} (${b.court}) • ${b.time} • ${b.status}`}
                                 style={{
                                   left: `${left + 2}px`,
                                   width: `${width}px`,
                                   top: '4px',
                                   bottom: '4px',
                                 }}
-                                className="absolute z-10 rounded-xl bg-blue-50 border border-blue-300 px-2 py-1 flex flex-col justify-center text-left shadow-sm active:scale-[0.99] transition-transform overflow-hidden cursor-pointer hover:bg-blue-100/90"
+                                className={`absolute z-10 rounded-xl border px-2 py-1 flex flex-col justify-center text-left shadow-sm active:scale-[0.99] transition-transform overflow-hidden cursor-pointer ${completed?'bg-slate-100 border-slate-300 hover:bg-slate-200':'bg-blue-50 border-blue-300 hover:bg-blue-100/90'}`}
                               >
                                 <span className="text-[10px] font-black text-blue-950 truncate leading-tight">{b.customerName}</span>
                                 <span className="text-[9px] font-bold text-blue-700 truncate leading-tight mt-0.5">
                                   {b.time}
                                 </span>
+                                {completed&&<span className="mt-0.5 truncate text-[8px] font-semibold text-slate-600">Đã check-out</span>}
                               </button>
                             );
                           })}
@@ -2276,6 +2256,10 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
                 </div>
               </div>
 
+              {(selectedBooking.checkInAt||selectedBooking.checkOutAt)&&<div className="space-y-1 rounded-xl border border-slate-200 px-3 py-2 text-[11px]">
+                <div className="flex justify-between gap-2"><span className="text-slate-600">Check-in thực tế</span><strong>{selectedBooking.checkInAt?new Date(selectedBooking.checkInAt).toLocaleString('vi-VN',{timeZone:'Asia/Ho_Chi_Minh'}):'Chưa check-in'}</strong></div>
+                <div className="flex justify-between gap-2"><span className="text-slate-600">Check-out thực tế</span><strong>{selectedBooking.checkOutAt?new Date(selectedBooking.checkOutAt).toLocaleString('vi-VN',{timeZone:'Asia/Ho_Chi_Minh'}):'Chưa check-out'}</strong></div>
+              </div>}
               {/* Action buttons */}
               <div className="space-y-2">
                 {selectedBooking.status === 'Đã đặt' && (

@@ -3,6 +3,8 @@ export type EquipmentStatus = 'san_sang' | 'dang_su_dung' | 'bao_tri' | 'hong';
 export type EquipmentSportType = 'CauLong' | 'BongChuyen' | 'BongDa' | 'DungChung' | 'Pickleball';
 
 export interface FacilityEquipment {
+  isCatalogItem?: boolean;
+  compensationItemId?: string;
   id: string;               // EQ01, EQ02...
   code: string;             // MATB-01, MATB-02...
   name: string;             // Bộ trụ & Lưới Yonex Pro...
@@ -14,7 +16,7 @@ export interface FacilityEquipment {
   statusLabel: string;      // Sẵn sàng, Đang sử dụng, Bảo trì, Hỏng
   healthRate: string;       // Mới 95%, Tốt, Cần bảo trì ngay...
   purchaseDate: string;     // Ngày nhập
-  purchasePrice?: number;
+  purchasePrice?: number | null;
   compensationPrice?: number;
   warrantyExpire: string;   // Hạn bảo hành
   supplier?: string;        // Hãng / Nhà cung cấp bảo hành
@@ -38,7 +40,7 @@ export interface CreateEquipmentDTO {
   currentLocation: string;
   healthRate?: string;
   purchaseDate?: string;
-  purchasePrice?: number;
+  purchasePrice?: number | null;
   compensationPrice?: number;
   warrantyExpire?: string;
   supplier?: string;
@@ -59,7 +61,7 @@ export interface UpdateEquipmentDTO {
   statusLabel?: string;
   healthRate?: string;
   purchaseDate?: string;
-  purchasePrice?: number;
+  purchasePrice?: number | null;
   compensationPrice?: number;
   warrantyExpire?: string;
   supplier?: string;

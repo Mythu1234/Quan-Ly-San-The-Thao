@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
 import {
-  ArrowRightLeft,
   CheckCircle2,
   Lock,
   Building2,
   X,
   AlertTriangle,
+  ArrowLeft,
+  Bell,
 } from 'lucide-react';
 import type { FacilityEquipment, CourtStatusItem, FacilityIncident } from '../../types/admin';
 import ReportIncidentView from './ReportIncidentView';
@@ -13,11 +14,10 @@ import IncidentReportsList from './IncidentReportsList';
 import useSharedBookings, { getSharedBookings } from '../../hooks/useSharedBookings';
 import { getCourtLockWarnings, vietnamBookingDate } from '../../utils/courtBookingWarnings';
 import IncidentDetailView from './IncidentDetailView';
-import { type IncidentReporter } from '../../utils/incidentStorage';
+import { filterIncidents, type IncidentReporter } from '../../utils/incidentStorage';
 import AddEquipmentView from './AddEquipmentView';
-import EquipmentDetailView from './EquipmentDetailView';
-import NotificationModal from './NotificationModal';
 import CompensationPriceTable from './CompensationPriceTable';
+import {refreshCourtAvailability} from '../../hooks/useCourtAvailability';
 
 interface FacilityManagementViewProps {
   currentUser: IncidentReporter;
@@ -49,25 +49,20 @@ export default function FacilityManagementView({
   courts,
   incidents,
   onAddEquipment,
-  onUpdateEquipmentLocation,
   onToggleCourtLock,
   onSubmitIncident,
   onDeleteIncident,
   onUpdateIncidentStatus,
-  onReturnToWarehouse,
-  onAssignBookingToEquipment,
   onCompleteEquipmentWarranty,
   onAddTimelineLog,
   isBackendOnline: _isBackendOnline = false,
 }: FacilityManagementViewProps) {
-  // Navigation sub-views: 'main' | 'report_incident' | 'incident_detail' | 'add_equipment' | 'equipment_detail' | 'notifications'
-  const [subView, setSubView] = useState<'main' | 'report_incident' | 'incident_detail' | 'add_equipment' | 'equipment_detail' | 'notifications'>('main');
-  const [selectedIncidentId, setSelectedIncidentId] = useState<string>('SC-8921');
+  const [subView, setSubView] = useState<'main' | 'report_incident' | 'incident_detail' | 'add_equipment' | 'incidents'>('main');
+  const [selectedIncidentId, setSelectedIncidentId] = useState('');
+  const [incidentReturnView,setIncidentReturnView]=useState<'main'|'incidents'>('main');
+  const unresolvedCount=filterIncidents(incidents,'unresolved').length;
 
 
-
-  // Filter & Search
-  const [selectedEquipmentDetail, setSelectedEquipmentDetail] = useState<FacilityEquipment | null>(null);
 
   // Court Lock Dialog
   const [lockingCourt, setLockingCourt] = useState<CourtStatusItem | null>(null);
@@ -84,15 +79,7 @@ export default function FacilityManagementView({
   },[lockingCourt]);
   const [courtSportFilter, setCourtSportFilter] = useState<'all' | 'badminton' | 'volleyball' | 'football'>('all');
 
-  // Equipment Relocate Dialog
-  const [relocatingEq, setRelocatingEq] = useState<FacilityEquipment | null>(null);
-  const [targetLocation, setTargetLocation] = useState<string>('Kho chung');
   const [operationError,setOperationError]=useState('');
-  const [operationSaving,setOperationSaving]=useState(false);
-  const [isAssignBooking, setIsAssignBooking] = useState(false);
-  const [assignBookingCode, setAssignBookingCode] = useState('');
-  const [assignTimeSlot, setAssignTimeSlot] = useState('');
-  const [assignCustomer, setAssignCustomer] = useState('');
 
   // Toast feedback
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -111,9 +98,8 @@ export default function FacilityManagementView({
   const handleCreateIncident = async (newIncident: FacilityIncident, lockCourt: boolean) => {
     await onSubmitIncident(newIncident, lockCourt);
 
-    setSubView('main');
+    setSubView('incidents');
     showToast('Đã lưu báo cáo sự cố.');
-    requestAnimationFrame(() => document.getElementById('recent-incidents')?.scrollIntoView({ block: 'start', behavior: 'smooth' }));
   };
 
   const handleAddNewEquipment = async (newEq: FacilityEquipment) => {
@@ -156,60 +142,9 @@ export default function FacilityManagementView({
     finally { setLockSaving(false); }
   };
 
-  // Equipment relocation & booking allocation
-  const handleConfirmRelocate = async () => {
-    if (!relocatingEq || operationSaving) return;
-    setOperationSaving(true);setOperationError('');
-    try {
-
-    if (targetLocation === 'Kho chung') {
-      if (onReturnToWarehouse) {
-        await onReturnToWarehouse(relocatingEq.code);
-      } else {
-        await onUpdateEquipmentLocation(relocatingEq.code, 'Kho chung');
-      }
-      showToast(`Đã thu hồi [${relocatingEq.code}] về Kho chung an toàn!`);
-    } else {
-      if (isAssignBooking && onAssignBookingToEquipment) {
-        const selected=bookings.find(booking=>booking.code===assignBookingCode.trim()&&booking.court===targetLocation&&['Đã đặt','Đang sử dụng'].includes(booking.status));
-        if(!selected)throw Error('Chọn mã lượt đặt có thật và thuộc sân đang điều phối.');
-        await onAssignBookingToEquipment(
-          relocatingEq.code,
-          targetLocation,
-          selected.time,
-          selected.code,
-          selected.customerName
-        );
-        showToast(`Đã gán [${relocatingEq.code}] vào ${targetLocation} ca ${assignTimeSlot}!`);
-      } else {
-        await onUpdateEquipmentLocation(relocatingEq.code, targetLocation);
-        showToast(`Đã điều phối [${relocatingEq.code}] sang ${targetLocation}!`);
-      }
-    }
-
-    setRelocatingEq(null);
-    setIsAssignBooking(false);
-    }catch(error){setOperationError(error instanceof Error?error.message:'Chưa lưu được vị trí thiết bị.');}
-    finally{setOperationSaving(false);}
-  };
-
   const handleCompleteEquipmentWarranty = async (equipmentCode: string, equipmentName?: string) => {
     if(!onCompleteEquipmentWarranty)throw Error('Chưa kết nối thao tác nghiệm thu.');
     await onCompleteEquipmentWarranty(equipmentCode,equipmentName);
-    const today = new Date().toLocaleDateString('vi-VN');
-    const formattedDate = `Hôm nay (${today})`;
-
-    // Update selectedEquipmentDetail if currently open
-    if (selectedEquipmentDetail && selectedEquipmentDetail.code === equipmentCode) {
-      setSelectedEquipmentDetail({
-        ...selectedEquipmentDetail,
-        status: 'san_sang',
-        statusLabel: 'Sẵn sàng',
-        healthRate: 'Tốt (Đã nghiệm thu)',
-        lastMaintenance: formattedDate,
-      });
-    }
-
     showToast(`Đã nghiệm thu thiết bị [${equipmentCode}] và cập nhật vào Nhật ký xử lý sự cố!`);
   };
 
@@ -222,7 +157,7 @@ export default function FacilityManagementView({
         currentUser={currentUser}
         equipments={equipments}
         courts={courts}
-        onBack={() => setSubView('main')}
+        onBack={() => setSubView(incidentReturnView)}
         onSubmitIncident={handleCreateIncident}
       />
     );
@@ -230,12 +165,12 @@ export default function FacilityManagementView({
 
   if (subView === 'incident_detail') {
     const currentIncident = incidents.find(i => i.id === selectedIncidentId && !i.deletedAt);
-    if(!currentIncident)return <div className="space-y-3 p-3"><p className="text-xs text-slate-700">Báo cáo không còn trong danh sách hiện tại.</p><button type="button" onClick={()=>setSubView('main')} className="rounded-lg bg-emerald-700 px-3 py-2 text-xs text-white">Quay lại cơ sở vật chất</button></div>;
+    if(!currentIncident)return <div className="space-y-3 p-3"><p className="text-xs text-slate-700">Báo cáo không còn trong danh sách hiện tại.</p><button type="button" onClick={()=>setSubView('incidents')} className="rounded-lg bg-emerald-700 px-3 py-2 text-xs text-white">Quay lại báo cáo sự cố</button></div>;
     return (
       <IncidentDetailView
         incident={currentIncident}
         equipments={equipments}
-        onBack={() => setSubView('main')}
+        onBack={() => setSubView('incidents')}
         onUpdateStatus={async (id, st, unlock) => {
           await onUpdateIncidentStatus(id, st, unlock);
           showToast(`Đã cập nhật trạng thái sự cố #${id}!`);
@@ -256,36 +191,13 @@ export default function FacilityManagementView({
     );
   }
 
-  if (subView === 'notifications') {
+  if (subView === 'incidents') {
     return (
-      <NotificationModal
-        onBack={() => setSubView('main')}
-        onClose={() => setSubView('main')}
-      />
-    );
-  }
-
-  if (subView === 'equipment_detail' && selectedEquipmentDetail) {
-    return (
-      <EquipmentDetailView
-        equipment={selectedEquipmentDetail}
-        onBack={() => {
-          setSubView('main');
-          setSelectedEquipmentDetail(null);
-        }}
-        onRelocate={(eq) => {
-          setSubView('main');
-          setSelectedEquipmentDetail(null);
-          setRelocatingEq(eq);
-          setTargetLocation(eq.currentLocation === 'Kho chung' ? courts.find(c=>!c.isLocked)?.name||'Kho chung' : 'Kho chung');
-          setIsAssignBooking(false);
-        }}
-        onReportIncident={() => {
-          setSelectedEquipmentDetail(null);
-          setSubView('report_incident');
-        }}
-        onCompleteMaintenance={(eq) => handleCompleteEquipmentWarranty(eq.code, eq.name)}
-      />
+      <div className="min-w-0 flex-1 space-y-4 bg-white p-4 pb-8">
+        <button type="button" onClick={()=>setSubView('main')} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50"><ArrowLeft className="h-4 w-4"/>Cơ sở vật chất</button>
+        {toastMessage&&<p role="status" className="rounded-lg bg-emerald-50 p-3 text-xs text-emerald-800">{toastMessage}</p>}
+        <IncidentReportsList incidents={incidents} onView={handleOpenIncidentDetail} onDelete={onDeleteIncident} onCreate={()=>{setIncidentReturnView('incidents');setSubView('report_incident');}}/>
+      </div>
     );
   }
 
@@ -305,13 +217,13 @@ export default function FacilityManagementView({
 
       <div className="flex items-start justify-between gap-3">
         <h1 className="text-2xl font-black tracking-tight text-slate-900 leading-tight">
-          QUẢN LÝ CƠ SỞ VẬT CHẤT <br />
-          <span className="text-emerald-800">& THIẾT BỊ</span>
+          QUẢN LÝ CƠ SỞ VẬT CHẤT
         </h1>
-
+        <button type="button" onClick={()=>setSubView('incidents')} aria-label={`Báo cáo sự cố, ${unresolvedCount} chưa xử lý`} title="Báo cáo sự cố" className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-emerald-800 shadow-sm transition hover:bg-emerald-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700">
+          <Bell className="h-5 w-5"/>
+          {unresolvedCount>0&&<span aria-hidden="true" className="absolute -right-1 -top-1 flex min-h-4 min-w-4 items-center justify-center rounded-full bg-red-600 px-1 text-[9px] font-bold text-white">{unresolvedCount>99?'99+':unresolvedCount}</span>}
+        </button>
       </div>
-
-      <IncidentReportsList incidents={incidents} onView={handleOpenIncidentDetail} onDelete={onDeleteIncident} onCreate={() => setSubView('report_incident')} />
 
       {/* 3. Chuyển đổi trạng thái sân */}
       <div id="court-switch-section" className="rounded-2xl border border-black/15 bg-white p-4 space-y-3">
@@ -349,6 +261,7 @@ export default function FacilityManagementView({
         </div>
 
         <div className="space-y-2">
+          {courts.length===0&&<div role="status" className="rounded-lg bg-amber-50 p-3 text-xs text-amber-800">Chưa tải được danh sách sân. <button type="button" onClick={()=>void refreshCourtAvailability()} className="font-bold underline">Tải lại danh sách sân</button></div>}
           {courts
             .filter((c) => {
               if (courtSportFilter === 'all') return true;
@@ -405,19 +318,6 @@ export default function FacilityManagementView({
       </div>
 
       {/* 5. Bảng giá bồi thường thiết bị */}
-      <section className="space-y-2 rounded-xl border border-slate-200 bg-white p-3">
-        <h2 className="text-xs font-bold text-emerald-800">Thiết bị theo số Seri / Asset ID</h2>
-        {equipments.map(equipment=><div key={equipment.id} className="flex items-center justify-between gap-2 border-t border-slate-100 py-2">
-          <div className="min-w-0"><p className="text-xs font-semibold text-slate-900">{equipment.name}</p>
-            <p className="break-words text-[10px] text-slate-500">{equipment.code} · Seri: {equipment.serialNumber||'Chưa ghi nhận'}</p>
-            <p className="text-[10px] text-emerald-800">{equipment.currentLocation} · {equipment.statusLabel}</p></div>
-          <div className="flex shrink-0 flex-col gap-1">
-            <button type="button" onClick={()=>{setSelectedEquipmentDetail(equipment);setSubView('equipment_detail');}} className="rounded-lg border border-slate-200 px-2 py-1 text-[10px] text-slate-700">Chi tiết</button>
-            <button type="button" onClick={()=>{setOperationError('');setRelocatingEq(equipment);setTargetLocation('Kho chung');}} className="rounded-lg bg-emerald-700 px-2 py-1 text-[10px] text-white hover:bg-emerald-800">Điều chuyển</button>
-          </div>
-        </div>)}
-        {!equipments.length&&<p className="text-xs text-slate-500">Chưa có dữ liệu thiết bị từ máy chủ.</p>}
-      </section>
       <CompensationPriceTable
         onAddEquipment={() => setSubView('add_equipment')}
         equipments={equipments}
@@ -500,139 +400,6 @@ export default function FacilityManagementView({
         </div>
       )}
 
-      {/* ============================================================ */}
-      {/* MODAL: ĐIỀU PHỐI THIẾT BỊ LƯU ĐỘNG                           */}
-      {/* ============================================================ */}
-      {relocatingEq && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-in fade-in">
-          <div className="w-full max-w-sm rounded-3xl bg-white p-5 shadow-2xl space-y-4 animate-in zoom-in-95">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-              <div className="flex items-center gap-2">
-                <ArrowRightLeft className="w-4 h-4 text-emerald-700" />
-                <h3 className="text-xs font-black uppercase tracking-wider text-slate-900">
-                  Điều phối thiết bị lưu động
-                </h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setRelocatingEq(null)}
-                className="text-slate-400 hover:text-slate-600"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <div className="rounded-2xl bg-emerald-50/70 border border-emerald-200 p-3 space-y-1">
-              {operationError&&<p role="alert" className="text-xs text-red-700">{operationError}</p>}
-              <div className="text-[10px] font-black text-emerald-700 uppercase">
-                MÃ THIẾT BỊ: {relocatingEq.code}
-              </div>
-              <div className="text-xs font-black text-slate-900">
-                {relocatingEq.name}
-              </div>
-              <div className="text-[11px] text-slate-600 font-medium">
-                Vị trí hiện tại: <span className="font-bold text-slate-900">{relocatingEq.currentLocation}</span>
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">
-                Chuyển đến vị trí mới:
-              </label>
-              <select
-                value={targetLocation}
-                onChange={(e) => setTargetLocation(e.target.value)}
-                className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-xs font-bold text-slate-800 outline-none focus:border-emerald-600"
-              >
-                <option value="Kho chung">Kho chung nhà thi đấu</option>
-                {courts.filter(c=>!c.isLocked).map(court=><option key={court.id} value={court.name}>{court.name}</option>)}
-              </select>
-            </div>
-
-            {/* Tùy chọn gán ca đặt sân khi chuyển vào sân cụ thể */}
-            {targetLocation !== 'Kho chung' ? (
-              <div className="p-3 rounded-2xl bg-amber-50/70 border border-amber-200/80 space-y-2">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={isAssignBooking}
-                    onChange={(e) => setIsAssignBooking(e.target.checked)}
-                    className="rounded text-emerald-600 focus:ring-emerald-500 accent-emerald-600"
-                  />
-                  <span className="text-xs font-bold text-amber-900">
-                    Ghi nhận ca đặt sân vào giờ đó
-                  </span>
-                </label>
-
-                {isAssignBooking && (
-                  <div className="space-y-2 pt-1 animate-in fade-in">
-                    <div>
-                      <label className="block text-[10px] font-bold text-slate-600 mb-0.5">
-                        Khung giờ đặt sân:
-                      </label>
-                      <input
-                        type="text"
-                        value={assignTimeSlot}
-                        onChange={(e) => setAssignTimeSlot(e.target.value)}
-                        placeholder="VD: 17:00 - 18:30"
-                        className="w-full rounded-xl border border-slate-200 bg-white p-2 text-xs font-bold text-slate-800 outline-none focus:border-emerald-600"
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <label className="block text-[10px] font-bold text-slate-600 mb-0.5">
-                          Mã đặt:
-                        </label>
-                        <input
-                          type="text"
-                          value={assignBookingCode}
-                          onChange={(e) => setAssignBookingCode(e.target.value)}
-                          placeholder="BK-8491"
-                          className="w-full rounded-xl border border-slate-200 bg-white p-2 text-xs font-bold text-slate-800 outline-none focus:border-emerald-600"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[10px] font-bold text-slate-600 mb-0.5">
-                          Khách đặt:
-                        </label>
-                        <input
-                          type="text"
-                          value={assignCustomer}
-                          onChange={(e) => setAssignCustomer(e.target.value)}
-                          placeholder="Anh Tuấn Hưng"
-                          className="w-full rounded-xl border border-slate-200 bg-white p-2 text-xs font-bold text-slate-800 outline-none focus:border-emerald-600"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="p-2.5 rounded-xl bg-blue-50/70 border border-blue-100 text-[11px] text-blue-800 font-medium leading-relaxed">
-                ℹ️ Thiết bị chuyển về Kho chung sẽ tự động được giải phóng ca đặt cũ và chuyển về trạng thái Sẵn sàng.
-              </div>
-            )}
-
-            <div className="grid grid-cols-2 gap-2 pt-2">
-              <button
-                type="button"
-                onClick={() => setRelocatingEq(null)}
-                className="rounded-xl border border-slate-200 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-50 cursor-pointer"
-              >
-                Hủy
-              </button>
-              <button
-                type="button"
-                disabled={operationSaving}
-                onClick={handleConfirmRelocate}
-                className="rounded-xl bg-emerald-700 hover:bg-emerald-800 py-2.5 text-xs font-black text-white shadow-md shadow-emerald-700/25 cursor-pointer"
-              >
-                Xác nhận chuyển
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

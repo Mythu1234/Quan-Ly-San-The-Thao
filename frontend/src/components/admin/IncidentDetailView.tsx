@@ -187,7 +187,7 @@ export default function IncidentDetailView({
       <div className="rounded-2xl bg-white border border-black/15 p-3 space-y-2.5 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-sm font-bold text-slate-900">{incident.courtName}</span>
+            {incident.courtName&&incident.courtName!=='Kho chung'&&<span className="text-sm font-bold text-slate-900">{incident.courtName}</span>}
             {incident.courtZone && (
               <span className="rounded-md bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-800">
                 {incident.courtZone}
@@ -197,7 +197,7 @@ export default function IncidentDetailView({
           <span className="text-[11px] text-slate-600">{incident.reportedAt}</span>
         </div>
         <div className="flex items-center justify-between gap-2">
-          {!courtLocked ? (
+          {incident.courtId && (!courtLocked ? (
             <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-700 text-white text-[11px] font-bold tracking-wide shadow-2xs">
               <Unlock className="w-3.5 h-3.5" />
               Sân đang mở
@@ -207,7 +207,7 @@ export default function IncidentDetailView({
               <Lock className="w-3.5 h-3.5" />
               Sân đang khóa
             </span>
-          )}
+          ))}
 
           <span className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-amber-100 text-amber-800 text-[11px] font-bold tracking-wide">
             <span className="text-amber-700 font-bold">!</span>
@@ -217,13 +217,14 @@ export default function IncidentDetailView({
 
       </div>
 
+      {incident.technicianNote&&<p className="rounded-xl border border-slate-200 p-3 text-xs text-slate-600"><strong>Ghi chú: </strong>{incident.technicianNote}</p>}
       {/* 3. Detailed Damage Items ("Hạng mục hư hại chi tiết") */}
-      {incident.bookingCode && <div className="space-y-1 rounded-xl border border-emerald-200 bg-white p-3 text-xs">
-        <div className="flex justify-between gap-2"><span className="text-slate-600">Lượt đặt</span><strong className="text-emerald-800">{incident.bookingCode}</strong></div>
+      <div className="space-y-1 rounded-xl border border-emerald-200 bg-white p-3 text-xs">
+        {incident.bookingCode&&<div className="flex justify-between gap-2"><span className="text-slate-600">Lượt đặt</span><strong className="text-emerald-800">{incident.bookingCode}</strong></div>}
         <div className="flex justify-between gap-2"><span className="text-slate-600">Trách nhiệm</span><span>{incident.liability === 'DO_KHACH_LAM_HONG' ? 'Do khách làm hỏng' : 'Sân chịu chi phí'}</span></div>
         {incident.compensationAmount !== undefined && <div className="flex justify-between gap-2"><span className="text-slate-600">Bồi thường</span><strong>{incident.compensationAmount.toLocaleString('vi-VN')} VND</strong></div>}
         <p className="text-right text-[11px] text-emerald-800">{incident.compensationPaymentStatus === 'paid' ? 'Đã thu qua VietQR khi trả sân' : incident.compensationPaymentStatus === 'not_required' ? 'Không thu phí khách' : 'Chưa quyết toán'}</p>
-      </div>}
+      </div>
       <div className="space-y-3">
         <div className="flex items-center justify-between px-1">
           <div className="flex items-center gap-2">
@@ -260,34 +261,19 @@ export default function IncidentDetailView({
                   </div>
                 </div>
 
-                <span
+                {equipments.some(equipment=>equipment.code===item.equipmentCode&&!equipment.isCatalogItem)&&<span
                   className={`px-2.5 py-1 rounded-xl text-[10px] font-bold ${
                     getEquipmentStatus(equipments.find(equipment => equipment.code === item.equipmentCode)).color
                   }`}
                 >
                   {getEquipmentStatus(equipments.find(equipment => equipment.code === item.equipmentCode)).label}
-                </span>
+                </span>}
               </div>
 
               <p className="text-xs text-slate-600 leading-relaxed font-medium">
                 {item.description}
               </p>
 
-              {item.imageUrl && (
-                <div className="relative rounded-2xl overflow-hidden border border-slate-200 shadow-2xs aspect-video bg-slate-100">
-                  <img
-                    src={item.imageUrl}
-                    alt={item.imageLabel || 'Hiện trường hư hỏng'}
-                    className="w-full h-full object-cover"
-                  />
-                  {item.imageLabel && (
-                    <div className="absolute bottom-2 left-2 flex items-center gap-1.5 rounded-lg bg-slate-900/80 backdrop-blur-sm px-2.5 py-1 text-[11px] font-bold text-white shadow">
-                      <Camera className="w-3.5 h-3.5" />
-                      <span>{item.imageLabel}</span>
-                    </div>
-                  )}
-                </div>
-              )}
             </div>
           ))
         ) : (
@@ -307,25 +293,12 @@ export default function IncidentDetailView({
               {incident.description}
             </p>
 
-            {incident.imageUrl && (
-              <div className="relative rounded-2xl overflow-hidden border border-slate-200 shadow-2xs aspect-video bg-slate-100">
-                <img
-                  src={incident.imageUrl}
-                  alt={incident.title}
-                  className="w-full h-full object-cover"
-                />
-                <div className="absolute bottom-2 left-2 flex items-center gap-1.5 rounded-lg bg-slate-900/80 backdrop-blur-sm px-2.5 py-1 text-[11px] font-bold text-white shadow">
-                  <Camera className="w-3.5 h-3.5" />
-                  <span>Ảnh chụp hiện trường sự cố</span>
-                </div>
-              </div>
-            )}
           </div>
         )}
       </div>
 
       {/* 3.5. Equipment Warranty & Acceptance Card ("BẢO HÀNH & NGHIỆM THU THIẾT BỊ") */}
-      <div className="rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50/70 via-white to-emerald-50/30 p-3 space-y-2.5">
+      {targetEquipment&&!targetEquipment.isCatalogItem&&<div className="rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50/70 via-white to-emerald-50/30 p-3 space-y-2.5">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Wrench className="w-4 h-4 text-emerald-700" />
@@ -395,7 +368,7 @@ export default function IncidentDetailView({
               : warranty.active ? 'Nghiệm thu thiết bị' : 'Xác nhận sửa xong'}
           </span>
         </button>
-      </div>
+      </div>}
 
       {/* 4. Reporter Card ("NGƯỜI LẬP BIÊN BẢN") */}
       <div className="rounded-2xl border border-slate-200 bg-white p-3 space-y-2">

@@ -15,15 +15,25 @@ export function sortRecentIncidents(incidents: FacilityIncident[]) {
 }
 
 export function getIncidentTimeline(incident: FacilityIncident) {
+  const initialLogs=(incident.timelineLogs||[]).filter(log=>log.id===`REPORT-${incident.id}`
+    || (log.title===incident.title&&log.description===incident.description));
   const report = {
     id: `REPORT-${incident.id}`, time: incident.reportedAt,
     title: incident.title, description: incident.description,
-    images: incident.images?.length ? incident.images : incident.imageUrl ? [incident.imageUrl] : [],
+    images: [...new Set([...(incident.images||[]),...(incident.imageUrl?[incident.imageUrl]:[]),
+      ...(incident.damageItems||[]).flatMap(item=>item.imageUrl?[item.imageUrl]:[]),
+      ...initialLogs.flatMap(log=>log.images||[])])],
     active: !incident.timelineLogs?.length,
   };
   const updates = (incident.timelineLogs || []).filter(log => log.id !== report.id
     && !(log.title === report.title && log.description === report.description));
-  return [...updates, report];
+  report.active=updates.length===0;
+  const seen=new Set(report.images);
+  const uniqueUpdates=[...updates].reverse().map(log=>({...log,images:(log.images||[]).filter(src=>{
+    if(seen.has(src))return false;seen.add(src);return true;
+  }),time:/^\d{4}-\d{2}-\d{2}T/.test(log.time)&&!Number.isNaN(Date.parse(log.time))
+    ?new Date(log.time).toLocaleString('vi-VN',{timeZone:'Asia/Ho_Chi_Minh'}):log.time})).reverse();
+  return [...uniqueUpdates, report];
 }
 
 // IndexedDB retains full photos without localStorage's small string quota.

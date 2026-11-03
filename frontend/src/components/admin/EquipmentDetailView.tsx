@@ -281,7 +281,7 @@ export default function EquipmentDetailView({
 
           <div className="flex justify-between gap-3 pt-2">
             <span className="text-slate-500 font-medium">Giá mua:</span>
-            <span className="font-bold text-slate-800">{currentEq.purchasePrice !== undefined ? `${currentEq.purchasePrice.toLocaleString('vi-VN')} VND` : 'Chưa cập nhật'}</span>
+            <span className="font-bold text-slate-800">{currentEq.purchasePrice != null ? `${currentEq.purchasePrice.toLocaleString('vi-VN')} VND` : 'Chưa cập nhật'}</span>
           </div>
           <div className="flex justify-between gap-3 pt-2">
             <span className="text-slate-500 font-medium">Giá bồi thường:</span>
