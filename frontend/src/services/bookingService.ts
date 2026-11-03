@@ -37,6 +37,7 @@ export interface SupabaseBookingRow {
   ma_nhan_vien_huy?: string;
   san?: SupabaseCourt;
   khach_hang?: SupabaseCustomer;
+  hoan_tien?: any[];
 }
 
 /**
@@ -91,9 +92,17 @@ export function mapSupabaseBookingToDetail(row: SupabaseBookingRow): BookingDeta
 
   const totalNum = Number(row.tong_tien_san || 0);
 
+  const [bYear, bMonth, bDay] = (row.ngay_dat || '').split('-').map(Number);
+  let hoursUntilStart = 48;
+  if (bYear && bMonth && bDay) {
+    const startDateTime = new Date(bYear, bMonth - 1, bDay, startH, startM, 0).getTime();
+    hoursUntilStart = Math.round(((startDateTime - Date.now()) / (1000 * 60 * 60)) * 10) / 10;
+  }
+
   return {
     code: row.ma_dat_san,
     bookingDate: row.ngay_dat,
+    hoursUntilStart,
     customerName: row.khach_hang?.ho_ten || 'Khách vãng lai',
     phone: row.khach_hang?.so_dien_thoai || '',
     court: courtName,
@@ -151,6 +160,12 @@ export function mapSupabaseToLookupTicket(row: SupabaseBookingRow) {
     statusText = 'HOÀN TẤT';
   }
 
+  const refunded = (row.hoan_tien || [])
+    .filter((item: any) => item.trang_thai === 'THANH_CONG')
+    .reduce((sum: number, item: any) => sum + Number(item.so_tien_hoan || 0), 0);
+
+  const canCancel = (row.trang_thai === 'DA_THANH_TOAN' || row.trang_thai === 'CHO_THANH_TOAN') && hoursUntilStart >= 0;
+
   return {
     code: row.ma_dat_san,
     name: row.khach_hang?.ho_ten || 'Khách đặt sân',
@@ -163,11 +178,14 @@ export function mapSupabaseToLookupTicket(row: SupabaseBookingRow) {
     rawTotal: totalNum,
     status: statusText,
     paymentStatus: paymentText,
+    refundAmount: refunded > 0 ? `${refunded.toLocaleString('vi-VN')}đ` : undefined,
+    refundStatus: refunded > 0 ? 'Đã hoàn tiền' : undefined,
     hoursUntilStart: Math.round(hoursUntilStart * 10) / 10,
     sportId: getSportSlug(row.san?.ma_bo_mon),
     cancellationReason: row.ly_do_huy,
     cancelledAt: row.thoi_gian_huy,
     isFromSupabase: true,
+    canCancel,
   };
 }
 
@@ -184,7 +202,7 @@ class BookingApiService {
       if (/^\d{9,11}$/.test(cleanPhone)) {
         const { data, error } = await supabase
           .from('dat_san')
-          .select('*, san(*), khach_hang!inner(*)')
+          .select('*, san(*), khach_hang!inner(*), hoan_tien(*)')
           .eq('khach_hang.so_dien_thoai', cleanPhone)
           .order('ngay_dat', { ascending: false });
 
@@ -196,7 +214,7 @@ class BookingApiService {
       const cleanCode = clean.replace(/^#/, '').toUpperCase();
       const { data, error } = await supabase
         .from('dat_san')
-        .select('*, san(*), khach_hang(*)')
+        .select('*, san(*), khach_hang(*), hoan_tien(*)')
         .ilike('ma_dat_san', `%${cleanCode}%`)
         .order('ngay_dat', { ascending: false });
 
@@ -255,15 +273,51 @@ class BookingApiService {
 
       // 2. Nếu đủ điều kiện >= 24h: Thêm bản ghi vào bảng hoan_tien
       if (params.isEligible && params.refundAmount) {
-        const nextHoanTienId = `HT${Date.now().toString().slice(-8)}`;
+        let nextHoanTienId = 'HT00000021';
         try {
-          // Lấy mã thanh toán gốc của đơn
+          // Lấy danh sách các mã hoàn tiền hiện có để tính số thứ tự tiếp theo dạng HT000000xx
+          const { data: existingRefunds } = await supabase
+            .from('hoan_tien')
+            .select('ma_hoan_tien')
+            .ilike('ma_hoan_tien', 'HT%')
+            .limit(100);
+
+          let maxNum = 0;
+          if (existingRefunds && existingRefunds.length > 0) {
+            for (const r of existingRefunds) {
+              const match = (r.ma_hoan_tien || '').match(/^HT(\d+)$/);
+              if (match) {
+                const num = parseInt(match[1], 10);
+                // Bỏ qua các mã timestamp cũ (như 29351443) để giữ số tuần tự chuẩn
+                if (num < 1000000 && num > maxNum) {
+                  maxNum = num;
+                }
+              }
+            }
+          }
+          if (maxNum > 0) {
+            nextHoanTienId = `HT${(maxNum + 1).toString().padStart(8, '0')}`;
+          }
+        } catch (e) {
+          console.warn('Không thể tự động tính mã HT tuần tự, dùng fallback:', e);
+        }
+
+        try {
+          // Lấy mã thanh toán gốc của đơn từ bảng thanh_toan
           const { data: payData } = await supabase
             .from('thanh_toan')
             .select('ma_thanh_toan')
             .eq('ma_dat_san', params.code)
             .maybeSingle();
           const origPaymentId = payData?.ma_thanh_toan || 'TT00000001';
+
+          const now = new Date();
+          const y = now.getFullYear();
+          const m = (now.getMonth() + 1).toString().padStart(2, '0');
+          const d = now.getDate().toString().padStart(2, '0');
+          const dateStamp = `${y}${m}${d}`;
+          const seqSuffix = nextHoanTienId.replace(/\D/g, '').slice(-2);
+          const bankRefundCode = `REFUND${dateStamp}${seqSuffix}`;
 
           await supabase
             .from('hoan_tien')
@@ -276,6 +330,7 @@ class BookingApiService {
               stk_nhan_tien: params.customerPhone || '0912345678',
               ngan_hang: 'VietinBank',
               ten_chu_tai_khoan: params.customerName || 'KHÁCH HÀNG',
+              ma_giao_dich_ngan_hang: bankRefundCode,
               trang_thai: 'THANH_CONG',
             });
         } catch (warnErr) {
@@ -304,6 +359,44 @@ class BookingApiService {
         .eq('ma_dat_san', code);
       return !error;
     } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Điều chuyển sân và đổi khung giờ thi đấu trên Supabase
+   */
+  async transferCourt(params: {
+    code: string;
+    targetCourtName: string;
+    targetCourtCode?: string;
+    gioBatDau: string;
+    gioKetThuc: string;
+  }): Promise<boolean> {
+    try {
+      const { data: courtData } = await supabase
+        .from('san')
+        .select('ma_san')
+        .ilike('ten_san', `%${params.targetCourtCode || params.targetCourtName}%`)
+        .maybeSingle();
+
+      const updatePayload: Record<string, any> = {
+        gio_bat_dau: params.gioBatDau,
+        gio_ket_thuc: params.gioKetThuc,
+      };
+
+      if (courtData?.ma_san) {
+        updatePayload.ma_san = courtData.ma_san;
+      }
+
+      const { error } = await supabase
+        .from('dat_san')
+        .update(updatePayload)
+        .eq('ma_dat_san', params.code);
+
+      return !error;
+    } catch (err) {
+      console.warn('Supabase transferCourt error:', err);
       return false;
     }
   }
@@ -344,7 +437,18 @@ export interface CreatePaidBookingRequest {
 const backendBookingApi={
   createBooking:(request:CreatePaidBookingRequest)=>apiRequest<{success:boolean;code:string;booking:BookingDetail}>('/bookings',{method:'POST',body:JSON.stringify(request)}),
   list:()=>apiRequest<BookingDetail[]>('/bookings'),
-  lookup:(query:string)=>apiRequest<CustomerLookupResult[]>('/bookings/lookup',{method:'POST',body:JSON.stringify({query})}),
+  lookup: async (query: string): Promise<CustomerLookupResult[]> => {
+    try {
+      const res = await apiRequest<CustomerLookupResult[]>('/bookings/lookup', {
+        method: 'POST',
+        body: JSON.stringify({ query }),
+      });
+      if (res && res.length > 0) return res;
+    } catch {
+      // Backend unavailable, fallback to Supabase direct query
+    }
+    return new BookingApiService().searchBookings(query);
+  },
   checkIn:(code:string,bookingDate:string)=>apiRequest<BookingDetail>(`/bookings/${encodeURIComponent(code)}/check-in`,{method:'POST',body:JSON.stringify({bookingDate})}),
 };
 

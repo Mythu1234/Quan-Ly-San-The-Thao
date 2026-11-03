@@ -26,7 +26,7 @@ export function mapCustomerBooking(row:any,instant=new Date()) {
     cancellationReason:row.ly_do_huy||undefined,cancelledAt:row.thoi_gian_huy||undefined,
     hoursUntilStart:(new Date(`${row.ngay_dat}T${row.gio_bat_dau}+07:00`).getTime()-instant.getTime())/3600000,
     sportId:/chuyền/i.test(sport)?'volleyball':/đá/i.test(sport)?'football':'badminton',
-    canCancel:false}; // Customer cancellation needs its own verified backend flow.
+    canCancel:(row.trang_thai==='DA_THANH_TOAN'||row.trang_thai==='CHO_THANH_TOAN')&&(new Date(`${row.ngay_dat}T${row.gio_bat_dau}+07:00`).getTime()>=instant.getTime())};
 }
 export async function lookupCustomerBookings(input:unknown) {
   const query=normalizeLookupInput(input);
