@@ -169,48 +169,14 @@ export default function CustomerSchedule({
     return intervalMode === 30 ? 56 : 72;
   }, [zoomMode, intervalMode]);
 
-  // Hàm chuyển nhanh mượt mà tới các ca giờ (Sáng 05:00, Chiều 12:00, Tối 17:00)
-  const scrollToHour = (targetHour: number) => {
-    if (scrollRef.current) {
-      const colIndex = Math.max(0, targetHour - startHour);
-      const targetScroll = colIndex * slotWidth;
-      scrollRef.current.scrollTo({
-        left: targetScroll,
-        behavior: 'smooth',
-      });
-    }
-  };
-
-  // Tự động cuộn đến giờ đã chọn (hoặc 17:00 ca tối cao điểm), căn chuẩn đúng mép cột không bị cắt chữ
-  useEffect(() => {
-    if (scrollRef.current) {
-      let targetHour = 17; // Mặc định hiển thị ca tối cao điểm đông khách nhất
-      if (selectedTimeStr) {
-        const h = parseInt(selectedTimeStr.split(':')[0], 10);
-        if (!isNaN(h) && h >= startHour && h <= endHour) {
-          targetHour = h;
-        }
-      }
-      const colIndex = Math.max(0, targetHour - startHour);
-      scrollRef.current.scrollLeft = colIndex * slotWidth;
-    }
-  }, [intervalMode, slotWidth, selectedTimeStr]);
-
-  const handlePrevDay = () => {
-    const d = new Date(selectedDate);
-    d.setDate(d.getDate() - 1);
-    setSelectedDate(d);
-  };
-
-  const handleNextDay = () => {
-    const d = new Date(selectedDate);
-    d.setDate(d.getDate() + 1);
-    setSelectedDate(d);
-  };
-
   const isToday = (date: Date) => {
     return date.getDate() === today.getDate() && date.getMonth() === today.getMonth() && date.getFullYear() === today.getFullYear();
   };
+
+  const isSelectedToday = isToday(selectedDate);
+  const nowHour = new Date().getHours();
+  const showMorningShift = !isSelectedToday || nowHour < 12;
+  const showAfternoonShift = !isSelectedToday || nowHour < 17;
 
   const formatDate = (date: Date) => {
     const d = date.getDate().toString().padStart(2, '0');
@@ -219,19 +185,73 @@ export default function CustomerSchedule({
     return `${d}/${m}/${y}`;
   };
 
-  const dateDisplay = (isToday(selectedDate) ? "Hôm nay, " : "") + formatDate(selectedDate);
+  const dateDisplay = (isSelectedToday ? "Hôm nay, " : "") + formatDate(selectedDate);
   const htmlDate = `${selectedDate.getFullYear()}-${(selectedDate.getMonth() + 1).toString().padStart(2, '0')}-${selectedDate.getDate().toString().padStart(2, '0')}`;
+  const todayHtmlDate = `${today.getFullYear()}-${(today.getMonth() + 1).toString().padStart(2, '0')}-${today.getDate().toString().padStart(2, '0')}`;
 
   const times = useMemo(() => {
-    const result = [];
+    const result: string[] = [];
+    const now = new Date();
+    const currentMins = now.getHours() * 60 + now.getMinutes();
+
     for (let h = startHour; h <= endHour; h++) {
-      result.push(`${h.toString().padStart(2, '0')}:00`);
+      const slotMins00 = h * 60;
+      // Nếu là ngày hôm nay: ẨN TOÀN BỘ các khung giờ đã trôi qua, chỉ hiện giờ tương lai
+      if (!isSelectedToday || slotMins00 > currentMins) {
+        result.push(`${h.toString().padStart(2, '0')}:00`);
+      }
       if (intervalMode === 30 && h < endHour) {
-        result.push(`${h.toString().padStart(2, '0')}:30`);
+        const slotMins30 = h * 60 + 30;
+        if (!isSelectedToday || slotMins30 > currentMins) {
+          result.push(`${h.toString().padStart(2, '0')}:30`);
+        }
       }
     }
     return result;
-  }, [intervalMode, startHour, endHour]);
+  }, [intervalMode, startHour, endHour, isSelectedToday]);
+
+  // Hàm chuyển nhanh mượt mà tới các ca giờ (Sáng 05:00, Chiều 12:00, Tối 17:00)
+  const scrollToHour = (targetHour: number) => {
+    if (scrollRef.current && times.length > 0) {
+      const targetPrefix = `${targetHour.toString().padStart(2, '0')}:`;
+      let colIndex = times.findIndex(t => t.startsWith(targetPrefix));
+      if (colIndex === -1) {
+        colIndex = times.findIndex(t => {
+          const [h] = t.split(':').map(Number);
+          return h >= targetHour;
+        });
+      }
+      const targetScroll = (colIndex >= 0 ? colIndex : 0) * slotWidth;
+      scrollRef.current.scrollTo({
+        left: targetScroll,
+        behavior: 'smooth',
+      });
+    }
+  };
+
+  // Tự động cuộn đến đầu tiên (khung giờ khả dụng sớm nhất)
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollLeft = 0;
+    }
+  }, [selectedDate, times, intervalMode, slotWidth]);
+
+  const handlePrevDay = () => {
+    const d = new Date(selectedDate);
+    d.setDate(d.getDate() - 1);
+    const todayZero = new Date(today);
+    todayZero.setHours(0, 0, 0, 0);
+    const dZero = new Date(d);
+    dZero.setHours(0, 0, 0, 0);
+    if (dZero.getTime() < todayZero.getTime()) return; // Không cho lùi về quá khứ
+    setSelectedDate(d);
+  };
+
+  const handleNextDay = () => {
+    const d = new Date(selectedDate);
+    d.setDate(d.getDate() + 1);
+    setSelectedDate(d);
+  };
 
   // Filter courts by sport
   const displayedCourts = useMemo(() => {
@@ -319,22 +339,26 @@ export default function CustomerSchedule({
           {/* Quick Shift Navigation & Zoom Toggle Toolbar */}
           <div className="flex flex-wrap items-center justify-between gap-1.5 px-2.5 py-1.5 bg-slate-50 border-t border-slate-100 text-[10px]">
             <div className="flex items-center gap-1 overflow-x-auto no-scrollbar">
-              <button
-                type="button"
-                onClick={() => scrollToHour(5)}
-                className="flex items-center gap-0.5 px-2 py-0.5 rounded-lg font-bold bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 active:scale-95 transition cursor-pointer shrink-0 shadow-2xs"
-                title="Cuộn tới ca sáng (05:00 - 12:00)"
-              >
-                <span>🌅</span> Sáng (5h-12h)
-              </button>
-              <button
-                type="button"
-                onClick={() => scrollToHour(12)}
-                className="flex items-center gap-0.5 px-2 py-0.5 rounded-lg font-bold bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 active:scale-95 transition cursor-pointer shrink-0 shadow-2xs"
-                title="Cuộn tới ca chiều (12:00 - 17:00)"
-              >
-                <span>☀️</span> Chiều (12h-17h)
-              </button>
+              {showMorningShift && (
+                <button
+                  type="button"
+                  onClick={() => scrollToHour(5)}
+                  className="flex items-center gap-0.5 px-2 py-0.5 rounded-lg font-bold bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 active:scale-95 transition cursor-pointer shrink-0 shadow-2xs"
+                  title="Cuộn tới ca sáng (05:00 - 12:00)"
+                >
+                  <span>🌅</span> Sáng (5h-12h)
+                </button>
+              )}
+              {showAfternoonShift && (
+                <button
+                  type="button"
+                  onClick={() => scrollToHour(12)}
+                  className="flex items-center gap-0.5 px-2 py-0.5 rounded-lg font-bold bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 active:scale-95 transition cursor-pointer shrink-0 shadow-2xs"
+                  title="Cuộn tới ca chiều (12:00 - 17:00)"
+                >
+                  <span>☀️</span> Chiều (12h-17h)
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => scrollToHour(17)}
@@ -376,8 +400,14 @@ export default function CustomerSchedule({
           <div className="flex items-center justify-between bg-slate-50 rounded-xl p-1.5 border border-slate-200 relative">
             <button 
               type="button"
+              disabled={isToday(selectedDate)}
               onClick={(e) => { e.stopPropagation(); handlePrevDay(); }} 
-              className="absolute left-1 w-7 h-7 flex items-center justify-center text-slate-500 bg-white rounded-lg shadow-xs active:scale-95 z-20 cursor-pointer"
+              className={`absolute left-1 w-7 h-7 flex items-center justify-center rounded-lg shadow-xs z-20 transition ${
+                isToday(selectedDate)
+                  ? 'text-slate-300 bg-slate-100 opacity-40 cursor-not-allowed pointer-events-none'
+                  : 'text-slate-500 bg-white active:scale-95 cursor-pointer hover:bg-slate-50'
+              }`}
+              title={isToday(selectedDate) ? 'Không thể lùi về ngày quá khứ' : 'Ngày trước'}
             >
               <ChevronLeft className="w-4 h-4"/>
             </button>
@@ -389,11 +419,17 @@ export default function CustomerSchedule({
 
             <input 
               type="date"
+              min={todayHtmlDate}
               value={htmlDate}
               onChange={(e) => {
                 if (e.target.value) {
                   const [year, month, day] = e.target.value.split('-').map(Number);
-                  setSelectedDate(new Date(year, month - 1, day));
+                  const newD = new Date(year, month - 1, day);
+                  const todayZero = new Date(today);
+                  todayZero.setHours(0, 0, 0, 0);
+                  if (newD.getTime() >= todayZero.getTime()) {
+                    setSelectedDate(newD);
+                  }
                 }
               }}
               className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
@@ -489,20 +525,24 @@ export default function CustomerSchedule({
           {/* Quick Shift Navigation & Zoom Toggle Toolbar for Modal Mode */}
           <div className="flex flex-wrap items-center justify-between gap-1.5 pt-1 border-t border-slate-100 text-[10px]">
             <div className="flex items-center gap-1 overflow-x-auto no-scrollbar">
-              <button
-                type="button"
-                onClick={() => scrollToHour(5)}
-                className="flex items-center gap-0.5 px-2 py-0.5 rounded-lg font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 active:scale-95 transition cursor-pointer shrink-0"
-              >
-                <span>🌅</span> Sáng (5h-12h)
-              </button>
-              <button
-                type="button"
-                onClick={() => scrollToHour(12)}
-                className="flex items-center gap-0.5 px-2 py-0.5 rounded-lg font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 active:scale-95 transition cursor-pointer shrink-0"
-              >
-                <span>☀️</span> Chiều (12h-17h)
-              </button>
+              {showMorningShift && (
+                <button
+                  type="button"
+                  onClick={() => scrollToHour(5)}
+                  className="flex items-center gap-0.5 px-2 py-0.5 rounded-lg font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 active:scale-95 transition cursor-pointer shrink-0"
+                >
+                  <span>🌅</span> Sáng (5h-12h)
+                </button>
+              )}
+              {showAfternoonShift && (
+                <button
+                  type="button"
+                  onClick={() => scrollToHour(12)}
+                  className="flex items-center gap-0.5 px-2 py-0.5 rounded-lg font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 active:scale-95 transition cursor-pointer shrink-0"
+                >
+                  <span>☀️</span> Chiều (12h-17h)
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => scrollToHour(17)}
@@ -691,6 +731,19 @@ export default function CustomerSchedule({
                       }
 
                       // Case 4: Entire 1 hour FREE
+                      const nowMin = today.getHours() * 60 + today.getMinutes();
+                      if (isToday(selectedDate) && cellStart + 60 <= nowMin) {
+                        return (
+                          <div 
+                            key={cIdx} 
+                            style={{ width: `${slotWidth}px` }} 
+                            className="shrink-0 border-r border-slate-200/50 bg-slate-100/50 flex flex-col items-center justify-center text-center p-0.5 select-none cursor-default"
+                            title={`${court.name}: Khung giờ ${t} đã qua`}
+                          >
+                            <span className="text-[8px] font-bold text-slate-300 leading-tight">Đã qua</span>
+                          </div>
+                        );
+                      }
                       const isSelected = selectedCourtName === court.name && selStartMin >= 0 && cellStart >= selStartMin && cellStart < selEndMin;
                       if (isSelected) {
                         return (

@@ -65,7 +65,12 @@ export default function TrangChu() {
   // Booking Form State
   const [selectedSportId, setSelectedSportId] = useState<'badminton' | 'football' | 'volleyball' | null>(null);
   const [sportError, setSportError] = useState<string | null>(null);
-  const [selectedDate, setSelectedDate] = useState<string>('');
+  const [selectedDate, setSelectedDate] = useState<string>(() => {
+    const now = new Date();
+    const dStr = now.getDate().toString().padStart(2, '0');
+    const mStr = (now.getMonth() + 1).toString().padStart(2, '0');
+    return `Hôm nay (${dStr}/${mStr})`;
+  });
   const [dateError, setDateError] = useState<string | null>(null);
   const [selectedCourt, setSelectedCourt] = useState<string>('');
 
@@ -585,13 +590,14 @@ export default function TrangChu() {
 
   const daysOfWeekVi = ['Chủ Nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
 
-  // Dynamically generate 21 consecutive days from base date (29/10/2026)
+  // Dynamically generate 21 consecutive days starting from TODAY (hoàn toàn không sinh ngày quá khứ)
   const availableDates = useMemo(() => {
     const list = [];
-    const base = new Date(2026, 9, 29); // 29/10/2026
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
     for (let i = 0; i < 21; i++) {
-      const d = new Date(base);
-      d.setDate(base.getDate() + i);
+      const d = new Date(today);
+      d.setDate(today.getDate() + i);
       const day = d.getDate().toString().padStart(2, '0');
       const month = (d.getMonth() + 1).toString().padStart(2, '0');
       const dow = d.getDay();
@@ -606,7 +612,9 @@ export default function TrangChu() {
   }, []);
 
   const scheduleDateObj = useMemo(() => {
-    if (!selectedDate) return new Date(2026, 9, 29);
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    if (!selectedDate) return now;
     const fullMatch = selectedDate.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
     if (fullMatch) {
       return new Date(parseInt(fullMatch[3], 10), parseInt(fullMatch[2], 10) - 1, parseInt(fullMatch[1], 10));
@@ -615,16 +623,15 @@ export default function TrangChu() {
     if (match) {
       const day = parseInt(match[1], 10);
       const month = parseInt(match[2], 10) - 1;
-      const year = month < 9 ? 2027 : 2026;
-      return new Date(year, month, day);
+      return new Date(now.getFullYear(), month, day);
     }
-    return new Date(2026, 9, 29);
+    return now;
   }, [selectedDate]);
 
 
   // --- INTERACTIVE MONTHLY CALENDAR DROPDOWN ---
   const [isDatePickerOpen, setIsDatePickerOpen] = useState<boolean>(false);
-  const [calendarMonth, setCalendarMonth] = useState<Date>(() => new Date(2026, 9, 1)); // Oct 2026
+  const [calendarMonth, setCalendarMonth] = useState<Date>(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1));
 
   useEffect(() => {
     if (isDatePickerOpen) {
@@ -633,7 +640,7 @@ export default function TrangChu() {
   }, [isDatePickerOpen, scheduleDateObj]);
 
   const handlePrevMonth = () => {
-    const todayBase = new Date(2026, 9, 1);
+    const todayBase = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
     const prev = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() - 1, 1);
     if (prev.getTime() < todayBase.getTime()) {
       showAlert('Thông báo', 'Không thể xem lịch cho các tháng trước tháng hiện tại!');
@@ -702,23 +709,23 @@ export default function TrangChu() {
   }, [calendarMonth]);
 
   const handleSelectCalendarDay = (targetDate: Date) => {
-    const baseToday = new Date(2026, 9, 29); // 29/10/2026
-    baseToday.setHours(0, 0, 0, 0);
+    const todayZero = new Date();
+    todayZero.setHours(0, 0, 0, 0);
     const target = new Date(targetDate);
     target.setHours(0, 0, 0, 0);
 
-    if (target.getTime() < baseToday.getTime()) {
-      showAlert('Thông báo', 'Không thể chọn ngày trong quá khứ!');
-      return;
+    if (target.getTime() < todayZero.getTime()) {
+      return; // Tuyệt đối không chọn ngày quá khứ
     }
 
-    const y = target.getFullYear();
     const m = target.getMonth() + 1;
     const day = target.getDate();
     const dow = target.getDay();
 
-    const isToday = y === 2026 && m === 10 && day === 29;
-    const isTomorrow = y === 2026 && m === 10 && day === 30;
+    const isToday = target.getTime() === todayZero.getTime();
+    const tomorrowZero = new Date(todayZero);
+    tomorrowZero.setDate(todayZero.getDate() + 1);
+    const isTomorrow = target.getTime() === tomorrowZero.getTime();
 
     const dayStr = day.toString().padStart(2, '0');
     const monthStr = m.toString().padStart(2, '0');
@@ -738,6 +745,43 @@ export default function TrangChu() {
     }
     return list;
   }, []);
+
+  // Kiểm tra ngày đang chọn có phải là hôm nay
+  const isSelectedDateToday = useMemo(() => {
+    if (!selectedDate) return false;
+    if (selectedDate.includes('Hôm nay')) return true;
+    const now = new Date();
+    const dMatch = selectedDate.match(/(\d{1,2})\/(\d{1,2})/);
+    if (dMatch) {
+      const day = parseInt(dMatch[1], 10);
+      const month = parseInt(dMatch[2], 10);
+      return day === now.getDate() && month === (now.getMonth() + 1);
+    }
+    return false;
+  }, [selectedDate]);
+
+  // Danh sách giờ bắt đầu: ẨN HOÀN TOÀN các giờ đã qua nếu là ngày Hôm nay
+  const filteredStartTimeOptions = useMemo(() => {
+    if (!isSelectedDateToday) {
+      return START_TIME_OPTIONS;
+    }
+    const now = new Date();
+    const currentMins = now.getHours() * 60 + now.getMinutes();
+    return START_TIME_OPTIONS.filter((t) => parseTimeToMinutes(t) > currentMins);
+  }, [isSelectedDateToday, START_TIME_OPTIONS]);
+
+  // Tự động gán khung giờ hợp lệ nếu giờ đang chọn nằm trong quá khứ
+  useEffect(() => {
+    if (isSelectedDateToday) {
+      const now = new Date();
+      const currentMins = now.getHours() * 60 + now.getMinutes();
+      if (!selectedStartTime || parseTimeToMinutes(selectedStartTime) <= currentMins) {
+        if (filteredStartTimeOptions.length > 0) {
+          setSelectedStartTime(filteredStartTimeOptions[0]);
+        }
+      }
+    }
+  }, [isSelectedDateToday, filteredStartTimeOptions, selectedStartTime]);
 
   const getAvailableDurations = (startTimeStr: string) => {
     const possibleDurations = [30, 60, 90, 120, 150, 180, 210, 240];
@@ -1521,24 +1565,35 @@ export default function TrangChu() {
                   <div className="grid grid-cols-7 gap-1 text-xs">
                     {calendarDays.map((item, idx) => {
                       const itemTime = new Date(item.dateObj.getFullYear(), item.dateObj.getMonth(), item.dateObj.getDate()).getTime();
-                      const baseTime = new Date(2026, 9, 29).getTime(); // 29/10/2026
-                      const isPast = itemTime < baseTime;
+                      const todayZero = new Date();
+                      todayZero.setHours(0, 0, 0, 0);
+                      const isPast = itemTime < todayZero.getTime();
                       const isSelected = Boolean(selectedDate) &&
                         scheduleDateObj.getFullYear() === item.dateObj.getFullYear() &&
                         scheduleDateObj.getMonth() === item.dateObj.getMonth() &&
                         scheduleDateObj.getDate() === item.dateObj.getDate();
-                      const isToday = item.dateObj.getFullYear() === 2026 && item.dateObj.getMonth() === 9 && item.dateObj.getDate() === 29;
+                      const isToday = itemTime === todayZero.getTime();
+
+                      if (isPast) {
+                        return (
+                          <div
+                            key={idx}
+                            className="h-9 w-full rounded-xl flex flex-col items-center justify-center font-bold text-xs text-slate-300 opacity-20 select-none cursor-not-allowed bg-slate-50/50 pointer-events-none"
+                          >
+                            <span>{item.dayNumber}</span>
+                          </div>
+                        );
+                      }
 
                       return (
                         <button
                           key={idx}
                           type="button"
-                          disabled={isPast}
                           onClick={() => handleSelectCalendarDay(item.dateObj)}
                           className={[
                             'h-9 w-full rounded-xl flex flex-col items-center justify-center font-bold transition text-xs relative',
                             !item.isCurrentMonth ? 'text-slate-300' : 'text-slate-800',
-                            isPast ? 'opacity-30 cursor-not-allowed bg-slate-50' : 'cursor-pointer hover:bg-emerald-50 hover:text-emerald-800 active:scale-95',
+                            'cursor-pointer hover:bg-emerald-50 hover:text-emerald-800 active:scale-95',
                             isSelected ? 'bg-emerald-600 text-white font-black hover:bg-emerald-700 shadow-sm shadow-emerald-600/30 ring-2 ring-emerald-300' : '',
                             isToday && !isSelected ? 'border border-emerald-500 text-emerald-700 font-black' : ''
                           ].filter(Boolean).join(' ')}
@@ -1557,13 +1612,16 @@ export default function TrangChu() {
                     <button
                       type="button"
                       onClick={() => {
-                        setSelectedDate('Hôm nay (29/10)');
+                        const now = new Date();
+                        const dStr = now.getDate().toString().padStart(2, '0');
+                        const mStr = (now.getMonth() + 1).toString().padStart(2, '0');
+                        setSelectedDate(`Hôm nay (${dStr}/${mStr})`);
                         setDateError(null);
                         setIsDatePickerOpen(false);
                       }}
                       className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 font-bold hover:bg-slate-200 transition cursor-pointer text-[11px]"
                     >
-                      Hôm nay (29/10)
+                      Hôm nay
                     </button>
 
                     <button
@@ -2985,7 +3043,7 @@ export default function TrangChu() {
                           : 'border-slate-300 bg-white text-slate-800 focus:border-emerald-500'
                         }`}
                     >
-                      {START_TIME_OPTIONS.map((t) => (
+                      {filteredStartTimeOptions.map((t) => (
                         <option key={t} value={t}>{t}</option>
                       ))}
                     </select>
