@@ -42,10 +42,11 @@ export default function CheckoutSettlementView({booking,date,equipments,incident
   const activeDrafts=expanded?drafts:[];
   const damage=calculateCheckoutDamage(activeDrafts,catalog,incidents);
   const balance=Number(booking.remaining.replace(/\D/g,''))||0;
-  const amountDue=balance+damage;
   const timeParts=booking.time.match(/\d{1,2}:\d{2}/g);
   const toMinutes=(time:string)=>{const [hour,minute]=time.split(':').map(Number);return hour*60+minute;};
   const duration=timeParts?.length===2?toMinutes(timeParts[1])-toMinutes(timeParts[0]):0;
+
+  const amountDue=balance+damage;
   const dateLabel=`${String(settlementDate.getDate()).padStart(2,'0')}/${String(settlementDate.getMonth()+1).padStart(2,'0')}/${settlementDate.getFullYear()}`;
   useEffect(()=>{setPaymentConfirmed(false);},[amountDue]);
   const candidates=incidents.filter(report=>!report.deletedAt && checkoutCourtCode(report.courtName)===checkoutCourtCode(booking.court) && (!report.bookingCode || report.bookingCode===booking.code)
@@ -125,7 +126,7 @@ export default function CheckoutSettlementView({booking,date,equipments,incident
       <div className="flex justify-between gap-2 text-emerald-800"><span>Đã thanh toán VietQR</span><strong>{booking.paidAmount}</strong></div>
       {balance>0&&<div className="flex justify-between"><span>Tiền sân còn lại</span><strong>{money(balance)}</strong></div>}
       {damage>0&&<div className="flex justify-between text-red-700"><span>Bồi thường thiết bị</span><strong>{money(damage)}</strong></div>}
-      <div className="flex items-center justify-between gap-2 border-t border-slate-100 pt-2"><span className="font-bold text-emerald-800">Cần thu thêm</span><strong className={`text-lg ${amountDue>0?'text-red-700':'text-emerald-800'}`}>{money(amountDue)}</strong></div>
+      <div className="flex items-center justify-between gap-2 border-t border-slate-100 pt-2"><span className="font-bold text-emerald-800">Cần thu lúc Check-out</span><strong className={`text-lg ${amountDue>0?'text-red-700':'text-emerald-800'}`}>{money(amountDue)}</strong></div>
     </section>
     {amountDue>0&&<section className="space-y-2 rounded-xl border border-black/15 p-3"><h3 className="text-xs font-bold text-emerald-800">Thanh toán qua VietQR</h3><img src="/images/QR.png" alt="VietQR chuyển khoản" className="mx-auto w-36 rounded-xl"/><p className="text-center text-xs font-semibold text-slate-800">Số tiền: {money(amountDue)}</p><p className="text-center text-[11px] text-slate-600">Nội dung: CK {booking.code}</p><label className="flex items-center gap-2 text-xs text-emerald-800"><input type="checkbox" checked={paymentConfirmed} onChange={event=>setPaymentConfirmed(event.target.checked)} disabled={saving} className="accent-emerald-700"/>Đã kiểm tra nhận đủ {money(amountDue)} qua VietQR</label></section>}
     <button type="button" onClick={confirm} disabled={checkingReceipt||saving||reading||(amountDue>0&&!paymentConfirmed)} className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-700 py-3 text-xs font-bold text-white hover:bg-emerald-800 disabled:opacity-60"><CheckCircle2 className="h-4 w-4"/>{saving?'Đang lưu...':checkingReceipt?'Đang kiểm tra lượt trả sân...':'Xác nhận Check-out'}</button>

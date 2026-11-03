@@ -23,6 +23,7 @@ const isSameDay = (a: Date, b: Date) =>
   a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 
 import useSharedBookings from '../hooks/useSharedBookings';
+import { bookingApiService } from '../services/bookingService';
 import { calendarBookingDate } from '../utils/courtBookingWarnings';
 import type { BookingDetail } from '../types/schedule';
 export type { BookingDetail } from '../types/schedule';
@@ -141,6 +142,25 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
 
   // Active Admin Bookings State
   const [allBookings, setAdminBookings] = useSharedBookings();
+
+  // Đồng bộ lịch đặt sân từ Supabase Online theo ngày
+  useEffect(() => {
+    let isMounted = true;
+    const dateStr = calendarBookingDate(selectedDate);
+    bookingApiService.getBookingsByDate(dateStr).then((onlineBookings) => {
+      if (isMounted && onlineBookings && onlineBookings.length > 0) {
+        setAdminBookings((prev) => {
+          const existingCodes = new Set(onlineBookings.map((b) => b.code));
+          const filteredPrev = prev.filter(
+            (b) => b.bookingDate !== dateStr || !existingCodes.has(b.code)
+          );
+          return [...filteredPrev, ...onlineBookings];
+        });
+      }
+    }).catch((err) => console.warn('Lỗi tải lịch từ Supabase:', err));
+
+    return () => { isMounted = false; };
+  }, [selectedDate, setAdminBookings]);
   const adminBookings = allBookings.filter(booking => booking.bookingDate === calendarBookingDate(selectedDate));
 
   // Booking Modal State (Đặt sân tại quầy trực tiếp trên lịch)
@@ -237,6 +257,9 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
   const handlePrevDay = () => {
     const d = new Date(selectedDate);
     d.setDate(d.getDate() - 1);
+    if (isPastDate(d, currentTime)) {
+      return; // Không cho lùi về ngày quá khứ
+    }
     setSelectedDate(d);
   };
 
@@ -244,6 +267,12 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
     const d = new Date(selectedDate);
     d.setDate(d.getDate() + 1);
     setSelectedDate(d);
+  };
+
+  const isPastDate = (targetDate: Date, refDate: Date = currentTime) => {
+    const d1 = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate()).getTime();
+    const d2 = new Date(refDate.getFullYear(), refDate.getMonth(), refDate.getDate()).getTime();
+    return d1 < d2;
   };
 
   const isToday = (d: Date) => {
@@ -297,10 +326,12 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
 
     // Current month days
     for (let i = 1; i <= daysInCurrentMonth; i++) {
+      const dObj = new Date(year, month, i);
       days.push({
         dayNumber: i,
-        dateObj: new Date(year, month, i),
+        dateObj: dObj,
         isCurrentMonth: true,
+        isPast: isPastDate(dObj, currentTime),
       });
     }
 
@@ -317,6 +348,10 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
   }, [calendarMonth]);
 
   const handleSelectCalendarDay = (dateObj: Date) => {
+    if (isPastDate(dateObj, currentTime)) {
+      window.alert('Không thể chọn ngày trong quá khứ! Vui lòng chọn ngày hôm nay hoặc tương lai.');
+      return;
+    }
     setSelectedDate(dateObj);
     setIsDatePickerOpen(false);
   };
@@ -329,6 +364,7 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
 
   const isSlotCovered = (courtCode: string, startMin: number, endMin: number) => {
     return adminBookings.some((b) => {
+      if (b.status === 'ĐÃ HỦY' || b.status === 'Đã hủy') return false;
       if (b.courtCode !== courtCode) return false;
       const bStartMin = (b.startH ?? 0) * 60 + (b.startM ?? 0);
       const bEndMin = (b.endH ?? 0) * 60 + (b.endM ?? 0);
@@ -379,12 +415,22 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
     const reqEnd = reqStart + bookingDuration;
 
     return adminBookings.find((b) => {
+      // Bỏ qua đơn đã hủy
+      if (b.status === 'ĐÃ HỦY' || b.status === 'Đã hủy') return false;
       if (b.courtCode !== bookingCourt.code && b.court !== bookingCourt.name) return false;
       const bStart = (b.startH ?? 0) * 60 + (b.startM ?? 0);
       const bEnd = (b.endH ?? 0) * 60 + (b.endM ?? 0);
       return Math.max(reqStart, bStart) < Math.min(reqEnd, bEnd);
     });
   }, [bookingCourt, bookingStartTime, bookingDuration, adminBookings]);
+
+  const validStartTimeOptions = useMemo(() => {
+    if (!isToday(selectedDate)) {
+      return START_TIME_OPTIONS;
+    }
+    const currentMins = currentTime.getHours() * 60 + currentTime.getMinutes();
+    return START_TIME_OPTIONS.filter((t) => parseTimeToMinutes(t) > currentMins);
+  }, [selectedDate, currentTime, START_TIME_OPTIONS]);
 
   const getAvailableDurations = (startTimeStr: string) => {
     const possibleDurations = [30, 60, 90, 120, 150, 180, 210, 240];
@@ -404,9 +450,29 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
   };
 
   const handleOpenBookingModal = (court: AdminCourtItem, time: string, duration: number = 60) => {
-    if (isCourtLocked(court.code)) return;
+    if (isCourtLocked(court.code)) {
+      window.alert('Sân đang bị khóa bảo trì, vui lòng chọn sân khác.');
+      return;
+    }
+    if (isPastDate(selectedDate, currentTime)) {
+      window.alert('Không thể đặt sân cho ngày trong quá khứ! Vui lòng chọn ngày hiện tại hoặc tương lai.');
+      return;
+    }
+
+    const currentMins = currentTime.getHours() * 60 + currentTime.getMinutes();
+    const isTodaySelected = isToday(selectedDate);
+    let chosenStart = time;
+    if (isTodaySelected && parseTimeToMinutes(time) <= currentMins) {
+      const nextSlot = START_TIME_OPTIONS.find((t) => parseTimeToMinutes(t) > currentMins);
+      if (!nextSlot) {
+        window.alert('Hôm nay đã hết khung giờ khả dụng để đặt sân (Nhà thi đấu đóng cửa lúc 23:00). Vui lòng chọn ngày tiếp theo!');
+        return;
+      }
+      chosenStart = nextSlot;
+    }
+
     setBookingCourt(court);
-    setBookingStartTime(time);
+    setBookingStartTime(chosenStart);
     setBookingDuration(duration);
     setBookingCustomerName('');
     setBookingCustomerPhone('');
@@ -418,7 +484,24 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
   };
 
   const validateBookingForm = () => {
-    const errors: { name?: string; phone?: string } = {};
+    const errors: { name?: string; phone?: string; time?: string; date?: string; conflict?: string } = {};
+
+    // 1. Ràng buộc ngày và giờ không ở quá khứ
+    if (isPastDate(selectedDate, currentTime)) {
+      errors.date = 'Không thể đặt sân cho ngày trong quá khứ!';
+    } else if (isToday(selectedDate)) {
+      const nowMin = currentTime.getHours() * 60 + currentTime.getMinutes();
+      const startMin = parseTimeToMinutes(bookingStartTime);
+      if (startMin <= nowMin) {
+        errors.time = `Giờ bắt đầu (${bookingStartTime}) phải sau giờ hiện tại (${currentTime.getHours().toString().padStart(2, '0')}:${currentTime.getMinutes().toString().padStart(2, '0')})!`;
+      }
+    }
+
+    // 2. Ràng buộc không trùng lịch
+    if (adminBookingConflict) {
+      errors.conflict = `Khung giờ ${bookingStartTime} - ${bookingEndTime} trên ${bookingCourt?.name} bị trùng với lịch của ${adminBookingConflict.customerName} (${adminBookingConflict.time}). Vui lòng chọn giờ hoặc sân khác!`;
+    }
+
     const trimmedName = bookingCustomerName.trim();
     if (!trimmedName) {
       errors.name = 'Vui lòng nhập họ và tên khách hàng!';
@@ -489,6 +572,31 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
       window.alert('Sân đang bị khóa, không thể xác nhận đặt sân.');
       return;
     }
+
+    // Đồng bộ đơn đặt mới lên Supabase Online
+    try {
+      const startMins = (pendingBookingData.startH ?? 0) * 60 + (pendingBookingData.startM ?? 0);
+      const endMins = (pendingBookingData.endH ?? 0) * 60 + (pendingBookingData.endM ?? 0);
+      const sH = Math.floor(startMins / 60).toString().padStart(2, '0');
+      const sM = (startMins % 60).toString().padStart(2, '0');
+      const eH = Math.floor(endMins / 60).toString().padStart(2, '0');
+      const eM = (endMins % 60).toString().padStart(2, '0');
+
+      bookingApiService.createBooking({
+        courtCode: pendingBookingData.courtCode || pendingBookingData.court,
+        bookingDate: pendingBookingData.bookingDate || calendarBookingDate(selectedDate),
+        startTime: `${sH}:${sM}`,
+        endTime: `${eH}:${eM}`,
+        customerName: pendingBookingData.customerName,
+        customerPhone: pendingBookingData.phone,
+        totalAmount: parseInt(pendingBookingData.total.replace(/\D/g, '') || '120000', 10),
+        channel: 'TAI_QUAY',
+        staffId: (currentUser as any)?.id?.startsWith('NV') ? (currentUser as any).id : 'NV00000002',
+      }).catch((err) => console.warn('Supabase createBooking warning:', err));
+    } catch (err) {
+      console.warn('Lỗi lưu đơn đặt Admin lên Supabase:', err);
+    }
+
     setAdminBookings((prev) => [...prev, pendingBookingData]);
     setPaymentSuccessBooking(pendingBookingData);
     setShowPaymentModal(false);
@@ -555,6 +663,94 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
       setTransferSuccessMsg(null);
       setSelectedBooking(null);
     }, 2500);
+  };
+
+  // Điều kiện kiểm tra Check-in
+  const getCheckinValidation = (booking: BookingDetail | null) => {
+    if (!booking) return { canCheckin: false, message: '' };
+
+    if (booking.status === 'Đang sử dụng') {
+      return { canCheckin: false, message: 'Lịch đặt sân này đã Check-in rồi (Đang sử dụng).' };
+    }
+    if (booking.status === 'ĐÃ HỦY' || booking.status === 'Đã hủy') {
+      return { canCheckin: false, message: 'Lịch đặt sân này đã bị hủy, không thể Check-in!' };
+    }
+    if (booking.status === 'Đã kết thúc' || booking.status === 'Hoàn tất') {
+      return { canCheckin: false, message: 'Lượt đặt sân này đã hoàn tất!' };
+    }
+
+    const bookingD = booking.bookingDate || calendarBookingDate(selectedDate);
+    const todayStr = calendarBookingDate(currentTime);
+    if (bookingD < todayStr) {
+      return { canCheckin: false, message: 'Lịch đặt sân này thuộc ngày trong quá khứ, không thể Check-in!' };
+    }
+    if (bookingD > todayStr) {
+      return { canCheckin: false, message: `Chưa đến ngày thi đấu (${bookingD}). Chỉ có thể Check-in vào đúng ngày thi đấu!` };
+    }
+
+    const nowMin = currentTime.getHours() * 60 + currentTime.getMinutes();
+    const startMin = (booking.startH ?? 0) * 60 + (booking.startM ?? 0);
+    const endMin = (booking.endH ?? 0) * 60 + (booking.endM ?? 0);
+
+    // Cho phép check-in sớm tối đa 30 phút
+    if (nowMin < startMin - 30) {
+      const waitMin = (startMin - 30) - nowMin;
+      const openTime = `${Math.floor((startMin - 30) / 60).toString().padStart(2, '0')}:${((startMin - 30) % 60).toString().padStart(2, '0')}`;
+      return {
+        canCheckin: false,
+        message: `Chưa đến giờ check-in! Hệ thống chỉ mở check-in sớm tối đa 30 phút trước giờ bắt đầu (từ ${openTime}). Còn ${waitMin} phút nữa.`
+      };
+    }
+
+    // Nếu đã quá giờ kết thúc
+    if (nowMin > endMin) {
+      return {
+        canCheckin: false,
+        message: `Khung giờ thi đấu này đã kết thúc (${booking.time}), không thể thực hiện Check-in!`
+      };
+    }
+
+    return { canCheckin: true, message: 'Đủ điều kiện Check-in vào sân' };
+  };
+
+  // Điều kiện kiểm tra Hủy đặt sân
+  const getCancelValidation = (booking: BookingDetail | null) => {
+    if (!booking) return { canCancel: false, message: '', isEligibleRefund: false };
+
+    if (booking.status === 'ĐÃ HỦY' || booking.status === 'Đã hủy') {
+      return { canCancel: false, message: 'Lịch đặt sân này đã bị hủy trước đó!', isEligibleRefund: false };
+    }
+    if (booking.status === 'Đang sử dụng') {
+      return { canCancel: false, message: 'Sân đang có khách thi đấu, không thể hủy! Vui lòng chọn Đổi sân hoặc Trả sân.', isEligibleRefund: false };
+    }
+    if (booking.status === 'Đã kết thúc' || booking.status === 'Hoàn tất') {
+      return { canCancel: false, message: 'Lượt đặt sân này đã kết thúc, không thể hủy!', isEligibleRefund: false };
+    }
+
+    const bookingD = booking.bookingDate || calendarBookingDate(selectedDate);
+    const startH = booking.startH ?? 0;
+    const startM = booking.startM ?? 0;
+    const [bYear, bMonth, bDay] = bookingD.split('-').map(Number);
+    const startDateTime = new Date(bYear, bMonth - 1, bDay, startH, startM, 0).getTime();
+    const nowTime = currentTime.getTime();
+
+    if (nowTime >= startDateTime) {
+      return {
+        canCancel: false,
+        message: 'Lượt đặt sân đã bắt đầu hoặc đã qua giờ thi đấu, không thể hủy trực tuyến!',
+        isEligibleRefund: false,
+      };
+    }
+
+    const diffHours = (startDateTime - nowTime) / (1000 * 60 * 60);
+    const isEligibleRefund = diffHours >= 24;
+
+    return {
+      canCancel: true,
+      message: isEligibleRefund ? 'Hủy trước 24h: Đủ điều kiện hoàn tiền 100%' : 'Hủy dưới 24h: Không được hoàn tiền',
+      isEligibleRefund,
+      diffHours,
+    };
   };
 
   const openBooking = (booking: BookingDetail) => {
@@ -739,17 +935,50 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
           </div>
         </section>
 
+        {/* Banner kiểm tra điều kiện Check-in */}
+        {(() => {
+          const val = getCheckinValidation(checkinBooking);
+          if (!val.canCheckin) {
+            return (
+              <div className="mb-3 flex items-start gap-2 rounded-xl border border-amber-300 bg-amber-50 p-3 text-xs font-bold text-amber-900 shadow-sm">
+                <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600 mt-0.5" />
+                <div className="space-y-0.5">
+                  <p className="font-black text-amber-950 uppercase text-[11px]">Chưa đủ điều kiện Check-in</p>
+                  <p className="font-medium text-amber-900 text-[11px]">{val.message}</p>
+                </div>
+              </div>
+            );
+          }
+          return (
+            <div className="mb-3 flex items-center gap-2 rounded-xl border border-emerald-300 bg-emerald-50 p-2.5 text-xs font-bold text-emerald-800 shadow-sm">
+              <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
+              <span>Đủ điều kiện Check-in nhận sân ngay bây giờ</span>
+            </div>
+          );
+        })()}
+
         {/* Action buttons */}
         <div className="mb-4 grid grid-cols-2 gap-2">
           <button
             type="button"
+            disabled={!getCheckinValidation(checkinBooking).canCheckin}
             onClick={() => {
+              const val = getCheckinValidation(checkinBooking);
+              if (!val.canCheckin) {
+                window.alert(val.message);
+                return;
+              }
+              bookingApiService.checkinBooking(checkinBooking.code);
               setAdminBookings(previous => previous.map(booking => booking.code === checkinBooking.code
                 && booking.bookingDate === calendarBookingDate(selectedDate) ? {...booking,status:'Đang sử dụng'} : booking));
               setCheckinBooking(null);
               onCheckoutModeChange?.(false);
             }}
-            className="flex h-10 min-w-0 items-center justify-center gap-1.5 rounded-xl bg-emerald-700 px-3 text-[11px] font-black text-white shadow-sm transition hover:bg-emerald-800 active:scale-[0.98]"
+            className={`flex h-10 min-w-0 items-center justify-center gap-1.5 rounded-xl px-3 text-[11px] font-black shadow-sm transition ${
+              getCheckinValidation(checkinBooking).canCheckin
+                ? 'bg-emerald-700 text-white hover:bg-emerald-800 active:scale-[0.98] cursor-pointer'
+                : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+            }`}
           >
             <CheckCircle2 className="h-4 w-4 shrink-0" />
             <span className="truncate">Check-In Sân</span>
@@ -1113,6 +1342,33 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
           </span>
         </div>
 
+        {/* Banner kiểm tra điều kiện Hủy sân */}
+        {(() => {
+          const val = getCancelValidation(cancelBooking);
+          if (!val.canCancel) {
+            return (
+              <div className="mb-3 flex items-start gap-2 rounded-xl border border-red-300 bg-red-50 p-3 text-xs font-bold text-red-900 shadow-sm">
+                <AlertTriangle className="h-4 w-4 shrink-0 text-red-600 mt-0.5" />
+                <div className="space-y-0.5">
+                  <p className="font-black text-red-950 uppercase text-[11px]">Không thể hủy lịch này</p>
+                  <p className="font-medium text-red-900 text-[11px]">{val.message}</p>
+                </div>
+              </div>
+            );
+          }
+          return val.isEligibleRefund ? (
+            <div className="mb-3 flex items-center gap-2 rounded-xl border border-emerald-300 bg-emerald-50 p-2.5 text-xs font-bold text-emerald-800 shadow-sm">
+              <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
+              <span>Hủy trước ít nhất 24 giờ: Đủ điều kiện hoàn tiền 100% qua VietQR</span>
+            </div>
+          ) : (
+            <div className="mb-3 flex items-center gap-2 rounded-xl border border-amber-300 bg-amber-50 p-2.5 text-xs font-bold text-amber-900 shadow-sm">
+              <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600" />
+              <span>Hủy dưới 24 giờ: Không hoàn tiền (0đ) theo quy định</span>
+            </div>
+          );
+        })()}
+
         <section className="mb-3 overflow-hidden rounded-xl bg-white p-3 shadow-sm ring-1 ring-slate-100">
           <div className="border-l-4 border-amber-600 pl-3">
             <div className="flex items-start justify-between gap-3">
@@ -1202,6 +1458,16 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
                 type="button"
                 onClick={() => {
                   const booked = cancelBooking;
+                  // Đồng bộ hủy đơn và hoàn tiền lên Supabase Online
+                  bookingApiService.cancelBooking({
+                    code: booked.code,
+                    isEligible: true,
+                    reason: 'Admin xác nhận hủy sân trước >= 24h (Tự động hoàn tiền 100%)',
+                    customerPhone: booked.phone,
+                    customerName: booked.customerName,
+                    refundAmount: parseInt(booked.total.replace(/\D/g, '') || '0', 10),
+                  }).catch((err) => console.warn('Supabase cancel booking warning:', err));
+
                   setCancelBooking(null);
                   setSelectedBooking(null);
                   onCheckoutModeChange?.(false);
@@ -1250,6 +1516,16 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
                 type="button"
                 onClick={() => {
                   const booked = cancelBooking;
+                  // Đồng bộ hủy đơn (không hoàn tiền) lên Supabase Online
+                  bookingApiService.cancelBooking({
+                    code: booked.code,
+                    isEligible: false,
+                    reason: 'Admin xác nhận hủy sân dưới 24h (Không hoàn tiền)',
+                    customerPhone: booked.phone,
+                    customerName: booked.customerName,
+                    refundAmount: 0,
+                  }).catch((err) => console.warn('Supabase cancel booking warning:', err));
+
                   setAdminBookings((prev) =>
                     prev.map((b) =>
                       b.code === booked.code
@@ -1284,6 +1560,7 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
       equipments={equipments} incidents={incidents} currentUser={currentUser} onComplete={onCompleteCheckout}
       onBack={() => { setCheckoutBooking(null); onCheckoutModeChange?.(false); }}
       onFinished={() => {
+        bookingApiService.checkoutBooking(checkoutBooking.code);
         setAdminBookings(previous => previous.map(booking => booking.code === checkoutBooking.code
           && booking.bookingDate === calendarBookingDate(selectedDate) ? { ...booking, status:'Đã kết thúc' } : booking));
         setCheckoutBooking(null); onCheckoutModeChange?.(false);
@@ -2007,9 +2284,13 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
                           : 'border-slate-300 bg-white text-slate-800 focus:border-emerald-500'
                       }`}
                     >
-                      {START_TIME_OPTIONS.map((t) => (
-                        <option key={t} value={t}>{t}</option>
-                      ))}
+                      {validStartTimeOptions.length > 0 ? (
+                        validStartTimeOptions.map((t) => (
+                          <option key={t} value={t}>{t}</option>
+                        ))
+                      ) : (
+                        <option value="">Hôm nay đã hết giờ đặt</option>
+                      )}
                     </select>
                   </div>
 
