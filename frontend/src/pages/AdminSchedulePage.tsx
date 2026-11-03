@@ -91,11 +91,23 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
   const [cancelReviewBackTarget, setCancelReviewBackTarget] = useState<'timeline' | 'pendingList'>('timeline');
   const [cancelReason, setCancelReason] = useState('Khách bận đột xuất công tác liên tỉnh, gọi báo xin hủy lịch đặt sân tối nay.');
 
-  // State for Court Transfer (Phương án 1: Điều chuyển sân trống cùng loại khi có sự cố)
+  // State for Court Transfer (Phương án 1: Điều chuyển sân & đổi khung giờ thi đấu)
   const [transferBooking, setTransferBooking] = useState<BookingDetail | null>(null);
   const [selectedTargetCourt, setSelectedTargetCourt] = useState<AdminCourtItem | null>(null);
+  const [transferStartTime, setTransferStartTime] = useState<string>('08:00');
   const [transferReason, setTransferReason] = useState<string>('Sân hiện tại gặp sự cố kỹ thuật / bảo trì');
   const [transferSuccessMsg, setTransferSuccessMsg] = useState<string | null>(null);
+  const [isTransferring, setIsTransferring] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (transferBooking) {
+      const sh = (transferBooking.startH ?? 8).toString().padStart(2, '0');
+      const sm = (transferBooking.startM ?? 0).toString().padStart(2, '0');
+      setTransferStartTime(`${sh}:${sm}`);
+      setSelectedTargetCourt(null);
+      setTransferSuccessMsg(null);
+    }
+  }, [transferBooking]);
 
   // Popup thông báo hủy sân / hoàn tiền (đồng bộ 100% form với bên khách hàng TrangChu)
   const [cancelPopup, setCancelPopup] = useState<{
@@ -300,6 +312,28 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
     const dow = d.getDay();
     const label = isToday(d) ? 'Hôm nay' : daysOfWeekVi[dow];
     return `${label} (${day}/${m})`;
+  };
+
+  const getBookingDateLabel = (dateStr?: string) => {
+    if (!dateStr) return 'Hôm nay';
+    const parts = dateStr.split('-').map(Number);
+    if (parts.length === 3) {
+      const d = new Date(parts[0], parts[1] - 1, parts[2]);
+      return formatBookingDateVi(d);
+    }
+    return dateStr;
+  };
+
+  const getBookingDateDetails = (dateStr?: string) => {
+    if (!dateStr) return { dayOfWeek: 'Hôm nay', fullDate: '' };
+    const parts = dateStr.split('-').map(Number);
+    if (parts.length === 3) {
+      const d = new Date(parts[0], parts[1] - 1, parts[2]);
+      const dow = isToday(d) ? 'Hôm nay' : daysOfWeekVi[d.getDay()];
+      const dStr = `${parts[2].toString().padStart(2, '0')}/${parts[1].toString().padStart(2, '0')}/${parts[0]}`;
+      return { dayOfWeek: dow, fullDate: dStr };
+    }
+    return { dayOfWeek: dateStr, fullDate: '' };
   };
 
   const handlePrevMonth = () => {
@@ -623,37 +657,93 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
     setPendingBookingData(null);
   };
 
-  // Tìm danh sách các sân cùng bộ môn khả dụng để điều chuyển (Phương án 1)
+  const transferDurationMinutes = useMemo(() => {
+    if (!transferBooking) return 60;
+    const bStart = (transferBooking.startH ?? 0) * 60 + (transferBooking.startM ?? 0);
+    const bEnd = (transferBooking.endH ?? 0) * 60 + (transferBooking.endM ?? 0);
+    const dur = bEnd - bStart;
+    return dur > 0 ? dur : 60;
+  }, [transferBooking]);
+
+  const transferEndTime = useMemo(() => {
+    const startMin = parseTimeToMinutes(transferStartTime || '08:00');
+    const endMin = startMin + transferDurationMinutes;
+    const endH = Math.floor(endMin / 60);
+    const endM = endMin % 60;
+    return `${endH.toString().padStart(2, '0')}:${endM.toString().padStart(2, '0')}`;
+  }, [transferStartTime, transferDurationMinutes]);
+
+  const transferStartTimeOptions = useMemo(() => {
+    if (!transferBooking) return START_TIME_OPTIONS;
+    const isBookingDayToday = isToday(selectedDate);
+    const currentMins = currentTime.getHours() * 60 + currentTime.getMinutes();
+    const origStartMin = (transferBooking.startH ?? 0) * 60 + (transferBooking.startM ?? 0);
+
+    return START_TIME_OPTIONS.filter((t) => {
+      const slotMin = parseTimeToMinutes(t);
+      // Không vượt quá giờ đóng cửa (23:00)
+      if (slotMin + transferDurationMinutes > 23 * 60) return false;
+      // Nếu là ngày hôm nay: giữ nguyên slot ban đầu HOẶC chỉ chọn các slot chưa diễn ra
+      if (isBookingDayToday) {
+        return slotMin === origStartMin || slotMin > currentMins;
+      }
+      return true;
+    });
+  }, [transferBooking, selectedDate, currentTime, START_TIME_OPTIONS, transferDurationMinutes]);
+
+  // Tìm danh sách các sân cùng bộ môn khả dụng để điều chuyển (theo khung giờ đã chọn)
   const candidateCourtsForTransfer = useMemo(() => {
     if (!transferBooking) return [];
-    const bStartH = transferBooking.startH ?? 0;
-    const bStartM = transferBooking.startM ?? 0;
-    const bEndH = transferBooking.endH ?? 0;
-    const bEndM = transferBooking.endM ?? 0;
-    const startMin = bStartH * 60 + bStartM;
-    const endMin = bEndH * 60 + bEndM;
+    const startMin = parseTimeToMinutes(transferStartTime || '08:00');
+    const endMin = startMin + transferDurationMinutes;
 
-    const sameSportCourts = STANDARD_ADMIN_COURTS.filter(
-      (c) => c.sportId === transferBooking.sportId && c.name !== transferBooking.court
-    );
+    const origStartMin = (transferBooking.startH ?? 0) * 60 + (transferBooking.startM ?? 0);
+    const isSameSlotAsOriginal = startMin === origStartMin;
+
+    const sameSportCourts = STANDARD_ADMIN_COURTS.filter((c) => {
+      if (c.sportId !== transferBooking.sportId) return false;
+      // Nếu là cùng khung giờ cũ: ẩn sân hiện tại (vì điều chuyển cùng giờ thì phải chọn sân khác)
+      // Nếu là khung giờ khác: cho phép cả sân hiện tại (khách đổi giờ thi đấu trên chính sân đó!)
+      if (isSameSlotAsOriginal && c.name === transferBooking.court) return false;
+      return true;
+    });
 
     return sameSportCourts.map((court) => {
-      const isOccupied = adminBookings.some((b) => {
-        if (b.court !== court.name || b.status === 'Đã hủy' || b.code === transferBooking.code) return false;
+      const isCurrentCourt = court.name === transferBooking.court;
+      const isLocked = isCourtLocked(court.code);
+
+      const isOccupied = isLocked || adminBookings.some((b) => {
+        if (b.court !== court.name || b.status === 'Đã hủy' || b.status === 'DA_HUY' || b.code === transferBooking.code) {
+          return false;
+        }
         const bStart = (b.startH ?? 0) * 60 + (b.startM ?? 0);
         const bEnd = (b.endH ?? 0) * 60 + (b.endM ?? 0);
         return Math.max(startMin, bStart) < Math.min(endMin, bEnd);
       });
+
       return {
         ...court,
         isOccupied,
+        isCurrentCourt,
+        isLocked,
       };
     });
-  }, [transferBooking, adminBookings]);
+  }, [transferBooking, transferStartTime, transferDurationMinutes, adminBookings]);
 
-  const handleConfirmTransfer = (targetCourt: AdminCourtItem) => {
+  const handleConfirmTransfer = async (targetCourt: AdminCourtItem) => {
     if (!transferBooking) return;
     const oldCourt = transferBooking.court;
+    const startMin = parseTimeToMinutes(transferStartTime);
+    const endMin = startMin + transferDurationMinutes;
+    const newStartH = Math.floor(startMin / 60);
+    const newStartM = startMin % 60;
+    const newEndH = Math.floor(endMin / 60);
+    const newEndM = endMin % 60;
+    const newTimeStr = `${transferStartTime} - ${transferEndTime} (${transferDurationMinutes / 60} giờ)`;
+
+    setIsTransferring(true);
+
+    // 1. Cập nhật local state ngay lập tức để UI phản hồi mượt mà
     setAdminBookings((prev) =>
       prev.map((b) =>
         b.code === transferBooking.code
@@ -661,19 +751,49 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
               ...b,
               court: targetCourt.name,
               courtCode: targetCourt.code,
+              startH: newStartH,
+              startM: newStartM,
+              endH: newEndH,
+              endM: newEndM,
+              time: newTimeStr,
             }
           : b
       )
     );
+
+    // 2. Ghi nhận điều chuyển lên Supabase
+    try {
+      await bookingApiService.transferCourt({
+        code: transferBooking.code,
+        targetCourtName: targetCourt.name,
+        targetCourtCode: targetCourt.code,
+        gioBatDau: `${transferStartTime}:00`,
+        gioKetThuc: `${transferEndTime}:00`,
+      });
+    } catch (err) {
+      console.warn('Lỗi đồng bộ điều chuyển sang Supabase:', err);
+    } finally {
+      setIsTransferring(false);
+    }
+
+    const origStartMin = (transferBooking.startH ?? 0) * 60 + (transferBooking.startM ?? 0);
+    const isSameSlot = startMin === origStartMin;
+    const summaryMsg = isSameSlot
+      ? `Đã chuyển sân từ ${oldCourt} sang ${targetCourt.name} (${transferStartTime} - ${transferEndTime}).`
+      : targetCourt.name === oldCourt
+      ? `Đã đổi khung giờ cho ${oldCourt} sang ${transferStartTime} - ${transferEndTime}.`
+      : `Đã chuyển sang ${targetCourt.name} khung giờ mới (${transferStartTime} - ${transferEndTime}).`;
+
     setTransferSuccessMsg(
-      `Đã chuyển lịch của ${transferBooking.customerName} từ ${oldCourt} sang ${targetCourt.name} (${transferBooking.time}). Hệ thống đã tự động gửi tin nhắn báo sân mới cho khách!`
+      `${summaryMsg} Hệ thống đã cập nhật lịch và sẵn sàng thi đấu!`
     );
+
     setTimeout(() => {
       setTransferBooking(null);
       setSelectedTargetCourt(null);
       setTransferSuccessMsg(null);
       setSelectedBooking(null);
-    }, 2500);
+    }, 2200);
   };
 
   // Điều kiện kiểm tra Check-in
@@ -1054,49 +1174,33 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
                 }}
                 className="w-full rounded-xl border border-slate-100 bg-white p-3 text-left shadow-sm active:scale-[0.99]"
               >
-                <div className="rounded-xl bg-indigo-50 p-4 shadow-inner">
-                  <div className="border-l-4 border-emerald-700 pl-3">
-                    <div className="flex items-start justify-between gap-3">
+                <div className="rounded-2xl border border-slate-200 bg-white p-3.5 shadow-xs hover:border-emerald-300 transition">
+                  <div className="flex items-center justify-between gap-3 pb-2.5 border-b border-slate-100">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-600 text-white font-black text-xs">
+                        {request.courtCode || request.court.replace(/^Sân\s*/i, '')}
+                      </div>
                       <div className="min-w-0">
-                        <h3 className="text-[17px] font-black text-slate-950">{request.court}</h3>
-                        <div className="mt-1 flex items-center gap-2 text-[12px] font-bold">
-                          <span className="text-emerald-700">#{request.code}</span>
-                          <span className="h-1 w-1 rounded-full bg-slate-400" />
-                          <span className="text-[11px] text-slate-500">Sân tiêu chuẩn</span>
-                        </div>
-                      </div>
-                      <UserRound className="h-7 w-7 shrink-0 text-emerald-700" />
-                    </div>
-
-                    <div className="mt-4 grid grid-cols-2 gap-3">
-                      <div className="flex items-center gap-2">
-                        <Clock3 className="h-5 w-5 text-slate-500" />
-                        <div>
-                          <p className="text-[9px] font-black text-slate-500">Khung giờ</p>
-                          <p className="text-[15px] font-black text-slate-950">{request.time}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <CalendarClock className="h-5 w-5 text-slate-500" />
-                        <div>
-                          <p className="text-[9px] font-black text-slate-500">Ngày chơi</p>
-                          <p className="text-[15px] font-black text-slate-950">Hôm nay</p>
-                        </div>
+                        <h3 className="text-[14px] font-black leading-tight text-slate-950">{request.court}</h3>
+                        <p className="text-[11px] text-emerald-700 font-bold mt-0.5">#{request.code}</p>
                       </div>
                     </div>
+                    <span className="rounded-full bg-amber-50 text-amber-800 px-2 py-0.5 text-[10px] font-black border border-amber-200">
+                      Chờ duyệt
+                    </span>
+                  </div>
 
-                    <div className="mt-4 flex items-center justify-between gap-3">
-                      <div className="flex min-w-0 items-center gap-3">
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-[15px] font-black text-slate-800">
-                          {request.customerName.trim().charAt(0)}
-                        </div>
-                        <div className="min-w-0">
-                          <p className="truncate text-[13px] font-black text-slate-950">{request.customerName}</p>
-                          <p className="text-[11px] font-semibold text-slate-500">{request.phone}</p>
-                        </div>
+                  <div className="mt-2.5 flex items-center justify-between gap-2 text-xs">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-800 font-bold text-[11px]">
+                        {request.customerName.trim().charAt(0)}
                       </div>
-                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-700">
-                        <Phone className="h-4 w-4" />
+                      <span className="truncate font-bold text-slate-800 text-[11px]">{request.customerName}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <span className="text-[11px] font-bold text-slate-700">{request.time}</span>
+                      <span className="rounded-md bg-emerald-50 text-emerald-800 border border-emerald-100 px-1.5 py-0.5 text-[10px] font-black">
+                        {getBookingDateLabel(request.bookingDate)}
                       </span>
                     </div>
                   </div>
@@ -1161,50 +1265,63 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
             </span>
           </div>
 
-          <div className="rounded-xl bg-indigo-50 p-4 shadow-inner">
-            <div className="border-l-4 border-emerald-700 pl-3">
-              <div className="flex items-start justify-between gap-3">
+          <div className="rounded-2xl bg-white p-3.5 shadow-xs border border-slate-200 space-y-2.5">
+            {/* Sân & Mã đặt */}
+            <div className="flex items-center justify-between gap-3 pb-2.5 border-b border-slate-100">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-600 text-white font-black text-xs shadow-xs">
+                  {cancelReviewBooking.courtCode || cancelReviewBooking.court.replace(/^Sân\s*/i, '')}
+                </div>
                 <div className="min-w-0">
-                  <h3 className="text-[17px] font-black text-slate-950">{cancelReviewBooking.court}</h3>
-                  <div className="mt-1 flex items-center gap-2 text-[12px] font-bold">
+                  <h3 className="text-[15px] font-black leading-tight text-slate-950 flex items-center gap-1.5">
+                    {cancelReviewBooking.court}
+                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                  </h3>
+                  <div className="mt-0.5 flex items-center gap-2 text-[11px] font-bold">
                     <span className="text-emerald-700">#{cancelReviewBooking.code}</span>
-                    <span className="h-1 w-1 rounded-full bg-slate-400" />
-                    <span className="text-[11px] text-slate-500">Sân tiêu chuẩn</span>
-                  </div>
-                </div>
-                <UserRound className="h-7 w-7 shrink-0 text-emerald-700" />
-              </div>
-
-              <div className="mt-4 grid grid-cols-2 gap-3">
-                <div className="flex items-center gap-2">
-                  <Clock3 className="h-5 w-5 text-slate-500" />
-                  <div>
-                    <p className="text-[9px] font-black text-slate-500">Khung giờ</p>
-                    <p className="text-[15px] font-black text-slate-950">{cancelReviewBooking.time}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <CalendarClock className="h-5 w-5 text-slate-500" />
-                  <div>
-                    <p className="text-[9px] font-black text-slate-500">Ngày chơi</p>
-                    <p className="text-[15px] font-black text-slate-950">Hôm nay</p>
+                    <span className="h-1 w-1 rounded-full bg-slate-300" />
+                    <span className="text-slate-500 font-semibold">{cancelReviewBooking.sport || 'Sân tiêu chuẩn'}</span>
                   </div>
                 </div>
               </div>
+            </div>
 
-              <div className="mt-4 flex items-center justify-between gap-3">
-                <div className="flex min-w-0 items-center gap-2.5">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-[15px] font-black text-slate-800">
-                    {cancelReviewBooking.customerName.charAt(0)}
-                  </div>
-                  <div className="min-w-0">
-                    <p className="truncate text-[14px] font-black text-slate-950">{cancelReviewBooking.customerName}</p>
-                    <p className="truncate text-[11px] font-semibold text-slate-500">{cancelReviewBooking.phone}</p>
-                  </div>
+            {/* Khách hàng - Hàng ngang thoáng đãng */}
+            <div className="flex items-center justify-between rounded-xl bg-slate-50 p-2.5 border border-slate-100">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-[12px] font-black text-emerald-800">
+                  {cancelReviewBooking.customerName.trim().charAt(0)}
                 </div>
-                <button type="button" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-700 active:scale-95">
-                  <Phone className="h-4 w-4" />
-                </button>
+                <div className="min-w-0">
+                  <p className="truncate text-xs font-black text-slate-900">{cancelReviewBooking.customerName}</p>
+                  <p className="text-[11px] font-medium text-slate-500 flex items-center gap-1 mt-0.5">
+                    <Phone className="h-3 w-3 text-slate-400 shrink-0" />
+                    {cancelReviewBooking.phone}
+                  </p>
+                </div>
+              </div>
+              <button type="button" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-700 hover:bg-emerald-100 active:scale-95 transition">
+                <Phone className="h-3.5 w-3.5" />
+              </button>
+            </div>
+
+            {/* Ngày thi đấu & Khung giờ - 2 ô cân đối, không bao giờ rớt dòng */}
+            <div className="grid grid-cols-2 gap-2">
+              {(() => {
+                const dateInfo = getBookingDateDetails(cancelReviewBooking.bookingDate);
+                return (
+                  <div className="rounded-xl bg-slate-50 p-2.5 border border-slate-100 min-w-0">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Ngày thi đấu</p>
+                    <p className="mt-1 text-[13px] font-black text-slate-900 truncate">{dateInfo.dayOfWeek}</p>
+                    <p className="text-[10px] font-medium text-slate-400 mt-0.5">{dateInfo.fullDate || cancelReviewBooking.bookingDate}</p>
+                  </div>
+                );
+              })()}
+
+              <div className="rounded-xl bg-slate-50 p-2.5 border border-slate-100 min-w-0">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Khung giờ</p>
+                <p className="mt-1 text-[13px] font-black text-slate-900 whitespace-nowrap">{cancelReviewBooking.time}</p>
+                <p className="text-[10px] font-medium text-slate-400 mt-0.5">Thời gian thi đấu</p>
               </div>
             </div>
           </div>
@@ -1355,7 +1472,7 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
           </span>
         </div>
 
-        {/* Banner kiểm tra điều kiện Hủy sân */}
+        {/* Cảnh báo nếu không thể hủy sân (đã sử dụng / đã qua giờ) */}
         {(() => {
           const val = getCancelValidation(cancelBooking);
           if (!val.canCancel) {
@@ -1369,52 +1486,67 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
               </div>
             );
           }
-          return val.isEligibleRefund ? (
-            <div className="mb-3 flex items-center gap-2 rounded-xl border border-emerald-300 bg-emerald-50 p-2.5 text-xs font-bold text-emerald-800 shadow-sm">
-              <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
-              <span>Hủy trước ít nhất 24 giờ: Đủ điều kiện hoàn tiền 100% qua VietQR</span>
-            </div>
-          ) : (
-            <div className="mb-3 flex items-center gap-2 rounded-xl border border-amber-300 bg-amber-50 p-2.5 text-xs font-bold text-amber-900 shadow-sm">
-              <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600" />
-              <span>Hủy dưới 24 giờ: Không hoàn tiền (0đ) theo quy định</span>
-            </div>
-          );
+          return null; // Giữ 1 thông báo chi tiết kèm số tiền hoàn ở phía dưới để tránh trùng lặp
         })()}
 
-        <section className="mb-3 overflow-hidden rounded-xl bg-white p-3 shadow-sm ring-1 ring-slate-100">
-          <div className="border-l-4 border-amber-600 pl-3">
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex min-w-0 items-center gap-2.5">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-emerald-700">
-                  <UserRound className="h-5 w-5" />
-                </div>
-                <div className="min-w-0">
-                  <h2 className="truncate text-[18px] font-black leading-tight text-slate-950">{cancelBooking.court}</h2>
-                  <p className="text-[11px] font-black text-slate-600">{cancelBooking.sport}</p>
-                </div>
+        <section className="mb-3 rounded-2xl bg-white p-3.5 shadow-xs border border-slate-200 space-y-2.5">
+          {/* Sân & Trạng thái */}
+          <div className="flex items-center justify-between gap-3 pb-2.5 border-b border-slate-100">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-600 text-white font-black text-xs shadow-xs">
+                {cancelBooking.courtCode || cancelBooking.court.replace(/^Sân\s*/i, '')}
               </div>
-              <span className="flex shrink-0 items-center gap-1.5 rounded-full bg-blue-50 px-2.5 py-1 text-[10px] font-black uppercase text-blue-700 ring-1 ring-blue-200">
-                <span className="h-2 w-2 rounded-full bg-blue-600" />
-                Đã giữ sân
-              </span>
+              <div className="min-w-0">
+                <h2 className="text-[15px] font-black leading-tight text-slate-950 flex items-center gap-1.5">
+                  {cancelBooking.court}
+                  <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                </h2>
+                <p className="text-[11px] font-semibold text-slate-500 mt-0.5">{cancelBooking.sport}</p>
+              </div>
             </div>
+            <span className="flex shrink-0 items-center gap-1.5 rounded-full bg-blue-50 px-2.5 py-1 text-[10px] font-black uppercase text-blue-700 border border-blue-200">
+              <span className="h-1.5 w-1.5 rounded-full bg-blue-600 animate-pulse" />
+              Đã giữ sân
+            </span>
+          </div>
 
-            <div className="mt-3 flex items-center justify-between gap-3 rounded-lg bg-indigo-50 p-3">
-              <div className="flex min-w-0 items-center gap-2">
-                <UserRound className="h-5 w-5 shrink-0 text-slate-600" />
-                <div className="min-w-0">
-                  <p className="truncate text-[13px] font-black text-slate-900">{cancelBooking.customerName}</p>
-                  <p className="truncate text-[11px] font-bold text-slate-500">Khách đặt sân • {cancelBooking.phone}</p>
-                </div>
+          {/* Khách hàng - Hàng ngang thoáng đãng */}
+          <div className="flex items-center justify-between rounded-xl bg-slate-50 p-2.5 border border-slate-100">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-[12px] font-black text-emerald-800">
+                {cancelBooking.customerName.trim().charAt(0)}
               </div>
-              <div className="shrink-0 text-right">
-                <div className="flex items-center justify-end gap-1 text-amber-700">
-                  <Clock3 className="h-4 w-4" />
-                  <span className="text-[14px] font-black">{cancelBooking.time}</span>
-                </div>
-                <p className="text-[10px] font-bold text-slate-500">Hôm nay</p>
+              <div className="min-w-0">
+                <p className="truncate text-xs font-black text-slate-900">{cancelBooking.customerName}</p>
+                <p className="text-[11px] font-medium text-slate-500 flex items-center gap-1 mt-0.5">
+                  <Phone className="h-3 w-3 text-slate-400 shrink-0" />
+                  {cancelBooking.phone}
+                </p>
               </div>
+            </div>
+            <span className="shrink-0 rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold text-slate-600 border border-slate-200">
+              Khách đặt sân
+            </span>
+          </div>
+
+          {/* Ngày thi đấu & Khung giờ - 2 ô cân đối, không bao giờ rớt dòng */}
+          <div className="grid grid-cols-2 gap-2">
+            {(() => {
+              const bDate = cancelBooking.bookingDate || calendarBookingDate(selectedDate);
+              const dateInfo = getBookingDateDetails(bDate);
+              return (
+                <div className="rounded-xl bg-slate-50 p-2.5 border border-slate-100 min-w-0">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Ngày thi đấu</p>
+                  <p className="mt-1 text-[13px] font-black text-slate-900 truncate">{dateInfo.dayOfWeek}</p>
+                  <p className="text-[10px] font-medium text-slate-400 mt-0.5">{dateInfo.fullDate || bDate}</p>
+                </div>
+              );
+            })()}
+
+            <div className="rounded-xl bg-slate-50 p-2.5 border border-slate-100 min-w-0">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Khung giờ</p>
+              <p className="mt-1 text-[13px] font-black text-slate-900 whitespace-nowrap">{cancelBooking.time}</p>
+              <p className="text-[10px] font-medium text-slate-400 mt-0.5">Thời gian thi đấu</p>
             </div>
           </div>
         </section>
@@ -1452,7 +1584,8 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
         </section>
 
         {(() => {
-          const isEligible24h = ((cancelBooking as any).hoursUntilStart ?? 0) >= 24;
+          const val = getCancelValidation(cancelBooking);
+          const isEligible24h = val.isEligibleRefund;
           return isEligible24h ? (
             <section className="mb-4 rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-100">
               <div className="mb-3 flex items-start gap-3 rounded-lg bg-emerald-50 p-3">
@@ -2853,7 +2986,7 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
           </div>
         </div>
       )}
-      {/* 🟢 MODAL ĐIỀU CHUYỂN SÂN KHI CÓ SỰ CỐ BẢO TRÌ (PHƯƠNG ÁN 1) */}
+      {/* 🟢 MODAL ĐIỀU CHUYỂN SÂN & ĐỔI KHUNG GIỜ THI ĐẤU */}
       {transferBooking && (
         <div className="fixed inset-0 z-[150] flex items-end sm:items-center justify-center bg-slate-900/60 p-0 sm:p-4 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="w-full max-w-md rounded-t-3xl sm:rounded-3xl bg-white p-5 shadow-2xl animate-in slide-in-from-bottom-6 duration-200 max-h-[92vh] overflow-y-auto space-y-4 border border-slate-100 flex flex-col">
@@ -2867,10 +3000,10 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
                 </div>
                 <div>
                   <h3 className="text-sm font-black text-slate-900 uppercase tracking-wide">
-                    Điều chuyển sân thi đấu
+                    Điều chuyển sân & Khung giờ
                   </h3>
                   <p className="text-[11px] text-slate-500 font-medium">
-                    Áp dụng khi sân gặp sự cố hoặc cần bảo trì
+                    Đổi sân thi đấu hoặc dời khung giờ linh hoạt theo yêu cầu
                   </p>
                 </div>
               </div>
@@ -2890,13 +3023,65 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
                 <span className="font-extrabold text-slate-900">{transferBooking.customerName} ({transferBooking.phone})</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-slate-500">Khung giờ:</span>
-                <span className="font-bold text-slate-900 bg-white px-2 py-0.5 rounded border border-slate-200">{transferBooking.time}</span>
-              </div>
-              <div className="flex justify-between items-center">
                 <span className="text-slate-500">Sân hiện tại:</span>
                 <span className="font-black text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full">{transferBooking.court} ({transferBooking.sport})</span>
               </div>
+              <div className="flex justify-between items-center">
+                <span className="text-slate-500">Khung giờ gốc:</span>
+                <span className="font-bold text-slate-900 bg-white px-2 py-0.5 rounded border border-slate-200">{transferBooking.time}</span>
+              </div>
+            </div>
+
+            {/* Chọn khung giờ thi đấu mới */}
+            <div className="space-y-1.5 rounded-2xl bg-amber-50/40 p-3 border border-amber-200/80">
+              <div className="flex items-center justify-between">
+                <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                  <Clock3 className="h-3.5 w-3.5 text-amber-700" />
+                  Khung giờ thi đấu:
+                </label>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border border-amber-200 bg-white text-amber-800">
+                  Thời lượng: {transferDurationMinutes} phút
+                </span>
+              </div>
+
+              <div className="flex items-center gap-2 pt-0.5">
+                <div className="flex-1">
+                  <select
+                    value={transferStartTime}
+                    onChange={(e) => {
+                      setTransferStartTime(e.target.value);
+                      setSelectedTargetCourt(null);
+                    }}
+                    className="w-full rounded-xl border border-slate-200 bg-white p-2.5 text-xs font-bold text-slate-800 focus:border-amber-500 focus:outline-none shadow-sm cursor-pointer"
+                  >
+                    {transferStartTimeOptions.map((timeStr) => {
+                      const origStartStr = `${(transferBooking.startH ?? 0).toString().padStart(2, '0')}:${(transferBooking.startM ?? 0).toString().padStart(2, '0')}`;
+                      const isOrig = timeStr === origStartStr;
+                      return (
+                        <option key={timeStr} value={timeStr}>
+                          {timeStr} {isOrig ? '★ (Giờ ban đầu)' : ''}
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
+
+                <div className="flex items-center gap-1.5 shrink-0 px-3 py-2 bg-white rounded-xl border border-amber-200 text-xs shadow-sm">
+                  <span className="text-slate-500 text-[11px]">Đến:</span>
+                  <span className="font-extrabold text-amber-900">{transferEndTime}</span>
+                </div>
+              </div>
+
+              {transferStartTime !== `${(transferBooking.startH ?? 0).toString().padStart(2, '0')}:${(transferBooking.startM ?? 0).toString().padStart(2, '0')}` ? (
+                <p className="text-[10.5px] text-amber-800 font-semibold flex items-center gap-1 pt-1">
+                  <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-600 animate-pulse"></span>
+                  Đang chọn dời sang khung giờ mới: {transferStartTime} – {transferEndTime}
+                </p>
+              ) : (
+                <p className="text-[10.5px] text-slate-500 font-medium pt-0.5">
+                  Giữ nguyên khung giờ ban đầu ({transferBooking.time})
+                </p>
+              )}
             </div>
 
             {/* Lý do chuyển sân */}
@@ -2909,9 +3094,9 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
                 onChange={(e) => setTransferReason(e.target.value)}
                 className="w-full rounded-xl border border-slate-200 bg-white p-2.5 text-xs font-semibold text-slate-800 focus:border-amber-500 focus:outline-none"
               >
-                <option value="Sân hiện tại gặp sự cố kỹ thuật / bảo trì">Sân gặp sự cố kỹ thuật / bảo trì</option>
+                <option value="Khách hàng yêu cầu đổi sân / đổi giờ">Khách hàng yêu cầu đổi sân / đổi giờ</option>
+                <option value="Sân hiện tại gặp sự cố kỹ thuật / bảo trì">Sân hiện tại gặp sự cố kỹ thuật / bảo trì</option>
                 <option value="Hỏng bóng đèn / rách lưới cần sửa gấp">Hỏng đèn / rách lưới cần sửa gấp</option>
-                <option value="Khách hàng yêu cầu đổi sân">Khách hàng yêu cầu đổi sân</option>
                 <option value="Điều phối mặt sân nội bộ">Điều phối mặt sàn nội bộ</option>
               </select>
             </div>
@@ -2922,12 +3107,12 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
                 <label className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">
                   Chọn sân chuyển đến:
                 </label>
-                <span className="text-[10px] text-slate-500 font-medium">
-                  {candidateCourtsForTransfer.filter(c => !c.isOccupied).length} sân trống cùng giờ
+                <span className="text-[10px] text-emerald-800 font-bold bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
+                  {candidateCourtsForTransfer.filter(c => !c.isOccupied).length} sân trống ({transferStartTime} - {transferEndTime})
                 </span>
               </div>
 
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto pr-1">
                 {candidateCourtsForTransfer.map((court) => {
                   const isSelected = selectedTargetCourt?.id === court.id;
                   return (
@@ -2946,13 +3131,20 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
                     >
                       <div className="flex items-center justify-between">
                         <span className="font-extrabold text-xs text-slate-900">{court.name}</span>
-                        {court.isOccupied ? (
+                        {court.isLocked ? (
+                          <span className="text-[9px] font-bold text-amber-800 bg-amber-100 px-1.5 py-0.5 rounded">Bảo trì</span>
+                        ) : court.isOccupied ? (
                           <span className="text-[9px] font-bold text-red-600 bg-red-100 px-1.5 py-0.5 rounded">Đã kín</span>
                         ) : (
                           <span className="text-[9px] font-bold text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded">Khả dụng</span>
                         )}
                       </div>
-                      <span className="text-[10px] text-slate-500 mt-1">{court.priceLabel}</span>
+                      <div className="flex items-center justify-between mt-1">
+                        <span className="text-[10px] text-slate-500">{court.priceLabel}</span>
+                        {court.isCurrentCourt && (
+                          <span className="text-[9px] font-bold text-amber-800 bg-amber-100/90 px-1.5 py-0.2 rounded">Sân hiện tại</span>
+                        )}
+                      </div>
                     </button>
                   );
                 })}
@@ -2977,15 +3169,24 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
               </button>
               <button
                 type="button"
-                disabled={!selectedTargetCourt || candidateCourtsForTransfer.find(c => c.id === selectedTargetCourt.id)?.isOccupied}
+                disabled={!selectedTargetCourt || candidateCourtsForTransfer.find(c => c.id === selectedTargetCourt.id)?.isOccupied || isTransferring}
                 onClick={() => selectedTargetCourt && handleConfirmTransfer(selectedTargetCourt)}
-                className={`flex-1 py-2.5 rounded-xl font-bold text-xs text-white transition shadow-sm ${
-                  !selectedTargetCourt || candidateCourtsForTransfer.find(c => c.id === selectedTargetCourt.id)?.isOccupied
+                className={`flex-1 py-2.5 rounded-xl font-bold text-xs text-white transition shadow-sm flex items-center justify-center gap-1.5 ${
+                  !selectedTargetCourt || candidateCourtsForTransfer.find(c => c.id === selectedTargetCourt.id)?.isOccupied || isTransferring
                     ? 'bg-slate-300 cursor-not-allowed'
                     : 'bg-amber-600 hover:bg-amber-700 active:scale-95 cursor-pointer'
                 }`}
               >
-                Xác nhận chuyển sân
+                {isTransferring ? (
+                  <>
+                    <RefreshCw className="h-4 w-4 animate-spin" />
+                    <span>Đang cập nhật...</span>
+                  </>
+                ) : selectedTargetCourt ? (
+                  <span>Đổi sang {selectedTargetCourt.name} ({transferStartTime} - {transferEndTime})</span>
+                ) : (
+                  <span>Chọn sân để chuyển</span>
+                )}
               </button>
             </div>
           </div>
