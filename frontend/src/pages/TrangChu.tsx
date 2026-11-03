@@ -1,10 +1,10 @@
+import {staffAuthService} from '../services/staffAuthService';
 import AdminDashboard from './AdminDashboard';
 import CustomerSchedule from '../components/CustomerSchedule';
 import useSharedBookings from '../hooks/useSharedBookings';
 import useVietnamToday from '../hooks/useVietnamToday';
 import { scheduleBookingsForDate } from '../utils/courtBookingWarnings';
 import { bookingApiService } from '../services/bookingService';
-import { paymentBookingService } from '../services/paymentBookingService';
 import QrCodeArtwork from '../components/QrCodeArtwork';
 import EmployeeDashboard from './employee/EmployeeDashboard';
 import VipCustomerDashboard from './VipCustomerDashboard';
@@ -93,7 +93,6 @@ export default function TrangChu() {
   // Order Submission State
   const [showBookingPopup, setShowBookingPopup] = useState<boolean>(false);
   const [showPayment, setShowPayment] = useState<boolean>(false);
-  const [paymentCd, setPaymentCd] = useState<number>(5);
   const [isSubmitted, setIsSubmitted] = useState<boolean>(false);
   const [showOTP, setShowOTP] = useState<boolean>(false);
   const [showLogin, setShowLogin] = useState<boolean>(false);
@@ -103,6 +102,8 @@ export default function TrangChu() {
   const [isVipLoggedIn, setIsVipLoggedIn] = useState<boolean>(false);
   const [username, setUsername] = useState<string>('');
   const [passwordInput, setPasswordInput] = useState<string>('');
+  const [loginSaving,setLoginSaving]=useState(false);
+  const [loginError,setLoginError]=useState('');
 
   // User Credentials for Authentication & Password Recovery
   const [accountCredentials, setAccountCredentials] = useState<{
@@ -312,9 +313,12 @@ export default function TrangChu() {
   const [otpPhone, setOtpPhone] = useState<string>('');
   const [popup, setPopup] = useState<any>(null);
   const showAlert = (title: string, message: string) => setPopup({ type: 'alert', title, message });
-  const [orderCode, setOrderCode] = useState<string>('DS00000000');
-  const [paymentCode, setPaymentCode] = useState<string>('TT00000000');
-  const [showReceipt, setShowReceipt] = useState<boolean>(false);
+  const [orderCode,setOrderCode] = useState<string>('');
+  const [paymentCode,setPaymentCode]=useState('');
+  const [showReceipt,setShowReceipt]=useState(false);
+  const [bookingBankCode,setBookingBankCode]=useState('');
+  const [bookingSaving,setBookingSaving]=useState(false);
+  const [bookingSaveError,setBookingSaveError]=useState('');
 
   // Lookup Search State
   const [lookupQuery, setLookupQuery] = useState<string>('');
@@ -432,6 +436,9 @@ export default function TrangChu() {
       setDateError(null);
     }
     handleTabChange('booking');
+    setCustomerName('');
+    setCustomerPhone('');
+    setCustomerNote('');
     setShowBookingPopup(true);
   };
 
@@ -952,10 +959,14 @@ export default function TrangChu() {
     }
   };
 
-  const confirmPaymentReceived = () => {
-    setShowPayment(false);
-    setPaymentCd(5);
-    setIsSubmitted(true);
+  const confirmPaymentReceived = async () => {
+    if(bookingSaving)return;
+    if(!bookingBankCode.trim()){setBookingSaveError('Nhập mã giao dịch ngân hàng đã đối soát.');return;}
+    const confirmed = window.confirm(
+      'Chỉ xác nhận sau khi chủ sân hoặc nhân viên đã kiểm tra và thấy tiền thực nhận trong tài khoản ngân hàng. Tiếp tục?',
+    );
+    if (!confirmed) return;
+    setBookingSaving(true);setBookingSaveError('');
 
     // Dong bo don dat moi len Supabase Online qua paymentBookingService
     try {
@@ -969,40 +980,26 @@ export default function TrangChu() {
       const eH = Math.floor(eMins / 60).toString().padStart(2, '0');
       const eM = (eMins % 60).toString().padStart(2, '0');
 
-      paymentBookingService.recordSuccessfulBookingPayment({
+      const saved=await bookingApiService.createBooking({
+        courtCode: selectedCourt,
+        bookingDate: formattedDate,
+        startTime: selectedStartTime,
+        endTime: `${eH}:${eM}`,
         customerName: customerName.trim(),
         customerPhone: customerPhone.trim(),
-        courtName: selectedCourt,
-        bookingDate: formattedDate,
-        timeSlot: `${selectedStartTime} - ${eH}:${eM}`,
-        totalPrice,
-        channel: 'ONLINE',
-      }).then((res: { success: boolean; bookingCode?: string; paymentCode?: string }) => {
-        if (res.success) {
-          if (res.bookingCode) setOrderCode(res.bookingCode);
-          if (res.paymentCode) setPaymentCode(res.paymentCode);
-          console.log('Supabase luu thanh cong:', res);
-        }
-      }).catch((err: unknown) => console.warn('Supabase recordPayment warning:', err));
+        totalAmount: totalPrice,
+        bankTransactionCode:bookingBankCode.trim(),paymentConfirmed:true,
+      });
+      setOrderCode(saved.code);
+      setPaymentCode(saved.booking.paymentCode||'');
+      setShowPayment(false);setIsSubmitted(true);
+      setBookingBankCode('');
+      window.dispatchEvent(new Event('focus'));
     } catch (err) {
-      console.warn('Loi ghi don len Supabase:', err);
-    }
+      setBookingSaveError(err instanceof Error?err.message:'Chưa lưu được lượt đặt và thanh toán.');
+    }finally{setBookingSaving(false);}
   };
 
-  // Countdown 5 giay tu dong xac nhan khi mo modal thanh toan khach hang
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => {
-    if (!showPayment) {
-      setPaymentCd(5);
-      return;
-    }
-    if (paymentCd <= 0) {
-      confirmPaymentReceived();
-      return;
-    }
-    const t = setTimeout(() => setPaymentCd((c) => c - 1), 1000);
-    return () => clearTimeout(t);
-  }, [showPayment, paymentCd]);
 
   const handleLookupSearch = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -1651,7 +1648,12 @@ export default function TrangChu() {
 
                   <button
                     type="button"
-                    onClick={() => setShowBookingPopup(true)}
+                    onClick={() => {
+                      setCustomerName('');
+                      setCustomerPhone('');
+                      setCustomerNote('');
+                      setShowBookingPopup(true);
+                    }}
                     className="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black px-3.5 py-2 active:scale-95 transition cursor-pointer shadow-xs shrink-0 flex items-center gap-1"
                   >
                     Mở màn hình đặt sân <ArrowRight className="w-3.5 h-3.5" />
@@ -2140,30 +2142,29 @@ export default function TrangChu() {
 
       {/* 🟠 MODAL XÁC THỰC OTP */}
       {showOTP && (
-        <div className="fixed top-0 bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md z-50 flex items-end sm:items-center justify-center bg-slate-900/60 p-0 sm:p-4 backdrop-blur-sm animate-in fade-in duration-300">
-          <div className="w-full max-w-md rounded-t-3xl sm:rounded-3xl bg-white p-6 shadow-2xl animate-in slide-in-from-bottom-8 duration-300 flex flex-col items-center">
-            <div className="w-12 h-1.5 bg-slate-200 rounded-full mb-4 sm:hidden"></div>
+        <div className="fixed inset-y-0 left-1/2 z-50 flex w-full max-w-md -translate-x-1/2 items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm animate-in fade-in duration-200">
+          <div role="dialog" aria-modal="true" aria-labelledby="otp-title" className="flex max-h-[90dvh] w-full max-w-xs flex-col items-center overflow-y-auto rounded-2xl bg-white p-5 shadow-2xl animate-in zoom-in-95 duration-200">
 
-            <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
-              <Phone className="h-6 w-6" />
+            <div className="mx-auto mb-2.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700">
+              <Phone className="h-4 w-4" />
             </div>
 
-            <h3 className="text-lg font-black text-slate-900 uppercase tracking-wide">
+            <h3 id="otp-title" className="text-sm font-extrabold text-slate-900">
               {otpAction === 'lookup'
                 ? 'Xác thực tra cứu'
                 : otpAction === 'cancel'
                   ? 'Xác thực hủy đặt sân'
                   : 'Xác thực OTP'}
             </h3>
-            <p className="text-xs text-slate-500 mt-1 mb-4 text-center">
+            <p className="mb-3 mt-1 text-center text-[11px] leading-relaxed text-slate-500">
               {otpAction === 'cancel' ? (
                 <>
-                  Vui lòng nhập mã OTP gồm 6 chữ số gửi về số điện thoại <br />
-                  <strong className="text-slate-800">{otpPhone}</strong> để xác nhận hủy vé
+                  Nhập mã 6 số để xác nhận hủy vé <br />
+                  <strong className="text-slate-800">{otpPhone}</strong>
                 </>
               ) : (
                 <>
-                  Vui lòng nhập mã gồm 6 chữ số được gửi đến số điện thoại <br />
+                  Nhập mã xác thực 6 số cho <br />
                   <strong className="text-slate-800">{otpPhone}</strong>
                 </>
               )}
@@ -2188,26 +2189,27 @@ export default function TrangChu() {
               </div>
             )}
 
-            <div className="w-full space-y-4">
+            <div className="w-full space-y-3">
               <div>
                 <input
                   type="text"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  aria-label="Mã OTP gồm 6 chữ số"
+                  aria-invalid={otpError}
                   maxLength={6}
                   value={otpInput}
                   onChange={(e) => {
                     setOtpInput(e.target.value.replace(/[^0-9]/g, ''));
                     setOtpError(false);
                   }}
-                  placeholder="Nhập mã OTP (Mẫu: 123456)"
-                  className={'w-full text-center text-2xl tracking-widest font-mono font-black rounded-xl border px-4 py-3 outline-none transition focus:border-emerald-500 ' + (otpError ? 'border-red-500 bg-red-50 text-red-900' : 'border-slate-200 bg-slate-50 text-slate-900')}
+                  placeholder="Nhập mã OTP"
+                  className={'h-11 w-full rounded-xl border px-3 text-center text-base font-bold tracking-[0.2em] outline-none transition placeholder:text-xs placeholder:font-normal placeholder:tracking-normal focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100 ' + (otpError ? 'border-red-500 bg-red-50 text-red-900' : 'border-slate-200 bg-slate-50 text-slate-900')}
                 />
                 {otpError && <p className="mt-2 text-center text-[10px] font-bold text-red-500">Mã OTP không chính xác. Vui lòng thử lại!</p>}
-                <p className="text-[11px] text-slate-400 text-center mt-2">
-                  Mã mẫu thử nghiệm: <span className="font-mono font-bold text-emerald-600">{bookingOtp}</span> hoặc <span className="font-mono font-bold text-emerald-600">123456</span>
-                </p>
               </div>
 
-              <div className="grid grid-cols-2 gap-3 mt-2">
+              <div className="grid grid-cols-2 gap-2">
                 <button
                   type="button"
                   onClick={() => {
@@ -2224,14 +2226,14 @@ export default function TrangChu() {
                       setShowBookingPopup(true);
                     }
                   }}
-                  className="rounded-xl border border-slate-200 py-3 text-xs font-bold text-slate-600 hover:bg-slate-50 cursor-pointer active:scale-95"
+                  className="h-10 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 transition hover:bg-slate-50 cursor-pointer active:scale-[0.98]"
                 >
                   Quay lại
                 </button>
                 <button
                   type="button"
                   onClick={handleVerifyOTP}
-                  className="rounded-xl bg-emerald-500 py-3 text-xs font-bold text-white hover:bg-emerald-600 cursor-pointer active:scale-95"
+                  className="h-10 rounded-xl bg-emerald-700 text-xs font-bold text-white transition hover:bg-emerald-800 cursor-pointer active:scale-[0.98]"
                 >
                   Xác nhận
                 </button>
@@ -2388,65 +2390,28 @@ export default function TrangChu() {
                       <button
                         type="button"
                         onClick={() => {
-                          setLoginView('forgot_password');
-                          setForgotStep('account');
-                          setForgotError(null);
-                          setForgotAccountInput(username || '');
+                          showAlert('Hỗ trợ mật khẩu','Liên hệ chủ sân để đặt lại mật khẩu. Sau khi đăng nhập, bạn có thể đổi mật khẩu trong Hồ sơ cá nhân.');
                         }}
-                        className="text-xs font-black text-emerald-700 hover:text-emerald-800 hover:underline transition cursor-pointer"
-                      >
-                        Quên mật khẩu?
-                      </button>
+                        className="text-xs font-bold text-emerald-700 hover:underline"
+                      >Quên mật khẩu?</button>
                     </div>
-
-                    {/* Submit Button */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const rawUser = username.trim().toLowerCase();
-                        const phoneClean = username.trim().replace(/\s+/g, '');
-                        // Match key or phone in accountCredentials
-                        const targetKey = Object.keys(accountCredentials).find(
-                          (k) =>
-                            k.toLowerCase() === rawUser ||
-                            accountCredentials[k].phone.replace(/\s+/g, '') === phoneClean
-                        );
-                        const targetAcc = targetKey ? accountCredentials[targetKey] : null;
-
-                        // Match admin
-                        if (
-                          (rawUser === 'admin' && (passwordInput === 'admin' || (targetAcc && passwordInput === targetAcc.password))) ||
-                          (targetAcc && targetAcc.role === 'admin' && passwordInput === targetAcc.password)
-                        ) {
-                          setCurrentUser({ name: targetAcc?.name || accountCredentials.admin.name, phone: targetAcc?.phone || accountCredentials.admin.phone, role: 'Chủ sân' });
-        setIsAdminLoggedIn(true);
-                          setShowLogin(false);
-                          setUsername('');
-                          setPasswordInput('');
-                        } else if (
-                          (rawUser === 'nhanvien' && (passwordInput === 'nhanvien' || (targetAcc && passwordInput === targetAcc.password))) ||
-                          (targetAcc && targetAcc.role === 'employee' && passwordInput === targetAcc.password)
-                        ) {
-                          setCurrentUser({ name: targetAcc?.name || accountCredentials.nhanvien.name, phone: targetAcc?.phone || accountCredentials.nhanvien.phone, role: 'Nhân viên' });
-        setIsEmployeeLoggedIn(true);
-                          setShowLogin(false);
-                          setUsername('');
-                          setPasswordInput('');
-                        } else if (
-                          ((rawUser === 'vip' || rawUser === 'khachvip') && (passwordInput === 'vip' || passwordInput === '123456' || (targetAcc && passwordInput === targetAcc.password))) ||
-                          (targetAcc && targetAcc.role === 'vip' && passwordInput === targetAcc.password)
-                        ) {
-                          setIsVipLoggedIn(true);
-                          setShowLogin(false);
-                          setUsername('');
-                          setPasswordInput('');
-                        } else {
-                          showAlert('Sai thông tin đăng nhập', 'Tên tài khoản / số điện thoại hoặc mật khẩu không chính xác!\n\nNếu bạn vừa nhận mật khẩu mới qua SMS, hãy nhập số điện thoại và mật khẩu vừa nhận để đăng nhập.\nHoặc nhấn "Quên mật khẩu?" để hệ thống gửi lại mã OTP.');
-                        }
+                    {loginError&&<p role="alert" className="text-xs text-red-600">{loginError}</p>}
+                    <button type="button" disabled={loginSaving}
+                      onClick={async () => {
+                        if(loginSaving)return;
+                        setLoginSaving(true);setLoginError('');
+                        try {
+                          const account=await staffAuthService.login(username,passwordInput);
+                          setCurrentUser({id:account.id,name:account.name,phone:account.phone,role:account.role});
+                          setIsAdminLoggedIn(account.authRole==='ADMIN');
+                          setIsEmployeeLoggedIn(account.authRole==='STAFF');
+                          setShowLogin(false);setUsername('');setPasswordInput('');
+                        }catch(error){setLoginError(error instanceof Error?error.message:'Chưa đăng nhập được.');}
+                        finally{setLoginSaving(false);}
                       }}
                       className="flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-emerald-700 px-3 text-xs font-black uppercase tracking-wide text-white shadow-sm transition hover:bg-emerald-800 active:scale-[0.98] cursor-pointer"
                     >
-                      ĐĂNG NHẬP HỆ THỐNG <Zap className="w-4 h-4 fill-current" />
+                      {loginSaving?'Đang đăng nhập...':'ĐĂNG NHẬP HỆ THỐNG'} <Zap className="w-4 h-4 fill-current" />
                     </button>
                   </div>
                 </div>
@@ -2886,235 +2851,95 @@ export default function TrangChu() {
         </div>
       )}
 
-      {/* 🟢 POPUP MODAL: MÀN HÌNH ĐẶT SÂN & THANH TOÁN (HIỆN KHI ẤN VÀO LỊCH SÂN) */}
+      {/* Booking details */}
       {showBookingPopup && (
-        <div className="fixed top-0 bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md z-50 flex items-end sm:items-center justify-center bg-slate-900/60 p-0 sm:p-4 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="w-full max-w-md rounded-t-3xl sm:rounded-3xl bg-slate-50 p-4 sm:p-5 shadow-2xl animate-in slide-in-from-bottom-6 duration-200 max-h-[92vh] overflow-y-auto space-y-4 border border-slate-100 flex flex-col">
-
-            {/* Mobile Drag Indicator */}
-            <div className="w-12 h-1.5 bg-slate-300 rounded-full mb-1 mx-auto sm:hidden shrink-0"></div>
-
-            {/* Header */}
-            <div className="flex items-center justify-between pb-2 border-b border-slate-200 shrink-0">
-              <div className="flex items-center gap-2">
-                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700 font-black">
-                  <CalendarIcon className="w-4 h-4" />
-                </div>
+        <div className="fixed inset-y-0 left-1/2 z-50 flex w-full max-w-md -translate-x-1/2 items-end justify-center bg-slate-900/60 p-2 backdrop-blur-sm sm:items-center sm:p-4">
+          <div role="dialog" aria-modal="true" aria-labelledby="booking-popup-title" className="flex max-h-[94dvh] w-full flex-col overflow-hidden rounded-3xl border border-white/80 bg-white shadow-2xl animate-in slide-in-from-bottom-6 duration-200">
+            <div className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-100 px-4 py-3">
+              <div className="flex items-center gap-2.5">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700"><CalendarIcon className="h-4 w-4" /></div>
                 <div>
-                  <h3 className="text-sm font-black uppercase tracking-wider text-slate-900">CHI TIẾT ĐẶT SÂN</h3>
-                  <p className="text-[10px] text-slate-500 font-medium">Kiểm tra thông tin & tiến hành thanh toán</p>
+                  <h2 id="booking-popup-title" className="text-sm font-extrabold text-slate-900">Chi tiết đặt sân</h2>
+                  <p className="mt-0.5 text-[11px] text-slate-500">Kiểm tra lịch và thông tin người đặt</p>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() => setShowBookingPopup(false)}
-                className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-200/70 hover:bg-slate-200 text-slate-600 transition cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
+              <button type="button" aria-label="Đóng chi tiết đặt sân" onClick={() => setShowBookingPopup(false)} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-500 transition hover:bg-slate-200 focus-visible:outline-2 focus-visible:outline-emerald-700"><X className="h-4 w-4" /></button>
             </div>
 
-            {/* Booking Form */}
-            <form onSubmit={handleBookingSubmit} className="space-y-4">
-
-              {/* Card 4: TÓM TẮT ĐƠN ĐẶT SÂN */}
-              <div className="rounded-2xl border border-slate-200 bg-white p-4 space-y-3 shadow-xs">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500 text-xs font-black text-white">4</span>
-                    <h3 className="text-sm font-black uppercase tracking-wider text-slate-900">TÓM TẮT ĐƠN ĐẶT SÂN</h3>
-                  </div>
-                  <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-[10px] font-extrabold uppercase text-emerald-700 border border-emerald-200 flex items-center gap-1">
-                    <CheckCircle2 className="w-3 h-3" /> ĐÃ CHỌN SÂN
-                  </span>
-                </div>
-
-                <div className="space-y-2.5 rounded-xl bg-slate-50 p-3.5 border border-slate-200 text-xs">
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-500">Môn thi đấu</span>
-                    <span className="font-bold text-slate-900">{currentSport?.name || ''}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-500">Sân thi đấu</span>
-                    <span className="font-black text-emerald-700 text-sm">{selectedCourt}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-500">Ngày đặt</span>
-                    <span className="font-bold text-slate-900">{selectedDate}</span>
+            <form onSubmit={handleBookingSubmit} className="flex min-h-0 flex-1 flex-col">
+              <div className="min-h-0 space-y-4 overflow-y-auto overscroll-contain px-4 py-3">
+                <section aria-label="Thông tin sân và thời gian" className="space-y-3">
+                  <div className="rounded-2xl border border-emerald-100 bg-emerald-50/60 p-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <p className="text-[11px] font-medium text-slate-500">{currentSport?.name || ''}</p>
+                        <h3 className="mt-0.5 text-lg font-extrabold tracking-tight text-emerald-800">{selectedCourt}</h3>
+                      </div>
+                      <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-white px-2 py-1 text-[10px] font-bold text-emerald-700"><CheckCircle2 className="h-3 w-3" />Đã chọn sân</span>
+                    </div>
+                    <p className="mt-2 flex items-center gap-1.5 border-t border-emerald-100 pt-2 text-xs font-semibold text-slate-700"><CalendarIcon className="h-3.5 w-3.5 text-emerald-600" />{selectedDate}</p>
                   </div>
 
-                  {/* Start Time Selector */}
-                  <div className="flex items-center justify-between border-t border-slate-200/80 pt-2">
-                    <span className="text-slate-600 font-bold">Giờ bắt đầu:</span>
-                    <select
-                      value={selectedStartTime}
-                      onChange={(e) => handleStartTimeChange(e.target.value)}
-                      className={`rounded-lg border px-2.5 py-1 text-xs font-black outline-none cursor-pointer transition ${conflictBooking
-                          ? 'border-red-500 bg-red-50 text-red-700 ring-2 ring-red-200'
-                          : 'border-slate-300 bg-white text-slate-800 focus:border-emerald-500'
-                        }`}
-                    >
-                      {filteredStartTimeOptions.map((t) => (
-                        <option key={t} value={t}>{t}</option>
-                      ))}
+                  <div className="grid grid-cols-2 gap-2.5">
+                    <label className="space-y-1 text-[11px] font-semibold text-slate-500">
+                      <span>Giờ bắt đầu</span>
+                      <select value={selectedStartTime} onChange={e => handleStartTimeChange(e.target.value)} className={`h-10 w-full cursor-pointer rounded-xl border bg-white px-3 text-sm font-bold outline-none transition focus:ring-2 focus:ring-emerald-100 ${conflictBooking ? 'border-red-300 text-red-700' : 'border-slate-200 text-slate-900 focus:border-emerald-600'}`}>
+                        {filteredStartTimeOptions.map(t => <option key={t} value={t}>{t}</option>)}
+                      </select>
+                    </label>
+                    <label className="space-y-1 text-[11px] font-semibold text-slate-500">
+                      <span>Giờ kết thúc</span>
+                      <select value={selectedEndTime} onChange={e => handleEndTimeChange(e.target.value)} className={`h-10 w-full cursor-pointer rounded-xl border bg-white px-3 text-sm font-bold outline-none transition focus:ring-2 focus:ring-emerald-100 ${conflictBooking ? 'border-red-300 text-red-700' : 'border-slate-200 text-slate-900 focus:border-emerald-600'}`}>
+                        {endTimeOptions.map(t => <option key={t} value={t}>{t}</option>)}
+                      </select>
+                    </label>
+                  </div>
+                  <div className="flex items-center justify-between gap-2">
+                    <label htmlFor="booking-duration" className="flex items-center gap-1.5 text-xs font-medium text-slate-500"><Clock className="h-3.5 w-3.5" />Thời lượng</label>
+                    <select id="booking-duration" value={selectedDuration} onChange={e => handleDurationChange(Number(e.target.value))} className="h-9 max-w-[60%] cursor-pointer rounded-lg border border-slate-200 bg-slate-50 px-2 text-xs font-bold text-slate-800 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100">
+                      {availableDurations.map(dur => <option key={dur} value={dur}>{dur === 30 ? '30 phút' : dur % 60 === 0 ? `${dur / 60} tiếng` : `${Math.floor(dur / 60)} tiếng 30 phút`}</option>)}
                     </select>
                   </div>
-
-                  {/* End Time Selector */}
-                  <div className="flex items-center justify-between pt-0.5">
-                    <span className="text-slate-600 font-bold">Giờ kết thúc:</span>
-                    <select
-                      value={selectedEndTime}
-                      onChange={(e) => handleEndTimeChange(e.target.value)}
-                      className={`rounded-lg border px-2.5 py-1 text-xs font-black outline-none cursor-pointer transition ${conflictBooking
-                          ? 'border-red-500 bg-red-50 text-red-700 ring-2 ring-red-200'
-                          : 'border-slate-300 bg-white text-slate-800 focus:border-emerald-500'
-                        }`}
-                    >
-                      {endTimeOptions.map((t) => (
-                        <option key={t} value={t}>{t}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Duration Selector */}
-                  <div className="flex items-center justify-between pt-0.5">
-                    <span className="text-slate-600 font-bold">Thời lượng thuê:</span>
-                    <select
-                      value={selectedDuration}
-                      onChange={(e) => handleDurationChange(Number(e.target.value))}
-                      className="rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs font-black text-slate-800 outline-none focus:border-emerald-500 cursor-pointer"
-                    >
-                      {availableDurations.map((dur) => (
-                        <option key={dur} value={dur}>
-                          {dur === 30 ? '30 phút (nửa tiếng)' : dur % 60 === 0 ? `${dur / 60} tiếng` : `${Math.floor(dur / 60)} tiếng 30 phút`}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-500">Khung giờ</span>
-                    <span className={`font-bold px-2 py-0.5 rounded ${conflictBooking
-                        ? 'text-red-700 bg-red-100 border border-red-300'
-                        : 'text-emerald-800 bg-emerald-100/70'
-                      }`}>
-                      {selectedSlot} ({selectedDuration === 30 ? '30 phút' : `${durationHours} tiếng`})
-                    </span>
-                  </div>
-
-                  {/* 🚨 RED CONFLICT WARNING BANNER */}
                   {conflictBooking && (
-                    <div className="rounded-xl border-2 border-red-500 bg-red-50 p-3 text-xs text-red-700 space-y-1.5 animate-in fade-in duration-150">
-                      <div className="flex items-center gap-1.5 font-black text-red-800 uppercase text-[11px]">
-                        <AlertTriangle className="w-4 h-4 text-red-600 shrink-0" />
-                        <span>KHÔNG THỂ ĐẶT — KHUNG GIỜ ĐÃ BỊ TRÙNG!</span>
-                      </div>
-                      <p className="text-[11px] font-medium text-red-700 leading-relaxed">
-                        Khung giờ <span className="font-black text-red-900 bg-red-100 px-1.5 py-0.5 rounded">{selectedStartTime} – {selectedEndTime}</span> bị trùng với lịch đặt trước trên {selectedCourt}:
-                      </p>
-                      <div className="rounded-lg bg-white border border-red-200 px-2.5 py-1 text-[11px] font-black text-red-900">
-                        📌 {conflictBooking.title || `Đã đặt (${conflictBooking.startH.toString().padStart(2, '0')}:${conflictBooking.startM.toString().padStart(2, '0')} - ${conflictBooking.endH.toString().padStart(2, '0')}:${conflictBooking.endM.toString().padStart(2, '0')})`}
-                      </div>
-                      <p className="text-[10px] font-bold text-red-600">
-                        👉 Vui lòng đổi Giờ bắt đầu hoặc Giờ kết thúc để chọn khung giờ còn trống!
-                      </p>
+                    <div role="alert" className="flex gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-700">
+                      <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                      <div><p className="font-bold">Khung giờ đã được đặt</p><p className="mt-1 leading-relaxed">{selectedStartTime} – {selectedEndTime} bị trùng lịch trên {selectedCourt}. Vui lòng chọn giờ khác.</p></div>
                     </div>
                   )}
+                </section>
 
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-500">Đơn giá niêm yết</span>
-                    <span className="font-bold text-slate-700">{currentSport ? `${currentSport.pricePerHour.toLocaleString('vi-VN')}đ / giờ` : ''}</span>
-                  </div>
-
-                  <div className="flex items-center justify-between border-t border-slate-200 pt-2.5">
-                    <span className="text-slate-700 font-black text-sm">TỔNG THANH TOÁN</span>
-                    <span className={`text-2xl font-black ${conflictBooking ? 'text-slate-400 line-through' : 'text-emerald-600'}`}>
-                      {formattedPrice}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Card 5: THÔNG TIN NGƯỜI ĐẶT */}
-              <div className="rounded-2xl border border-slate-200 bg-white p-4 space-y-3 shadow-xs">
-                <div className="flex items-center gap-2">
-                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500 text-xs font-black text-white">5</span>
-                  <h3 className="text-sm font-black uppercase tracking-wider text-slate-900">THÔNG TIN NGUỜI ĐẶT</h3>
-                </div>
-
-                <div className="space-y-3 text-xs">
-                  <div>
-                    <label className="mb-1 block font-bold uppercase text-slate-500 text-[10px] tracking-wider">
-                      HỌ VÀ TÊN *
+                <section className="space-y-2.5 border-t border-slate-100 pt-3">
+                  <h3 className="flex items-center gap-1.5 text-xs font-bold text-slate-900"><User className="h-3.5 w-3.5 text-emerald-700" />Thông tin người đặt</h3>
+                  <div className="grid grid-cols-1 gap-2.5 min-[380px]:grid-cols-2">
+                    <label className="space-y-1 text-[11px] font-semibold text-slate-500">
+                      <span>Họ và tên <span className="text-red-500">*</span></span>
+                      <input type="text" autoComplete="off" required value={customerName} onChange={e => setCustomerName(e.target.value)} placeholder="Nhập họ và tên" className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-medium text-slate-900 outline-none transition placeholder:font-normal placeholder:text-slate-400 focus:border-emerald-600 focus:bg-white focus:ring-2 focus:ring-emerald-100" />
                     </label>
-                    <input
-                      type="text"
-                      required
-                      value={customerName}
-                      onChange={(e) => setCustomerName(e.target.value)}
-                      placeholder="Nhập họ và tên..."
-                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3 text-sm text-slate-900 placeholder-slate-400 outline-none transition focus:border-emerald-500 focus:bg-white"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="mb-1 block font-bold uppercase text-slate-500 text-[10px] tracking-wider">
-                      SỐ ĐIỆN THOẠI *
+                    <label className="space-y-1 text-[11px] font-semibold text-slate-500">
+                      <span>Số điện thoại <span className="text-red-500">*</span></span>
+                      <input type="tel" autoComplete="off" required value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} placeholder="Nhập số điện thoại" className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-medium text-slate-900 outline-none transition placeholder:font-normal placeholder:text-slate-400 focus:border-emerald-600 focus:bg-white focus:ring-2 focus:ring-emerald-100" />
                     </label>
-                    <input
-                      type="tel"
-                      required
-                      value={customerPhone}
-                      onChange={(e) => setCustomerPhone(e.target.value)}
-                      placeholder="Nhập số điện thoại..."
-                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3 text-sm text-slate-900 placeholder-slate-400 outline-none transition focus:border-emerald-500 focus:bg-white"
-                    />
                   </div>
-
-                  <div>
-                    <label className="mb-1 block font-bold uppercase text-slate-500 text-[10px] tracking-wider">
-                      GHI CHÚ THÊM (TÙY CHỌN)
-                    </label>
-                    <input
-                      type="text"
-                      value={customerNote}
-                      onChange={(e) => setCustomerNote(e.target.value)}
-                      placeholder="VD: Cần mượn thêm vợt, bóng..."
-                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3 text-sm text-slate-900 placeholder-slate-400 outline-none transition focus:border-emerald-500 focus:bg-white"
-                    />
-                  </div>
-
-                  <label className="flex items-center gap-2 cursor-pointer pt-1">
-                    <input
-                      type="checkbox"
-                      checked={sendZalo}
-                      onChange={(e) => setSendZalo(e.target.checked)}
-                      className="h-4 w-4 rounded border-slate-300 text-emerald-500 focus:ring-emerald-500 cursor-pointer"
-                    />
-                    <span className="text-slate-700 text-xs font-semibold">Gửi vé điện tử & thông báo nhắc lịch qua Zalo/SMS</span>
+                  <label className="block space-y-1 text-[11px] font-semibold text-slate-500">
+                    <span>Ghi chú <span className="font-normal text-slate-400">(tùy chọn)</span></span>
+                    <input type="text" value={customerNote} onChange={e => setCustomerNote(e.target.value)} placeholder="Yêu cầu thêm cho lượt đặt" className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-medium text-slate-900 outline-none transition placeholder:font-normal placeholder:text-slate-400 focus:border-emerald-600 focus:bg-white focus:ring-2 focus:ring-emerald-100" />
                   </label>
-                </div>
+                  <label className="flex cursor-pointer items-start gap-2 py-1 text-[11px] leading-relaxed text-slate-600">
+                    <input type="checkbox" checked={sendZalo} onChange={e => setSendZalo(e.target.checked)} className="mt-0.5 h-3.5 w-3.5 shrink-0 cursor-pointer accent-emerald-700" />
+                    <span>Nhận vé và nhắc lịch qua Zalo/SMS</span>
+                  </label>
+                </section>
               </div>
 
-              {/* Submit Button & Conflict Alert */}
-              {conflictBooking && (
-                <div className="rounded-xl border border-red-200 bg-red-50 p-2.5 text-center text-[11px] font-bold text-red-700 animate-in fade-in flex items-center justify-center gap-1.5">
-                  <AlertTriangle className="w-3.5 h-3.5 text-red-600 shrink-0" />
-                  <span>Khung giờ đã bị trùng lịch! Vui lòng chọn giờ khác để tiếp tục.</span>
+              <div className="shrink-0 space-y-2.5 border-t border-slate-100 bg-white px-4 pb-[max(0.875rem,env(safe-area-inset-bottom))] pt-3">
+                <div className="flex items-end justify-between gap-2">
+                  <div><p className="text-xs font-bold text-slate-700">Tổng thanh toán</p><p className="mt-0.5 text-[10px] text-slate-400">{currentSport?.pricePerHour.toLocaleString('vi-VN')}đ/giờ · {selectedDuration} phút</p></div>
+                  <strong className={`text-2xl font-extrabold tracking-tight ${conflictBooking ? 'text-slate-400 line-through' : 'text-emerald-700'}`}>{formattedPrice}</strong>
                 </div>
-              )}
-
-              <button
-                type="submit"
-                disabled={Boolean(conflictBooking)}
-                className={`w-full flex items-center justify-center gap-2 rounded-2xl py-4 text-sm font-black uppercase tracking-widest transition ${conflictBooking
-                    ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
-                    : 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-lg shadow-emerald-500/25 cursor-pointer active:scale-95'
-                  }`}
-              >
-                TIẾN HÀNH THANH TOÁN ({formattedPrice})
-              </button>
+                <button type="submit" disabled={Boolean(conflictBooking)} className="flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-emerald-700 text-xs font-bold text-white shadow-sm transition hover:bg-emerald-800 active:scale-[0.99] disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400 disabled:shadow-none">
+                  Thanh toán qua VietQR <ArrowRight className="h-4 w-4" />
+                </button>
+              </div>
             </form>
           </div>
         </div>
@@ -3158,8 +2983,13 @@ export default function TrangChu() {
 
             </div>
 
-            <div className="w-full mt-4">
-              <button onClick={() => { setShowPayment(false); setPaymentCd(5); }} type="button" className="w-full rounded-xl border border-slate-200 py-3 text-xs font-bold text-slate-600 hover:bg-slate-50 cursor-pointer active:scale-95">Hủy giao dịch</button>
+            <label className="mt-4 w-full text-xs font-semibold text-slate-600">Mã giao dịch ngân hàng
+              <input value={bookingBankCode} onChange={e=>setBookingBankCode(e.target.value)} disabled={bookingSaving} maxLength={100} placeholder="Mã giao dịch đã đối soát" className="mt-1 h-10 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-emerald-700" />
+            </label>
+            {bookingSaveError&&<p role="alert" className="mt-2 text-xs text-red-600">{bookingSaveError}</p>}
+            <div className="w-full mt-6 grid grid-cols-1 gap-2 sm:grid-cols-2 sm:gap-3">
+              <button onClick={() => setShowPayment(false)} type="button" className="rounded-xl border border-slate-200 py-3 text-xs font-bold text-slate-600 hover:bg-slate-50 cursor-pointer active:scale-95">Hủy giao dịch</button>
+              <button onClick={confirmPaymentReceived} disabled={bookingSaving||!bookingBankCode.trim()} type="button" className="rounded-xl bg-emerald-800 py-3 text-xs font-bold text-white hover:bg-emerald-900 cursor-pointer active:scale-95">{bookingSaving?'Đang lưu...':'Xác nhận đã nhận tiền'}</button>
             </div>
           </div>
         </div>
@@ -3196,7 +3026,7 @@ export default function TrangChu() {
             </div>
 
             <p className="text-[11px] text-slate-500">
-              Thông tin xác nhận & vé QR đã được hệ thống gửi qua Zalo/SMS tới số <strong className="text-slate-900">{customerPhone}</strong>.
+              Số điện thoại liên hệ cho lượt đặt: <strong className="text-slate-900">{customerPhone}</strong>.
             </p>
 
             <div className="w-full rounded-xl bg-amber-50 border border-amber-200 px-3 py-2 text-[11px] text-amber-700 text-center">

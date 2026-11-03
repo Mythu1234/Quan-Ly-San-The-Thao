@@ -1,27 +1,19 @@
-import { Router } from 'express';
-import { employeeController } from '../controllers/employeeController.js';
-
-const router = Router();
-
-// GET /api/employees/stats - Statistical counts
-router.get('/stats', (req, res) => employeeController.getStats(req, res));
-
-// GET /api/employees - List with filters & pagination
-router.get('/', (req, res) => employeeController.getEmployees(req, res));
-
-// GET /api/employees/:id - Single employee detail
-router.get('/:id', (req, res) => employeeController.getEmployeeById(req, res));
-
-// POST /api/employees - Create new employee
-router.post('/', (req, res) => employeeController.createEmployee(req, res));
-
-// PUT /api/employees/:id - Update employee
-router.put('/:id', (req, res) => employeeController.updateEmployee(req, res));
-
-// PATCH /api/employees/:id/status - Toggle active/inactive
-router.patch('/:id/status', (req, res) => employeeController.toggleStatus(req, res));
-
-// DELETE /api/employees/:id - Soft delete (UC-11) or permanent delete
-router.delete('/:id', (req, res) => employeeController.deleteEmployee(req, res));
-
+import {Router} from 'express';
+import {staffAuthService} from '../services/staffAuthService.js';
+import {staffDirectoryService as directory} from '../services/staffDirectoryService.js';
+const router=Router();
+router.post('/login',async(req,res,next)=>{try{res.json({success:true,data:await staffAuthService.login(req.body.identifier,req.body.password)});}catch(error){next(error);}});
+router.post('/:id/password',async(req,res,next)=>{try{res.json({success:true,data:await staffAuthService.changePassword(String(req.params.id),req.body.currentPassword,req.body.newPassword)});}catch(error){next(error);}});
+router.get('/stats',async(_req,res,next)=>{try{const rows=await directory.list();res.json({success:true,data:{total:rows.length,active:rows.filter(row=>row.status==='active').length,inactive:rows.filter(row=>row.status==='inactive').length}});}catch(error){next(error);}});
+router.get('/',async(req,res,next)=>{try{
+  let rows=await directory.list();
+  if(req.query.status==='active'||req.query.status==='inactive')rows=rows.filter(row=>row.status===req.query.status);
+  if(typeof req.query.search==='string'){const search=req.query.search.trim().toLocaleLowerCase('vi-VN');rows=rows.filter(row=>[row.name,row.id,row.phone,row.email].some(value=>value.toLocaleLowerCase('vi-VN').includes(search)));}
+  res.json({success:true,data:rows});
+}catch(error){next(error);}});
+router.get('/:id',async(req,res,next)=>{try{res.json({success:true,data:await directory.get(String(req.params.id))});}catch(error){next(error);}});
+router.post('/',async(req,res,next)=>{try{res.status(201).json({success:true,data:await directory.create(req.body)});}catch(error){next(error);}});
+router.put('/:id',async(req,res,next)=>{try{res.json({success:true,data:await directory.update(String(req.params.id),req.body)});}catch(error){next(error);}});
+router.patch('/:id/status',async(req,res,next)=>{try{res.json({success:true,data:await directory.toggle(String(req.params.id))});}catch(error){next(error);}});
+router.delete('/:id',async(req,res,next)=>{try{const employee=await directory.update(String(req.params.id),{status:'inactive'});res.json({success:true,data:{success:true,employee,message:'Đã ngừng hoạt động tài khoản; giữ lịch sử.'}});}catch(error){next(error);}});
 export default router;

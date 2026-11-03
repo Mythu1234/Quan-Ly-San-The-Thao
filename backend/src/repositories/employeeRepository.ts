@@ -187,7 +187,7 @@ export class EmployeeRepository {
           ho_ten: newEmployee.name,
           so_dien_thoai: newEmployee.phone,
           email: newEmployee.email,
-          mat_khau: password || 'staff@123',
+          mat_khau: password || (vaiTro==='ADMIN'?'admin@1234':'staff@1234'),
           vai_tro: vaiTro,
           trang_thai_hoat_dong: newEmployee.status === 'active',
         },

@@ -24,6 +24,14 @@ async function main() {
     return response(200,{success:true,data:[{code:'DS00000001'}]});
   };
   assert.equal((await booking.lookup('DS00000001'))[0].code,'DS00000001');
+  fetchImpl=async(url,options)=>{
+    assert.equal(url,'/api/bookings');assert.equal(options.method,'POST');
+    assert.equal(JSON.parse(options.body).bankTransactionCode,'BANK-001');
+    return response(200,{success:true,data:{success:true,code:'DS00000042',booking:{code:'DS00000042'}}});
+  };
+  assert.equal((await booking.createBooking({bankTransactionCode:'BANK-001',paymentConfirmed:true})).code,'DS00000042');
+  fetchImpl=async()=>response(503,{success:false,message:'Chưa có migration đặt sân'});
+  await assert.rejects(booking.createBooking({bankTransactionCode:'BANK-001',paymentConfirmed:true}),/migration/);
   fetchImpl=()=>Promise.reject(Error('offline'));
   await assert.rejects(facility.loadAllFacilityData(),/chưa được lưu/);
   await assert.rejects(facility.completeCheckout({}),/chưa được lưu/);

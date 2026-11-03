@@ -329,98 +329,7 @@ class BookingApiService {
   /**
    * Tạo đơn đặt sân mới trên Supabase
    */
-  async createBooking(booking: {
-    courtCode: string;
-    bookingDate: string;
-    startTime: string;
-    endTime: string;
-    customerName: string;
-    customerPhone: string;
-    totalAmount: number;
-    channel?: 'ONLINE' | 'TAI_QUAY';
-    staffId?: string | null;
-  }): Promise<{ success: boolean; code: string }> {
-    try {
-      // 1. Tìm hoặc tạo khách hàng
-      let customerId = 'KH00000001';
-      const { data: existingCust } = await supabase
-        .from('khach_hang')
-        .select('ma_khach_hang')
-        .eq('so_dien_thoai', booking.customerPhone)
-        .maybeSingle();
 
-      if (existingCust) {
-        customerId = existingCust.ma_khach_hang;
-      } else {
-        customerId = `KH${Date.now().toString().slice(-8)}`;
-        try {
-          await supabase.from('khach_hang').insert({
-            ma_khach_hang: customerId,
-            ho_ten: booking.customerName,
-            so_dien_thoai: booking.customerPhone,
-          });
-        } catch {}
-      }
-
-      // 2. Map mã sân (vd: CL-01, Sân CL-01 -> SAN00000001)
-      let courtId = 'SAN00000001';
-      const codeMatch = booking.courtCode.match(/(CL|BC|BD)-\d{2}/i);
-      const searchPattern = codeMatch ? codeMatch[0] : booking.courtCode;
-
-      const { data: courtData } = await supabase
-        .from('san')
-        .select('ma_san')
-        .ilike('ten_san', `%${searchPattern}%`)
-        .maybeSingle();
-      if (courtData) {
-        courtId = courtData.ma_san;
-      }
-
-      // 3. Tạo mã đặt sân và thanh toán CÙNG CHUNG MÃ SỐ ĐỒNG BỘ
-      const sharedSeq = Date.now().toString().slice(-8);
-      const newBookingId = `DS${sharedSeq}`;
-      const newPaymentId = `TT${sharedSeq}`;
-
-      // 4. Lưu đơn vào dat_san
-      const { error: insertErr } = await supabase.from('dat_san').insert({
-        ma_dat_san: newBookingId,
-        ma_san: courtId,
-        ma_khach_hang: customerId,
-        ma_nhan_vien: booking.staffId || null,
-        ngay_dat: booking.bookingDate,
-        gio_bat_dau: booking.startTime.length === 5 ? `${booking.startTime}:00` : booking.startTime,
-        gio_ket_thuc: booking.endTime.length === 5 ? `${booking.endTime}:00` : booking.endTime,
-        kenh_dat: booking.channel || 'ONLINE',
-        don_gia_gio: booking.totalAmount,
-        tong_tien_san: booking.totalAmount,
-        trang_thai: 'DA_THANH_TOAN',
-      });
-
-      if (insertErr) {
-        console.warn('Supabase createBooking insert warning:', insertErr);
-      } else {
-        // 5. Lưu bản ghi thanh toán VietQR 100% vào bảng thanh_toan (dùng cùng sharedSeq)
-        try {
-          await supabase.from('thanh_toan').insert({
-            ma_thanh_toan: newPaymentId,
-            ma_dat_san: newBookingId,
-            so_tien: booking.totalAmount,
-            phuong_thuc_thanh_toan: 'VIETQR',
-            loai_giao_dich: 'THANH_TOAN_DAT_SAN',
-            trang_thai: 'THANH_CONG',
-            ghi_chu: 'Thanh toán 100% qua VietQR lúc đặt sân',
-          });
-        } catch (payErr) {
-          console.warn('Supabase thanh_toan insert warning:', payErr);
-        }
-      }
-
-      return { success: true, code: newBookingId };
-    } catch (err) {
-      console.error('Supabase createBooking error:', err);
-      return { success: false, code: `BK-${Math.floor(1000 + Math.random() * 9000)}` };
-    }
-  }
 }
 
 export interface CustomerLookupResult {
@@ -428,7 +337,12 @@ export interface CustomerLookupResult {
   total:string;paidAmount:string;remaining:string;status:string;paymentStatus:string;refundAmount:string;refundStatus:string;
   cancellationReason?:string;cancelledAt?:string;hoursUntilStart:number;sportId:string;canCancel:boolean;
 }
+export interface CreatePaidBookingRequest {
+  courtCode:string;bookingDate:string;startTime:string;endTime:string;customerName:string;customerPhone:string;
+  totalAmount:number;channel?:'ONLINE'|'TAI_QUAY';staffId?:string|null;bankTransactionCode:string;paymentConfirmed:boolean;
+}
 const backendBookingApi={
+  createBooking:(request:CreatePaidBookingRequest)=>apiRequest<{success:boolean;code:string;booking:BookingDetail}>('/bookings',{method:'POST',body:JSON.stringify(request)}),
   list:()=>apiRequest<BookingDetail[]>('/bookings'),
   lookup:(query:string)=>apiRequest<CustomerLookupResult[]>('/bookings/lookup',{method:'POST',body:JSON.stringify({query})}),
   checkIn:(code:string,bookingDate:string)=>apiRequest<BookingDetail>(`/bookings/${encodeURIComponent(code)}/check-in`,{method:'POST',body:JSON.stringify({bookingDate})}),

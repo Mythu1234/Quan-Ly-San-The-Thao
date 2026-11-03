@@ -1,7 +1,10 @@
 import {Router} from 'express';
-import {listBookings,checkInBooking} from '../services/bookingService.js';
+import {listBookings,checkInBooking,createPaidBooking} from '../services/bookingService.js';
 import {lookupCustomerBookings} from '../services/customerLookupService.js';
 const router=Router();
+router.post('/',async(req,res,next)=>{
+  try {res.json({success:true,data:await createPaidBooking(req.body)});}catch(error){next(error);}
+});
 router.post('/lookup',async(req,res,next)=>{
   try {res.json({success:true,data:await lookupCustomerBookings(req.body.query)});}catch(error){next(error);}
 });

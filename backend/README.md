@@ -22,12 +22,26 @@ không xóa bảng, không thay chính sách RLS hiện tại. Có thể chạy 
 Khóa publishable dùng trong ứng dụng không có quyền thực hiện DDL nên bước này
 cần được chạy bởi người quản trị dự án Supabase.
 
+Để tạo lượt đặt mới và thanh toán đồng thời, chạy thêm
+[`migrations/20261103_booking_payment.sql`](migrations/20261103_booking_payment.sql).
+File này cấp mã DS/KH/TT tăng dần trong database, giữ nguyên mã lịch sử,
+kiểm tra giá và trùng lịch, bắt buộc mã ngân hàng và xác nhận đối soát.
+Nếu lưu thanh toán thất bại, toàn bộ lượt đặt mới được rollback. Gửi lại cùng
+mã ngân hàng cho cùng lượt đặt trả về mã đã lưu. Đây là ghi nhận đối soát thủ công,
+không phải kết nối xác thực giao dịch trực tiếp với ngân hàng.
+
 Sau khi chạy SQL, khởi động lại backend và tải lại frontend.
 Chạy `npm.cmd run check:db` trong `backend/` để kiểm tra kết nối và phiên bản migration.
 
 ## Luồng dữ liệu
 
+- `POST /api/employees/login`: kiểm tra tài khoản ADMIN/STAFF đang hoạt động trong `nhan_vien`; nhận mã NV, số điện thoại, email hoặc bí danh `admin` / `staff` / `nhanvien` (bí danh trỏ tài khoản đầu tiên của vai trò).
+- `POST /api/employees/:id/password`: xác minh mật khẩu hiện tại trước khi lưu mật khẩu mới dạng scrypt trong Supabase. API không trả mật khẩu/hash về FE.
+- Hồ sơ cá nhân trên FE chọn đúng mã tài khoản đăng nhập. Danh sách và chi tiết tài khoản đọc qua API BE từ Supabase, không thay bằng dữ liệu mẫu khi lỗi kết nối. Vai trò `ADMIN` hiển thị Chủ sân, `STAFF` hiển thị Nhân viên.
+- Thêm/sửa nhân sự chờ Supabase ghi thành công; mật khẩu mới/đặt lại lưu dạng scrypt. Xóa tài khoản chỉ ngừng hoạt động để giữ lịch sử.
+
 - `GET /api/bookings`: lịch đặt, khách hàng và tiền sân đã trả từ database.
+- `POST /api/bookings`: tạo đơn đã đối soát VietQR và bản ghi thanh toán trong cùng giao dịch; trả mã thật và chi tiết đã lưu.
 - `POST /api/bookings/lookup` với body `{ "query": "mã đặt sân hoặc số điện thoại" }`: tra cứu chính xác dữ liệu trên Supabase, không trả kết quả mẫu khi không tìm thấy hoặc API lỗi.
 - `POST /api/bookings/:code/check-in`: kiểm tra thanh toán, khóa sân và trạng thái trước khi nhận sân.
 - `GET/POST/PUT /api/equipments`: quản lý từng thiết bị theo mã và Seri.

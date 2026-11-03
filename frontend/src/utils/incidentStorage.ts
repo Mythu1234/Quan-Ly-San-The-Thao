@@ -3,7 +3,7 @@ import type { FacilityIncident } from '../types/admin';
 import { INITIAL_INCIDENTS } from '../types/admin';
 import type { CheckoutResult } from './checkoutSettlement';
 
-export interface IncidentReporter { name: string; phone: string; role: string }
+export interface IncidentReporter { id?: string; name: string; phone: string; role: string }
 export type IncidentFilter = 'all' | 'resolved' | 'unresolved';
 export function filterIncidents(incidents: FacilityIncident[], filter: IncidentFilter = 'all') {
   return sortRecentIncidents(incidents.filter(incident => !incident.deletedAt && (filter === 'all'

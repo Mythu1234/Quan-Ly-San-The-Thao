@@ -24,7 +24,6 @@ const isSameDay = (a: Date, b: Date) =>
 
 import useSharedBookings, { refreshSharedBookings } from '../hooks/useSharedBookings';
 import { bookingApiService } from '../services/bookingService';
-import { paymentBookingService } from '../services/paymentBookingService';
 import { calendarBookingDate } from '../utils/courtBookingWarnings';
 import type { BookingDetail } from '../types/schedule';
 export type { BookingDetail } from '../types/schedule';
@@ -147,6 +146,10 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
   const [allBookings, setAdminBookings, bookingsState] = useSharedBookings();
   const [checkinSaving,setCheckinSaving]=useState(false);
   const [checkinError,setCheckinError]=useState('');
+  useEffect(() => {
+    setCheckinBooking(previous => previous ? allBookings.find(booking => booking.code === previous.code) || previous : null);
+    setSelectedBooking(previous => previous ? allBookings.find(booking => booking.code === previous.code) || previous : null);
+  }, [allBookings]);
   const adminBookings = allBookings.filter(booking => booking.bookingDate === calendarBookingDate(selectedDate));
 
   // Danh sách các đơn đã hủy trong ngày đang chọn
@@ -167,7 +170,6 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
   const [bookingSendZalo, setBookingSendZalo] = useState<boolean>(true);
   const [bookingErrors, setBookingErrors] = useState<{ name?: string; phone?: string }>({});
   const [showPaymentModal, setShowPaymentModal] = useState<boolean>(false);
-  const [paymentCountdown, setPaymentCountdown] = useState<number>(5);
   const [pendingBookingData, setPendingBookingData] = useState<BookingDetail | null>(null);
   const [paymentSuccessBooking, setPaymentSuccessBooking] = useState<BookingDetail | null>(null);
   const [showReceipt, setShowReceipt] = useState<boolean>(false);
@@ -538,7 +540,7 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
 
     const pendingBooking: BookingDetail = {
       bookingDate: calendarBookingDate(selectedDate),
-      code: `BK-${Math.floor(1000 + Math.random() * 9000)}`,
+      code: '', // Assigned by the database after the booking and payment commit.
       customerName: bookingCustomerName.trim(),
       phone: bookingCustomerPhone.trim(),
       court: bookingCourt.name,
@@ -561,14 +563,20 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
     setShowPaymentModal(true);
   };
 
-  const handleConfirmPaymentSuccess = () => {
+  const [bookingBankCode,setBookingBankCode]=useState('');
+  const [bookingSaving,setBookingSaving]=useState(false);
+  const [bookingSaveError,setBookingSaveError]=useState('');
+  const handleConfirmPaymentSuccess = async () => {
+    if(bookingSaving)return;
+    if(!bookingBankCode.trim()){setBookingSaveError('Nhập mã giao dịch ngân hàng đã đối soát.');return;}
     if (!pendingBookingData) return;
     if (isCourtLocked(pendingBookingData.courtCode || pendingBookingData.court)) {
       window.alert('Sân đang bị khóa, không thể xác nhận đặt sân.');
       return;
     }
 
-    // Đồng bộ đơn đặt mới lên Supabase Online qua paymentBookingService (chung mã số tuần tự)
+    setBookingSaving(true);setBookingSaveError('');
+    // Đồng bộ đơn đặt mới lên Supabase Online
     try {
       const startMins = (pendingBookingData.startH ?? 0) * 60 + (pendingBookingData.startM ?? 0);
       const endMins = (pendingBookingData.endH ?? 0) * 60 + (pendingBookingData.endM ?? 0);
@@ -577,58 +585,30 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
       const eH = Math.floor(endMins / 60).toString().padStart(2, '0');
       const eM = (endMins % 60).toString().padStart(2, '0');
 
-      paymentBookingService.recordSuccessfulBookingPayment({
-        courtName: pendingBookingData.court,
+      const saved=await bookingApiService.createBooking({
+        courtCode: pendingBookingData.courtCode || pendingBookingData.court,
         bookingDate: pendingBookingData.bookingDate || calendarBookingDate(selectedDate),
-        timeSlot: `${sH}:${sM} - ${eH}:${eM}`,
+        startTime: `${sH}:${sM}`,
+        endTime: `${eH}:${eM}`,
         customerName: pendingBookingData.customerName,
         customerPhone: pendingBookingData.phone,
-        totalPrice: parseInt(pendingBookingData.total.replace(/\D/g, '') || '120000', 10),
+        totalAmount: parseInt(pendingBookingData.total.replace(/\D/g, '') || '120000', 10),
         channel: 'TAI_QUAY',
-        staffId: (currentUser as any)?.id?.startsWith('NV') ? (currentUser as any).id : 'NV00000002',
-      }).then((res: { success: boolean; bookingCode?: string; paymentCode?: string }) => {
-        if (res.success && res.bookingCode) {
-          const updated: BookingDetail = {
-            ...pendingBookingData,
-            code: res.bookingCode,
-            paymentCode: res.paymentCode,
-          };
-          setPendingBookingData(updated);
-          setPaymentSuccessBooking(updated);
-          setAdminBookings((prev) =>
-            prev.map((b) => (b.code === pendingBookingData.code ? updated : b))
-          );
-        }
-      }).catch((err: unknown) => console.warn('Supabase recordPayment warning:', err));
+        staffId: (currentUser as any)?.id?.startsWith('NV') ? (currentUser as any).id : null,
+        bankTransactionCode:bookingBankCode.trim(),paymentConfirmed:true,
+      });
+      await refreshSharedBookings();
+      setPaymentSuccessBooking(saved.booking);
+      setShowPaymentModal(false);setBookingCourt(null);setBookingBankCode('');
     } catch (err) {
-      console.warn('Lỗi lưu đơn đặt Admin lên Supabase:', err);
-    }
-
-    setAdminBookings((prev) => [...prev, pendingBookingData]);
-    setPaymentSuccessBooking(pendingBookingData);
-    setShowPaymentModal(false);
-    setBookingCourt(null);
+      setBookingSaveError(err instanceof Error?err.message:'Chưa lưu được lượt đặt và thanh toán.');
+    }finally{setBookingSaving(false);}
   };
 
   const handleCancelPayment = () => {
     setShowPaymentModal(false);
-    setPaymentCountdown(5);
   };
 
-  // Countdown 5 giay tu dong xac nhan khi mo modal thanh toan
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => {
-    if (!showPaymentModal) {
-      setPaymentCountdown(5);
-      return;
-    }
-    if (paymentCountdown <= 0) {
-      handleConfirmPaymentSuccess();
-      return;
-    }
-    const t = setTimeout(() => setPaymentCountdown((c) => c - 1), 1000);
-    return () => clearTimeout(t);
-  }, [showPaymentModal, paymentCountdown]);
 
   const handleFinishBooking = () => {
     setPaymentSuccessBooking(null);
@@ -700,6 +680,9 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
     }
     if (booking.status === 'Đã kết thúc' || booking.status === 'Hoàn tất') {
       return { canCheckin: false, message: 'Lượt đặt sân này đã hoàn tất!' };
+    }
+    if (Number(booking.remaining.replace(/\D/g, '')) > 0) {
+      return { canCheckin: false, message: `Chưa ghi nhận đủ tiền sân. Còn thiếu ${booking.remaining}; cần đối soát giao dịch VietQR trước khi check-in.` };
     }
 
     const bookingD = booking.bookingDate || calendarBookingDate(selectedDate);
@@ -836,6 +819,8 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
     const checkinDuration=checkinEnd-checkinStart;
     const startAt=new Date(`${checkinBooking.bookingDate||calendarBookingDate(selectedDate)}T${checkinBooking.time.slice(0,5)}:00+07:00`);
     const minutesToStart=Math.ceil((startAt.getTime()-Date.now())/60000);
+    const paymentOutstanding=Number(checkinBooking.remaining.replace(/\D/g,''))>0;
+    const hasRecordedPayment=Number(checkinBooking.paidAmount.replace(/\D/g,''))>0;
 
     return (
       <div className="flex-1 min-h-0 overflow-y-auto bg-white px-3 py-3">
@@ -869,7 +854,7 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
             <Clock3 className="h-4 w-4" />
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-[12px] font-black text-slate-800">{minutesToStart>0?`Bắt đầu sau ${minutesToStart} phút`:'Đã đến giờ sử dụng sân'}</p>
+            <p className="text-[12px] font-black text-slate-800">{minutesToStart>0?<>Bắt đầu sau <span className="text-red-600">{minutesToStart} phút</span></>:'Đã đến giờ sử dụng sân'}</p>
             <p className="text-[10px] font-medium text-slate-400">Giờ bắt đầu: {checkinBooking.time.slice(0,5)}</p>
           </div>
           <ChevronRight className="h-3.5 w-3.5 shrink-0 text-slate-300" />
@@ -895,10 +880,6 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
                 {checkinBooking.phone}
               </p>
             </div>
-          </div>
-          <div className="mt-2 flex items-center gap-1.5 rounded-lg bg-white px-2 py-1.5 ring-1 ring-black/15">
-            <Clock3 className="h-3 w-3 shrink-0 text-emerald-800" />
-            <p className="text-[10px] font-medium text-slate-500">Đối chiếu khách hàng theo số điện thoại trên lượt đặt.</p>
           </div>
         </section>
 
@@ -952,14 +933,14 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
             </div>
             <div className="flex items-center justify-between gap-3">
               <span className="flex items-center gap-1.5 text-[11px] font-medium text-slate-500">
-                <span className="h-2 w-2 rounded-full bg-emerald-500" />
-                Đã thanh toán qua VietQR
+                <span className={`h-2 w-2 rounded-full ${hasRecordedPayment?'bg-emerald-500':'bg-amber-500'}`} />
+                {hasRecordedPayment?'Đã ghi nhận qua VietQR':'Chưa ghi nhận thanh toán'}
               </span>
-              <span className="text-[13px] font-black text-emerald-800">-{checkinBooking.paidAmount}</span>
+              <span className={`text-[13px] font-black ${hasRecordedPayment?'text-emerald-800':'text-slate-500'}`}>{hasRecordedPayment?'-':''}{checkinBooking.paidAmount}</span>
             </div>
             <div className="flex items-center justify-between gap-3 rounded-lg bg-white px-2.5 py-2 ring-1 ring-black/15">
-              <span className="text-[12px] font-black text-slate-700">Khoản cần thu tại quầy</span>
-              <span className="text-[14px] font-black text-slate-900">{checkinBooking.remaining}</span>
+              <span className="text-[12px] font-black text-slate-700">Tiền sân chưa ghi nhận</span>
+              <span className={`text-[14px] font-black ${paymentOutstanding?'text-red-600':'text-slate-900'}`}>{checkinBooking.remaining}</span>
             </div>
           </div>
         </section>
@@ -978,12 +959,7 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
               </div>
             );
           }
-          return (
-            <div className="mb-3 flex items-center gap-2 rounded-xl border border-emerald-300 bg-emerald-50 p-2.5 text-xs font-bold text-emerald-800 shadow-sm">
-              <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
-              <span>Đủ điều kiện Check-in nhận sân ngay bây giờ</span>
-            </div>
-          );
+          return null;
         })()}
 
         {/* Action buttons */}
@@ -2694,10 +2670,9 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
                   <span className="h-2 w-2 bg-white rounded-full"></span>
                 </span>
               </div>
-              <p className="text-sm font-semibold text-emerald-700 text-center">
-                Đang chờ ghi nhận thanh toán qua VietQR…
-              </p>
-
+              <label className="w-full text-xs font-semibold text-slate-600">Mã giao dịch ngân hàng<input value={bookingBankCode} onChange={e=>setBookingBankCode(e.target.value)} disabled={bookingSaving} maxLength={100} placeholder="Mã giao dịch đã đối soát" className="mt-1 h-10 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-emerald-700" /></label>
+              {bookingSaveError&&<p role="alert" className="text-xs text-red-600">{bookingSaveError}</p>}
+              <button type="button" disabled={bookingSaving||!bookingBankCode.trim()} onClick={handleConfirmPaymentSuccess} className="rounded-xl bg-emerald-700 px-4 py-3 text-sm font-bold text-white">{bookingSaving?'Đang lưu...':'Xác nhận đã nhận thanh toán VietQR'}</button>
             </div>
 
             <div className="w-full mt-6">
@@ -2755,7 +2730,7 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
             </div>
 
             <p className="text-[11px] text-slate-500 leading-relaxed">
-              Hệ thống đã tự động gửi vé điện tử và thông báo nhắc lịch qua Zalo/SMS tới SĐT <strong className="text-slate-900">{paymentSuccessBooking.phone}</strong>.
+              Số điện thoại liên hệ cho lượt đặt: <strong className="text-slate-900">{paymentSuccessBooking.phone}</strong>.
             </p>
 
             <p className="text-center text-[11px] text-amber-800 bg-amber-50 border border-amber-200/90 rounded-xl py-2 px-3">

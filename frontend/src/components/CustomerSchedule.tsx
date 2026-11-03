@@ -629,7 +629,7 @@ export default function CustomerSchedule({
             {/* Matrix Rows: 1 Row per Court */}
             <div className="relative">
               {displayedCourts.map((court) => (
-                <div key={court.id} className="flex h-[56px] border-b border-slate-200/50">
+                <div key={court.id} className="relative flex h-[56px] border-b border-slate-200/50">
                   {times.map((t, cIdx) => {
                     const cellStart = parseTimeToMinutes(t);
                     const selStartMin = selectedTimeStr ? parseTimeToMinutes(selectedTimeStr) : -1;
@@ -648,7 +648,6 @@ export default function CustomerSchedule({
                             className="shrink-0 border-r border-slate-200/60 bg-slate-100/90 flex flex-col items-center justify-center text-center p-0.5 select-none cursor-not-allowed"
                             title={`${court.name} đã được đặt lúc ${t}`}
                           >
-                            <span className="text-[8.5px] font-bold text-slate-400 leading-tight">Đã đặt</span>
                           </div>
                         );
                       }
@@ -666,7 +665,6 @@ export default function CustomerSchedule({
                               className="h-full bg-slate-100/90 border-r border-slate-200/60 flex flex-col items-center justify-center text-center p-0.5 select-none cursor-not-allowed"
                               title={`${court.name} đã đặt lúc ${t} - ${tSecond}`}
                             >
-                              <span className="text-[7.5px] font-bold text-slate-400 leading-none">Đã đặt</span>
                             </div>
 
                             {/* Right: FREE */}
@@ -724,7 +722,6 @@ export default function CustomerSchedule({
                               className="h-full bg-slate-100/90 flex flex-col items-center justify-center text-center p-0.5 select-none cursor-not-allowed"
                               title={`${court.name} đã đặt lúc ${t.slice(0, 2)}:30`}
                             >
-                              <span className="text-[7.5px] font-bold text-slate-400 leading-none">Đã đặt</span>
                             </div>
                           </div>
                         );
@@ -787,7 +784,6 @@ export default function CustomerSchedule({
                             className="shrink-0 border-r border-slate-200/60 bg-slate-100/90 flex flex-col items-center justify-center text-center p-0.5 select-none cursor-not-allowed"
                             title={`${court.name} đã được đặt lúc ${t}`}
                           >
-                            <span className="text-[8px] font-bold text-slate-400 leading-tight">Đã đặt</span>
                           </div>
                         );
                       }
@@ -821,6 +817,22 @@ export default function CustomerSchedule({
                         </div>
                       );
                     }
+                  })}
+                  {scheduleBookings.filter(booking => booking.courtCode === court.code).map(booking => {
+                    const gridStart = parseTimeToMinutes(times[0]);
+                    const gridEnd = gridStart + times.length * intervalMode;
+                    const start = Math.max(gridStart, booking.startH * 60 + booking.startM);
+                    const end = Math.min(gridEnd, booking.endH * 60 + booking.endM);
+                    if (end <= start) return null;
+                    const formatTime = (hour: number, minute: number) => `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+                    return (
+                      <div key={booking.id}
+                        style={{left: `${(start - gridStart) / intervalMode * slotWidth}px`, width: `${(end - start) / intervalMode * slotWidth}px`}}
+                        className="absolute inset-y-0 z-10 flex cursor-not-allowed select-none items-center justify-center overflow-hidden border-r border-slate-200 bg-slate-100 px-0.5 text-center"
+                        title={`${court.name}: ${formatTime(booking.startH, booking.startM)} – ${formatTime(booking.endH, booking.endM)}`}>
+                        <span className="whitespace-nowrap text-[8.5px] font-bold text-slate-400">Đã đặt</span>
+                      </div>
+                    );
                   })}
                 </div>
               ))}

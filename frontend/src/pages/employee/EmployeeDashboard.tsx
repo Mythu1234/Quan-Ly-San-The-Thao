@@ -1,3 +1,4 @@
+import {staffAuthService} from '../../services/staffAuthService';
 import type { IncidentReporter } from '../../utils/incidentStorage';
 import useFacilityOperations from '../../hooks/useFacilityOperations';
 import { useState, useEffect } from 'react';
@@ -13,7 +14,6 @@ import AdminSetupReminderPage from '../AdminSetupReminderPage';
 import EmployeeProfileView from '../../components/employee/EmployeeProfileView';
 import FacilityManagementView from '../../components/admin/FacilityManagementView';
 import type { Employee } from '../../types/admin';
-import { INITIAL_EMPLOYEES } from '../../types/admin';
 import { employeeApiService } from '../../services/employeeService';
 
 export type EmployeeTab = 'lich_san' | 'nhan_vien' | 'co_so_vat_chat';
@@ -21,7 +21,9 @@ export type EmployeeTab = 'lich_san' | 'nhan_vien' | 'co_so_vat_chat';
 export default function EmployeeDashboard({ onLogout, currentUser }: { onLogout: () => void; currentUser: IncidentReporter }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<EmployeeTab>('lich_san');
-  const [employees, setEmployees] = useState<Employee[]>(INITIAL_EMPLOYEES);
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [profileError,setProfileError]=useState('');
+  const currentEmployee=employees.find(employee=>currentUser.id?employee.id===currentUser.id:employee.phone===currentUser.phone);
   const handleTabChange=(tab:EmployeeTab)=>{setActiveTab(tab);setSidebarOpen(false);};
 
   // Facility management states
@@ -31,36 +33,22 @@ export default function EmployeeDashboard({ onLogout, currentUser }: { onLogout:
 
   useEffect(() => {
     let mounted = true;
-    employeeApiService.getEmployees().then(result => {
-      if(mounted) setEmployees(result.employees);
-    }).catch(console.error);
-    return () => { mounted = false; };
+    const refresh=()=>{void employeeApiService.getEmployees().then(result => {
+      if(mounted){setEmployees(result.employees);setProfileError('');}
+    }).catch(error=>{if(mounted)setProfileError(error instanceof Error?error.message:'Chưa tải được hồ sơ.');});};
+    refresh();const timer=setInterval(refresh,15000);window.addEventListener('focus',refresh);
+    return () => { mounted = false;clearInterval(timer);window.removeEventListener('focus',refresh); };
   }, []);
 
   // Employee Profile Handlers
-  const handleUpdateCurrentEmployeePassword = async (newPassword: string) => {
-    const currentEmp = employees[0];
-    if (!currentEmp) return;
-    try {
-      await employeeApiService.updateEmployee(currentEmp.id, {
-        ...currentEmp,
-        password: newPassword,
-      });
-    } catch (err) {
-      console.warn('Backend update password failed, keeping local state:', err);
-    }
+  const handleUpdateCurrentEmployeePassword = async (currentPassword:string,newPassword:string) => {
+    if(!currentEmployee)throw Error('Chưa tải được hồ sơ tài khoản hiện tại.');
+    await staffAuthService.changePassword(currentEmployee.id,currentPassword,newPassword);
   };
-
-  const handleUpdateCurrentEmployeePhone = async (newPhone: string) => {
-    const currentEmp = employees[0];
-    if (!currentEmp) return;
-    const updated = { ...currentEmp, phone: newPhone };
-    setEmployees((prev) => [updated, ...prev.slice(1)]);
-    try {
-      await employeeApiService.updateEmployee(currentEmp.id, updated);
-    } catch (err) {
-      console.warn('Backend update phone failed, keeping local state:', err);
-    }
+  const handleUpdateCurrentEmployeePhone = async (newPhone:string) => {
+    if(!currentEmployee)throw Error('Chưa tải được hồ sơ tài khoản hiện tại.');
+    const saved=await employeeApiService.updateEmployee(currentEmployee.id,{phone:newPhone});
+    setEmployees(previous=>previous.map(employee=>employee.id===saved.id?saved:employee));
   };
 
   const {equipments, incidents, courtStatuses, facilityError, refreshFacility, completeCheckout,
@@ -217,11 +205,12 @@ export default function EmployeeDashboard({ onLogout, currentUser }: { onLogout:
         {/* 🟢 3. HỒ SƠ CÁ NHÂN (CHỈ HIỂN THỊ THÔNG TIN RIÊNG CỦA NHÂN VIÊN ĐÓ) */}
         {activeTab === 'nhan_vien' && (
           <div className="flex-1 overflow-auto bg-slate-50 relative custom-scrollbar">
-            <EmployeeProfileView
-              employee={employees[0]}
+            {profileError&&<p role="alert" className="p-4 text-xs text-red-600">{profileError}</p>}
+            {currentEmployee?<EmployeeProfileView
+              employee={currentEmployee}
               onUpdatePhone={handleUpdateCurrentEmployeePhone}
               onChangePassword={handleUpdateCurrentEmployeePassword}
-            />
+            />:<p className="p-4 text-xs text-slate-500">Đang tải hồ sơ tài khoản...</p>}
           </div>
         )}
       </div>

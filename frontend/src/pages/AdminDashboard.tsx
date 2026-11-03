@@ -1,3 +1,5 @@
+import EmployeeProfileView from '../components/employee/EmployeeProfileView';
+import {staffAuthService} from '../services/staffAuthService';
 import type { IncidentReporter } from '../utils/incidentStorage';
 import useFacilityOperations from '../hooks/useFacilityOperations';
 import { useState, useEffect } from 'react';
@@ -22,30 +24,33 @@ import EditStaffView from '../components/admin/EditStaffView';
 import WalletRevenueView from '../components/admin/WalletRevenueView';
 import FacilityManagementView from '../components/admin/FacilityManagementView';
 import type { Employee, Transaction } from '../types/admin';
-import { INITIAL_EMPLOYEES, INITIAL_TRANSACTIONS } from '../types/admin';
+import { INITIAL_TRANSACTIONS } from '../types/admin';
 import { employeeApiService } from '../services/employeeService';
 
 export default function AdminDashboard({ onLogout, currentUser }: { onLogout: () => void; currentUser: IncidentReporter }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isSetupMode, setIsSetupMode] = useState(false);
   
-  const [activeTab, setActiveTab] = useState<'lich_san' | 'nhan_vien' | 'vi_thu' | 'co_so_vat_chat'>('lich_san');
-  const [employees, setEmployees] = useState<Employee[]>(INITIAL_EMPLOYEES);
+  const [activeTab, setActiveTab] = useState<'lich_san' | 'nhan_vien' | 'vi_thu' | 'co_so_vat_chat' | 'ho_so'>('lich_san');
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [staffError,setStaffError]=useState('');
+  const currentEmployee=employees.find(employee=>currentUser.id?employee.id===currentUser.id:employee.phone===currentUser.phone);
   const [transactions, setTransactions] = useState<Transaction[]>(INITIAL_TRANSACTIONS);
   const [staffSubView, setStaffSubView] = useState<'list' | 'add' | 'detail' | 'edit'>('list');
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
 
-  const handleTabChange = (tabId: 'lich_san' | 'nhan_vien' | 'vi_thu' | 'co_so_vat_chat') => {
+  const handleTabChange = (tabId: 'lich_san' | 'nhan_vien' | 'vi_thu' | 'co_so_vat_chat' | 'ho_so') => {
     setActiveTab(tabId);
     setSidebarOpen(false);
     if (tabId === 'nhan_vien') {
       setStaffSubView('list');
       employeeApiService.getEmployees().then((res) => {
-        if (res.employees && res.employees.length > 0) {
+        if (res.employees) {
           setEmployees(res.employees);
+          setStaffError('');
           setIsBackendOnline(true);
         }
-      }).catch((err) => console.warn('Could not refresh staff list:', err));
+      }).catch(error=>setStaffError(error instanceof Error?error.message:'Chưa tải được nhân viên.'));
     }
   };
 
@@ -54,17 +59,21 @@ export default function AdminDashboard({ onLogout, currentUser }: { onLogout: ()
 
   useEffect(() => {
     let mounted = true;
-    employeeApiService.getEmployees().then(result => {
-      if(mounted) setEmployees(result.employees);
-    }).catch(console.error);
-    return () => { mounted = false; };
+    const refresh=()=>{void employeeApiService.getEmployees().then(result => {
+      if(mounted){setEmployees(result.employees);setStaffError('');setIsBackendOnline(true);}
+    }).catch(error=>{if(mounted)setStaffError(error instanceof Error?error.message:'Chưa tải được nhân viên.');});};
+    refresh();const timer=setInterval(refresh,15000);window.addEventListener('focus',refresh);
+    return () => { mounted = false;clearInterval(timer);window.removeEventListener('focus',refresh); };
   }, []);
 
   // Staff handlers connected to backend
   const handleAddNewStaff = () => setStaffSubView('add');
-  const handleSelectEmployee = (emp: Employee) => {
-    setSelectedEmployee(emp);
-    setStaffSubView('detail');
+  const handleSelectEmployee = async (emp: Employee) => {
+    try {
+      const saved=await employeeApiService.getEmployeeById(emp.id);
+      if(!saved)throw Error('Tài khoản không còn tồn tại.');
+      setSelectedEmployee(saved);setStaffError('');setStaffSubView('detail');
+    }catch(error){setStaffError(error instanceof Error?error.message:'Chưa tải được chi tiết tài khoản.');}
   };
   const handleEditEmployee = (emp: Employee) => {
     setSelectedEmployee(emp);
@@ -215,6 +224,7 @@ export default function AdminDashboard({ onLogout, currentUser }: { onLogout: ()
               >
                 <Users className="w-4 h-4" /> Nhân viên
               </div>
+              <button type="button" onClick={()=>handleTabChange('ho_so')} className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-sm font-bold transition ${activeTab==='ho_so'?'bg-emerald-700 text-white shadow-sm':'text-slate-600 hover:bg-slate-50'}`}><UserIcon className="h-4 w-4"/>Hồ sơ cá nhân</button>
               <div
                 onClick={() => handleTabChange('vi_thu')}
                 className={`flex items-center gap-3 px-3 py-3 rounded-xl font-bold text-sm cursor-pointer ${activeTab === 'vi_thu' ? 'bg-emerald-700 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50'}`}
@@ -234,8 +244,8 @@ export default function AdminDashboard({ onLogout, currentUser }: { onLogout: ()
                   <UserIcon className="w-4 h-4 text-emerald-700" />
                 </div>
                 <div className="text-xs">
-                  <div className="font-bold text-slate-700">Ban Quản Trị</div>
-                  <div className="text-slate-500 scale-90 origin-left">admin@courtx.vn</div>
+                  <div className="font-bold text-slate-700">{currentUser.name}</div>
+                  <div className="text-slate-500 scale-90 origin-left">{currentEmployee?.email || currentUser.phone}</div>
                 </div>
               </div>
             </div>
@@ -244,6 +254,8 @@ export default function AdminDashboard({ onLogout, currentUser }: { onLogout: ()
       )}
 
       <div className="flex-1 flex flex-col w-full h-full overflow-hidden">
+        {staffError&&<p role="alert" className="m-3 rounded-xl bg-red-50 p-3 text-xs text-red-600">{staffError}</p>}
+
         {facilityError && <div role="alert" className="m-3 rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-700">{facilityError}<button type="button" onClick={()=>void refreshFacility()} className="ml-2 font-bold underline">Thử lại</button></div>}
         <header className="h-12 bg-white border-b border-slate-200 flex items-center justify-between px-2 shrink-0 z-30 shadow-sm relative">
           <div className="flex items-center gap-2">
@@ -263,6 +275,10 @@ export default function AdminDashboard({ onLogout, currentUser }: { onLogout: ()
             </button>
           </div>
         </header>
+        {activeTab==='ho_so'&&<div className="flex-1 overflow-auto">{currentEmployee?<EmployeeProfileView employee={currentEmployee}
+          onChangePassword={async(currentPassword,newPassword)=>{await staffAuthService.changePassword(currentEmployee.id,currentPassword,newPassword);}}
+          onUpdatePhone={async phone=>{const saved=await employeeApiService.updateEmployee(currentEmployee.id,{phone});setEmployees(previous=>previous.map(employee=>employee.id===saved.id?saved:employee));}}
+        />:<p className="p-4 text-xs text-slate-500">Đang tải hồ sơ tài khoản...</p>}</div>}
 
         {activeTab === 'lich_san' && (
           <>

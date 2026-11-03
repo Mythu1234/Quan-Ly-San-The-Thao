@@ -8,6 +8,7 @@ export interface Employee {
   avatarImage?: string;
   status: 'active' | 'inactive'; // Đang hoạt động / Ngừng hoạt động
   role: string;
+  authRole?: 'ADMIN' | 'STAFF';
   joinDate: string;
   currentShift?: {
     type: 'morning' | 'afternoon' | 'evening';
