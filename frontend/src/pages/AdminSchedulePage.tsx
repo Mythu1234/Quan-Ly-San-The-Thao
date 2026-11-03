@@ -148,6 +148,7 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
   const [checkinError,setCheckinError]=useState('');
   useEffect(() => {
     setCheckinBooking(previous => previous ? allBookings.find(booking => booking.code === previous.code) || previous : null);
+    setCheckoutBooking(previous => previous ? allBookings.find(booking => booking.code === previous.code) || previous : null);
     setSelectedBooking(previous => previous ? allBookings.find(booking => booking.code === previous.code) || previous : null);
   }, [allBookings]);
   const adminBookings = allBookings.filter(booking => booking.bookingDate === calendarBookingDate(selectedDate));

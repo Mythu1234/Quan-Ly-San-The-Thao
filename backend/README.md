@@ -44,6 +44,7 @@ Chạy `npm.cmd run check:db` trong `backend/` để kiểm tra kết nối và 
 - `POST /api/bookings`: tạo đơn đã đối soát VietQR và bản ghi thanh toán trong cùng giao dịch; trả mã thật và chi tiết đã lưu.
 - `POST /api/bookings/lookup` với body `{ "query": "mã đặt sân hoặc số điện thoại" }`: tra cứu chính xác dữ liệu trên Supabase, không trả kết quả mẫu khi không tìm thấy hoặc API lỗi.
 - `POST /api/bookings/:code/check-in`: kiểm tra thanh toán, khóa sân và trạng thái trước khi nhận sân.
+- Dữ liệu cũ có trạng thái `DA_THANH_TOAN` / `DANG_SU_DUNG` nhưng thiếu hoàn toàn dòng tiền sân được hiểu là đã trả 100% theo trạng thái trong database. Trước check-in/check-out, BE đồng bộ dòng tiền bị thiếu từ chính đơn đó, ghi rõ nguồn trong ghi chú; không phát sinh thu mới hoặc tạo mã ngân hàng giả. Giao dịch thất bại/thanh toán một phần không được tự nâng thành đủ tiền. Check-out lấy số tiền từ database và chỉ thu bồi thường.
 - `GET/POST/PUT /api/equipments`: quản lý từng thiết bị theo mã và Seri.
 - `PATCH /api/equipments/:code/relocate`: điều phối; thiết bị hỏng không được chuyển thành sẵn sàng.
 - `POST /api/equipments/:code/complete-maintenance`: nghiệm thu và lưu nhật ký trong cùng giao dịch.

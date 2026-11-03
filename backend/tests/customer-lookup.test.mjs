@@ -7,10 +7,13 @@ const fixture={ma_dat_san:'DS00000001',ngay_dat:'2026-11-04',gio_bat_dau:'12:00:
   khach_hang:{ho_ten:'Khách kiểm thử',so_dien_thoai:'0901234567'},san:{ten_san:'Sân CL-01',bo_mon:{ten_bo_mon:'Cầu lông'}},
   thanh_toan:[{so_tien:120000,trang_thai:'THANH_CONG',loai_giao_dich:'THANH_TOAN_DAT_SAN'},{so_tien:150000,trang_thai:'THANH_CONG',loai_giao_dich:'THANH_TOAN_BOI_THUONG'}],hoan_tien:[]};
 let filter,queryCount=0,failure=false;
+const rentalExports={};
+vm.runInNewContext(ts.transpileModule(readFileSync(new URL('../src/services/rentalPayment.ts',import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,{exports:rentalExports,require:name=>name==='../lib/supabaseClient.js'?{supabase:{}}:{databaseError:error=>{throw Error(error.message);}}});
 const source=readFileSync(new URL('../src/services/customerLookupService.ts',import.meta.url),'utf8');
 const code=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
 const exports={};
 vm.runInNewContext(code,{exports,Date,Error,console,require:name=>{
+  if(name==='./rentalPayment.js')return rentalExports;
   if(name==='../repositories/facilityRepository.js')return {databaseError:error=>{throw Error(error.message);}};
   if(name==='../lib/supabaseClient.js')return {supabase:{from:table=>{
     assert.equal(table,'dat_san');queryCount++;

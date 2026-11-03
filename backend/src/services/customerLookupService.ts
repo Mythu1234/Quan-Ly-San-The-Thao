@@ -1,5 +1,6 @@
 import {supabase} from '../lib/supabaseClient.js';
 import {databaseError} from '../repositories/facilityRepository.js';
+import {rentalPayment} from './rentalPayment.js';
 
 export function normalizeLookupInput(input:unknown):{kind:'phone'|'code';value:string} {
   if(typeof input!=='string'||input.length>64)throw Object.assign(Error('Nhập mã đặt sân hoặc số điện thoại hợp lệ.'),{status:400});
@@ -13,14 +14,13 @@ export function normalizeLookupInput(input:unknown):{kind:'phone'|'code';value:s
 const money=(amount:number)=>`${amount.toLocaleString('vi-VN')}đ`;
 export function mapCustomerBooking(row:any,instant=new Date()) {
   const total=Number(row.tong_tien_san);
-  const paid=(row.thanh_toan||[]).filter((item:any)=>item.loai_giao_dich==='THANH_TOAN_DAT_SAN'&&item.trang_thai==='THANH_CONG')
-    .reduce((sum:number,item:any)=>sum+Number(item.so_tien),0);
+  const {paid,remaining}=rentalPayment(row);
   const refunded=(row.hoan_tien||[]).filter((item:any)=>item.trang_thai==='THANH_CONG').reduce((sum:number,item:any)=>sum+Number(item.so_tien_hoan),0);
   const statuses:Record<string,string>={CHO_THANH_TOAN:'CHỜ THANH TOÁN',DA_THANH_TOAN:'ĐÃ XÁC NHẬN',DANG_SU_DUNG:'ĐANG SỬ DỤNG',HOAN_TAT:'ĐÃ KẾT THÚC',DA_HUY:'ĐÃ HỦY'};
   const sport=row.san.bo_mon.ten_bo_mon;
   return {code:row.ma_dat_san,name:row.khach_hang.ho_ten,phone:row.khach_hang.so_dien_thoai,sport,court:row.san.ten_san,
     bookingDate:row.ngay_dat,date:row.ngay_dat.split('-').reverse().join('/'),time:`${row.gio_bat_dau.slice(0,5)} - ${row.gio_ket_thuc.slice(0,5)}`,
-    total:money(total),paidAmount:money(paid),remaining:money(Math.max(0,total-paid)),
+    total:money(total),paidAmount:money(paid),remaining:money(remaining),
     status:statuses[row.trang_thai]||row.trang_thai,paymentStatus:paid>=total?'Đã thanh toán đủ qua VietQR':paid>0?'Chưa thanh toán đủ tiền sân':'Chưa thanh toán tiền sân',
     refundAmount:money(refunded),refundStatus:refunded>0?'Đã hoàn tiền':'Chưa có giao dịch hoàn tiền thành công',
     cancellationReason:row.ly_do_huy||undefined,cancelledAt:row.thoi_gian_huy||undefined,
