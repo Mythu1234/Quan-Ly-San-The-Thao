@@ -50,6 +50,10 @@ export default function CheckoutSettlementView({booking,date,equipments,incident
   const duration=timeParts?.length===2?toMinutes(timeParts[1])-toMinutes(timeParts[0]):0;
 
   const dateLabel=`${String(settlementDate.getDate()).padStart(2,'0')}/${String(settlementDate.getMonth()+1).padStart(2,'0')}/${settlementDate.getFullYear()}`;
+  const checkInDate=booking.checkInAt?new Date(booking.checkInAt):null;
+  const checkInLabel=checkInDate&&!Number.isNaN(checkInDate.getTime())
+    ?new Intl.DateTimeFormat('vi-VN',{timeZone:'Asia/Ho_Chi_Minh',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23',day:'2-digit',month:'2-digit',year:'numeric'}).format(checkInDate)
+    :'Chưa ghi nhận';
   useEffect(()=>{setPaymentConfirmed(false);},[amountDue]);
   const candidates=incidents.filter(report=>!report.deletedAt && checkoutCourtCode(report.courtName)===checkoutCourtCode(booking.court) && (!report.bookingCode || report.bookingCode===booking.code)
     && (!report.bookingDate || report.bookingDate===bookingDate) && report.compensationPaymentStatus!=='paid' && report.compensationPaymentStatus!=='not_required'
@@ -102,6 +106,10 @@ export default function CheckoutSettlementView({booking,date,equipments,incident
       <div className="grid grid-cols-2 gap-2 border-t border-slate-100 pt-2">
         <div><p className="mb-1 flex items-center gap-1 text-[10px] text-slate-600"><CalendarDays className="h-3 w-3"/>Ngày chơi</p><p className="text-xs font-semibold text-slate-900">{dateLabel}</p></div>
         <div><p className="mb-1 flex items-center gap-1 text-[10px] text-slate-600"><Clock3 className="h-3 w-3"/>Khung giờ</p><p className="text-xs font-semibold text-slate-900">{booking.time}</p>{duration>0&&<p className="mt-0.5 text-[10px] text-slate-500">{duration} phút</p>}</div>
+        <div className="col-span-2 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-2">
+          <p className="flex items-center gap-1 text-[10px] text-slate-600"><Clock3 className="h-3 w-3"/>Check-in thực tế</p>
+          <p className="text-xs font-semibold text-emerald-800">{checkInLabel}</p>
+        </div>
       </div>
     </section>
     {error&&<p role="alert" className="rounded-lg bg-red-50 p-2 text-xs text-red-700">{error}</p>}

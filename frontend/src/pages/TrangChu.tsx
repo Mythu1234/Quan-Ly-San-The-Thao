@@ -12,7 +12,7 @@ import { addBookingRequest } from '../types/bookingRequest';
 import type { IncidentReporter } from '../utils/incidentStorage';
 import { isCourtLocked } from '../hooks/useCourtAvailability';
 import { useState, useRef, useEffect, useMemo } from 'react';
-import { Search, MapPin, Phone, Clock, Play, Home, Calendar as CalendarIcon, X, Zap, User, Lock, Eye, EyeOff, Bell, ArrowLeft, ArrowRight, ChevronLeft, ChevronRight, ChevronDown, Trophy, CheckCircle2, RefreshCw, MessageSquare, Copy, Check, AlertTriangle } from 'lucide-react';
+import { Search, MapPin, Phone, Clock, Play, Home, Calendar as CalendarIcon, X, Zap, User, Lock, Eye, EyeOff, ArrowLeft, ArrowRight, ChevronLeft, ChevronRight, ChevronDown, Trophy, CheckCircle2, RefreshCw, MessageSquare, Copy, Check, AlertTriangle } from 'lucide-react';
 
 const parseTimeToMinutes = (t: string): number => {
   if (!t) return 0;
@@ -2312,7 +2312,6 @@ export default function TrangChu() {
               </div>
             </div>
             <div className="flex items-center gap-3">
-              <Bell className="w-5 h-5 text-slate-500" />
               <button
                 onClick={() => setShowLogin(false)}
                 className="rounded-full bg-emerald-700 px-3.5 py-2 text-[10px] font-black uppercase text-white shadow-sm flex items-center gap-1 hover:bg-emerald-800 active:scale-95 transition"

@@ -2,6 +2,8 @@ export type BookingDetail = {
   bookingDate?: string;
   code: string;
   paymentCode?: string;
+  checkInAt?: string | null;
+  checkOutAt?: string | null;
   customerName: string;
   phone: string;
   court: string;

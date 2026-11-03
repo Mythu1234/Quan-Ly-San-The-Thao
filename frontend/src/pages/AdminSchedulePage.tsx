@@ -22,6 +22,13 @@ const getVietnamTime = (instant = new Date()) => {
 const isSameDay = (a: Date, b: Date) =>
   a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 
+const formatWaitingTime = (totalMinutes: number) => {
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  if (hours === 0) return `${minutes} phút`;
+  return minutes === 0 ? `${hours} giờ` : `${hours} giờ ${minutes} phút`;
+};
+
 import useSharedBookings, { refreshSharedBookings } from '../hooks/useSharedBookings';
 import { bookingApiService } from '../services/bookingService';
 import { calendarBookingDate } from '../utils/courtBookingWarnings';
@@ -705,7 +712,7 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
       const openTime = `${Math.floor((startMin - 30) / 60).toString().padStart(2, '0')}:${((startMin - 30) % 60).toString().padStart(2, '0')}`;
       return {
         canCheckin: false,
-        message: `Chưa đến giờ check-in! Hệ thống chỉ mở check-in sớm tối đa 30 phút trước giờ bắt đầu (từ ${openTime}). Còn ${waitMin} phút nữa.`
+        message: `Chưa đến giờ check-in! Hệ thống chỉ mở check-in sớm tối đa 30 phút trước giờ bắt đầu (từ ${openTime}). Còn ${formatWaitingTime(waitMin)} nữa.`
       };
     }
 
@@ -855,7 +862,7 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
             <Clock3 className="h-4 w-4" />
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-[12px] font-black text-slate-800">{minutesToStart>0?<>Bắt đầu sau <span className="text-red-600">{minutesToStart} phút</span></>:'Đã đến giờ sử dụng sân'}</p>
+            <p className="text-[12px] font-black text-slate-800">{minutesToStart>0?<>Bắt đầu sau <span className="text-red-600">{formatWaitingTime(minutesToStart)}</span></>:'Đã đến giờ sử dụng sân'}</p>
             <p className="text-[10px] font-medium text-slate-400">Giờ bắt đầu: {checkinBooking.time.slice(0,5)}</p>
           </div>
           <ChevronRight className="h-3.5 w-3.5 shrink-0 text-slate-300" />
@@ -2346,12 +2353,6 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
                 )}
               </div>
 
-              {(selectedBooking.status === 'Đã đặt' || selectedBooking.status === 'Đang sử dụng') && (
-                <div className="flex items-start gap-1.5 px-0.5 text-[10px] leading-relaxed text-slate-600">
-                  <Phone className="mt-0.5 h-3 w-3 shrink-0" />
-                  <p>Lưu ý: Thao tác hủy thủ công sẽ gửi tin nhắn SMS xác nhận tự động hoàn tiền/cấn trừ cho khách.</p>
-                </div>
-              )}
             </div>
           </section>
         </div>

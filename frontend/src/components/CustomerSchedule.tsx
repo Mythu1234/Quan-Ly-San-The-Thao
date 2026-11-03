@@ -200,7 +200,7 @@ export default function CustomerSchedule({
       if (!isSelectedToday || slotMins00 > currentMins) {
         result.push(`${h.toString().padStart(2, '0')}:00`);
       }
-      if (intervalMode === 30 && h < endHour) {
+      if (intervalMode === 30) {
         const slotMins30 = h * 60 + 30;
         if (!isSelectedToday || slotMins30 > currentMins) {
           result.push(`${h.toString().padStart(2, '0')}:30`);
@@ -818,7 +818,7 @@ export default function CustomerSchedule({
                       );
                     }
                   })}
-                  {scheduleBookings.filter(booking => booking.courtCode === court.code).map(booking => {
+                  {times.length > 0 && scheduleBookings.filter(booking => booking.courtCode === court.code).map(booking => {
                     const gridStart = parseTimeToMinutes(times[0]);
                     const gridEnd = gridStart + times.length * intervalMode;
                     const start = Math.max(gridStart, booking.startH * 60 + booking.startM);
@@ -840,6 +840,12 @@ export default function CustomerSchedule({
           </div>
         </div>
       </div>
+
+      {times.length === 0 && (
+        <p role="status" className="border-t border-slate-200 bg-white px-4 py-5 text-center text-sm text-slate-500">
+          Không còn khung giờ đặt sân trong ngày. Vui lòng chọn ngày khác.
+        </p>
+      )}
 
       {/* 3. MODAL CONFIRMATION (WHEN NOT IN INLINE MODE) */}
       {!isInlineBookingMode && selectedSlotModal && (
