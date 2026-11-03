@@ -106,6 +106,20 @@ Các thông tin này là cơ sở cốt lõi để lập trình logic xử lý, 
 4. **Vé đặt sân:**
    * Không sử dụng bảng Vé điện tử riêng. Mã đặt sân (`ma_dat_san`) kiêm luôn vai trò của Mã vé điện tử để khách quét QR đối soát và làm thủ tục Check-in/Check-out.
 
+5. **Quy trình Thanh toán VietQR & Xuất biên nhận (Đồng bộ Khách hàng & Nhân viên/Chủ sân):**
+   * **Giao diện thanh toán VietQR tinh gọn:**
+     - Khi xác nhận đặt sân, hệ thống hiển thị mã QR VietQR với số tiền tương ứng và nội dung chuyển khoản chuẩn hóa (`CX <MÃ SÂN> <SỐ ĐIỆN THOẠI>`).
+     - Giao diện hiển thị trạng thái duy nhất: `"Đang chờ ghi nhận thanh toán qua VietQR…"` kèm biểu tượng radar nhấp nháy.
+     - Tuyệt đối **không hiển thị thanh tiến trình (progress bar) và không hiển thị số giây đếm ngược** trên giao diện nhằm giữ trải nghiệm tinh gọn, chuyên nghiệp.
+     - Cung cấp nút `"Hủy giao dịch"` cho phép hủy thao tác nếu có thay đổi.
+   * **Cơ chế ghi nhận tự động sau 5 giây:**
+     - Hệ thống chạy ngầm bộ đếm 5 giây (`5s`) mô phỏng phản hồi ghi nhận tiền vào tài khoản từ hệ thống ngân hàng.
+     - Sau 5 giây, hệ thống tự động lưu trữ dữ liệu vào CSDL Supabase: đơn đặt sân (`dat_san`), giao dịch thanh toán (`thanh_toan`), và biên nhận điện tử (`bien_nhan`) với mã định dạng tuần tự chuẩn (`DS...`, `TT...`, `BN...`).
+     - Tự động chuyển thẳng sang màn hình **"ĐẶT SÂN THÀNH CÔNG!"**.
+   * **Màn hình Đặt sân thành công & Biên nhận:**
+     - Màn hình "ĐẶT SÂN THÀNH CÔNG!" hiển thị mã đơn đặt sân, thông tin chi tiết môn, sân, thời gian, số tiền đã thanh toán 100% qua VietQR.
+     - Đồng bộ ở cả 2 luồng: cung cấp nút **"📋 BIÊN NHẬN"** mở modal biên nhận chi tiết (hỗ trợ in biên nhận kiểm tra vé tại quầy) và nút **"HOÀN TẤT"**.
+
 ---
 
 ## 6. CHÍNH SÁCH HỦY ĐẶT SÂN & HOÀN TIỀN (CANCELLATION & REFUND)

@@ -1,6 +1,7 @@
 export type BookingDetail = {
   bookingDate?: string;
   code: string;
+  paymentCode?: string;
   customerName: string;
   phone: string;
   court: string;
