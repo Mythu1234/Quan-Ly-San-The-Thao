@@ -1,4 +1,5 @@
 import AdminDashboard from './AdminDashboard';
+import { bookingApiService } from '../services/bookingService';
 import CustomerSchedule, { STANDARD_15_BOOKINGS } from '../components/CustomerSchedule';
 import QrCodeArtwork from '../components/QrCodeArtwork';
 import EmployeeDashboard from './employee/EmployeeDashboard';
@@ -903,14 +904,51 @@ export default function TrangChu() {
     if (!confirmed) return;
     setShowPayment(false);
     setIsSubmitted(true);
+
+    // Đồng bộ đơn đặt mới lên Cơ sở dữ liệu Supabase Online
+    try {
+      const dYear = scheduleDateObj.getFullYear();
+      const dMonth = (scheduleDateObj.getMonth() + 1).toString().padStart(2, '0');
+      const dDay = scheduleDateObj.getDate().toString().padStart(2, '0');
+      const formattedDate = `${dYear}-${dMonth}-${dDay}`;
+
+      const sMins = parseTimeToMinutes(selectedStartTime);
+      const eMins = sMins + selectedDuration;
+      const eH = Math.floor(eMins / 60).toString().padStart(2, '0');
+      const eM = (eMins % 60).toString().padStart(2, '0');
+
+      bookingApiService.createBooking({
+        courtCode: selectedCourt,
+        bookingDate: formattedDate,
+        startTime: selectedStartTime,
+        endTime: `${eH}:${eM}`,
+        customerName: customerName.trim(),
+        customerPhone: customerPhone.trim(),
+        totalAmount: totalPrice,
+      }).catch((err) => console.warn('Supabase createBooking warning:', err));
+    } catch (err) {
+      console.warn('Lỗi ghi đơn lên Supabase:', err);
+    }
   };
 
-  const handleLookupSearch = (e: React.FormEvent) => {
+  const handleLookupSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!lookupQuery.trim()) {
       setHasSearched(true);
       setLookupResults([]);
       return;
+    }
+
+    // 1. Tra cứu trực tiếp từ Cơ sở dữ liệu Supabase Online
+    try {
+      const onlineResults = await bookingApiService.searchBookings(lookupQuery);
+      if (onlineResults && onlineResults.length > 0) {
+        setLookupResults(onlineResults);
+        setHasSearched(true);
+        return;
+      }
+    } catch (err) {
+      console.warn('Lỗi kết nối Supabase tra cứu, sử dụng dữ liệu dự phòng:', err);
     }
 
     const demoBookings = [
@@ -974,6 +1012,16 @@ export default function TrangChu() {
 
   const completeCancellation = (ticket: any, refundEligible: boolean) => {
     setCancelConfirmation(null);
+
+    // Đồng bộ trạng thái hủy lên Supabase Online
+    bookingApiService.cancelBooking({
+      code: ticket.code,
+      isEligible: refundEligible,
+      reason: refundEligible ? 'Khách tự hủy trước ít nhất 24 giờ (Đã hoàn tiền tự động)' : 'Khách xác nhận hủy dưới 24 giờ',
+      customerPhone: ticket.phone,
+      customerName: ticket.name,
+      refundAmount: ticket.rawTotal || 180000,
+    }).catch((err) => console.warn('Supabase cancel update warning:', err));
 
     // Nếu đủ điều kiện: bên thứ 3 xử lý hoàn tiền tự động trong 2 giây
     if (refundEligible) {
