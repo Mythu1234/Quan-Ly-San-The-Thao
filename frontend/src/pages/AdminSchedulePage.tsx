@@ -24,6 +24,7 @@ const isSameDay = (a: Date, b: Date) =>
 
 import useSharedBookings, { refreshSharedBookings } from '../hooks/useSharedBookings';
 import { bookingApiService } from '../services/bookingService';
+import { paymentBookingService } from '../services/paymentBookingService';
 import { calendarBookingDate } from '../utils/courtBookingWarnings';
 import type { BookingDetail } from '../types/schedule';
 export type { BookingDetail } from '../types/schedule';
@@ -166,6 +167,7 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
   const [bookingSendZalo, setBookingSendZalo] = useState<boolean>(true);
   const [bookingErrors, setBookingErrors] = useState<{ name?: string; phone?: string }>({});
   const [showPaymentModal, setShowPaymentModal] = useState<boolean>(false);
+  const [paymentCountdown, setPaymentCountdown] = useState<number>(5);
   const [pendingBookingData, setPendingBookingData] = useState<BookingDetail | null>(null);
   const [paymentSuccessBooking, setPaymentSuccessBooking] = useState<BookingDetail | null>(null);
   const [showReceipt, setShowReceipt] = useState<boolean>(false);
@@ -566,7 +568,7 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
       return;
     }
 
-    // Đồng bộ đơn đặt mới lên Supabase Online
+    // Đồng bộ đơn đặt mới lên Supabase Online qua paymentBookingService (chung mã số tuần tự)
     try {
       const startMins = (pendingBookingData.startH ?? 0) * 60 + (pendingBookingData.startM ?? 0);
       const endMins = (pendingBookingData.endH ?? 0) * 60 + (pendingBookingData.endM ?? 0);
@@ -575,17 +577,29 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
       const eH = Math.floor(endMins / 60).toString().padStart(2, '0');
       const eM = (endMins % 60).toString().padStart(2, '0');
 
-      bookingApiService.createBooking({
-        courtCode: pendingBookingData.courtCode || pendingBookingData.court,
+      paymentBookingService.recordSuccessfulBookingPayment({
+        courtName: pendingBookingData.court,
         bookingDate: pendingBookingData.bookingDate || calendarBookingDate(selectedDate),
-        startTime: `${sH}:${sM}`,
-        endTime: `${eH}:${eM}`,
+        timeSlot: `${sH}:${sM} - ${eH}:${eM}`,
         customerName: pendingBookingData.customerName,
         customerPhone: pendingBookingData.phone,
-        totalAmount: parseInt(pendingBookingData.total.replace(/\D/g, '') || '120000', 10),
+        totalPrice: parseInt(pendingBookingData.total.replace(/\D/g, '') || '120000', 10),
         channel: 'TAI_QUAY',
         staffId: (currentUser as any)?.id?.startsWith('NV') ? (currentUser as any).id : 'NV00000002',
-      }).catch((err) => console.warn('Supabase createBooking warning:', err));
+      }).then((res: { success: boolean; bookingCode?: string; paymentCode?: string }) => {
+        if (res.success && res.bookingCode) {
+          const updated: BookingDetail = {
+            ...pendingBookingData,
+            code: res.bookingCode,
+            paymentCode: res.paymentCode,
+          };
+          setPendingBookingData(updated);
+          setPaymentSuccessBooking(updated);
+          setAdminBookings((prev) =>
+            prev.map((b) => (b.code === pendingBookingData.code ? updated : b))
+          );
+        }
+      }).catch((err: unknown) => console.warn('Supabase recordPayment warning:', err));
     } catch (err) {
       console.warn('Lỗi lưu đơn đặt Admin lên Supabase:', err);
     }
@@ -598,7 +612,23 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
 
   const handleCancelPayment = () => {
     setShowPaymentModal(false);
+    setPaymentCountdown(5);
   };
+
+  // Countdown 5 giay tu dong xac nhan khi mo modal thanh toan
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!showPaymentModal) {
+      setPaymentCountdown(5);
+      return;
+    }
+    if (paymentCountdown <= 0) {
+      handleConfirmPaymentSuccess();
+      return;
+    }
+    const t = setTimeout(() => setPaymentCountdown((c) => c - 1), 1000);
+    return () => clearTimeout(t);
+  }, [showPaymentModal, paymentCountdown]);
 
   const handleFinishBooking = () => {
     setPaymentSuccessBooking(null);
@@ -2657,14 +2687,17 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
               </div>
             </div>
 
-            <div className="mt-6 flex flex-col items-center gap-2">
+            <div className="mt-6 flex flex-col items-center gap-3 w-full">
               <div className="relative flex h-10 w-10 items-center justify-center">
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
                 <span className="relative inline-flex h-6 w-6 rounded-full bg-emerald-500 items-center justify-center">
                   <span className="h-2 w-2 bg-white rounded-full"></span>
                 </span>
               </div>
-              <button type="button" onClick={handleConfirmPaymentSuccess} className="rounded-xl bg-emerald-700 px-4 py-3 text-sm font-bold text-white">Xác nhận đã nhận thanh toán VietQR</button>
+              <p className="text-sm font-semibold text-emerald-700 text-center">
+                Đang chờ ghi nhận thanh toán qua VietQR…
+              </p>
+
             </div>
 
             <div className="w-full mt-6">
@@ -2692,6 +2725,9 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
               <h3 className="text-xl font-black text-slate-900">ĐẶT SÂN THÀNH CÔNG!</h3>
               <p className="mt-1 text-xs text-slate-600">
                 Mã đơn của khách là <span className="font-mono font-bold text-emerald-700">#{paymentSuccessBooking.code}</span>
+              </p>
+              <p className="text-[11px] text-slate-500 mt-0.5">
+                Mã thanh toán: <span className="font-mono font-bold text-blue-700">{paymentSuccessBooking.paymentCode || paymentSuccessBooking.code.replace('DS', 'TT')}</span>
               </p>
             </div>
 
@@ -2778,6 +2814,10 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
               <div className="flex justify-between items-center">
                 <span className="text-slate-500">Mã biên nhận (Vé):</span>
                 <span className="font-mono font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">#{paymentSuccessBooking.code}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-slate-500">Mã thanh toán:</span>
+                <span className="font-mono font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">{paymentSuccessBooking.paymentCode || paymentSuccessBooking.code.replace('DS', 'TT')}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-500">Khách hàng:</span>

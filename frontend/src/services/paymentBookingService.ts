@@ -18,39 +18,66 @@ export interface BookingPaymentPayload {
  * Lấy số thứ tự tiếp theo chuẩn hóa từ Supabase:
  * DS00000031, TT00000036, KH00000016
  */
-async function generateNextCode(
-  prefix: string,
-  table: string,
-  pkColumn: string
-): Promise<string> {
-  try {
-    const { data, error } = await supabase.from(table).select(pkColumn);
+/**
+ * Lấy số thứ tự tuần tự chung cao nhất từ các bảng dat_san, thanh_toan, bien_nhan
+ * để đảm bảo mã đặt sân (DS...), mã thanh toán (TT...), và mã biên nhận (BN...)
+ * CÓ CÙNG MỘT SỐ THỨ TỰ ĐỒNG BỘ 100%!
+ * Ví dụ: DS00000040, TT00000040, BN00000040
+ */
+async function getNextSharedBookingSequence(): Promise<number> {
+  let maxSeq = 0;
+  const tables = [
+    { table: 'dat_san', col: 'ma_dat_san', prefix: 'DS' },
+    { table: 'thanh_toan', col: 'ma_thanh_toan', prefix: 'TT' },
+    { table: 'bien_nhan', col: 'ma_bien_nhan', prefix: 'BN' },
+  ];
 
-    if (error || !data || data.length === 0) {
-      return `${prefix}00000001`;
-    }
-
-    let maxNum = 0;
-    for (const row of data as any[]) {
-      const code = row[pkColumn] || '';
-      if (code.startsWith(prefix)) {
-        const numPart = code.slice(prefix.length);
-        const num = parseInt(numPart, 10);
-        // Bỏ qua các mã cũ ngẫu nhiên lớn hơn 1 triệu để lấy đúng chuỗi tăng dần
-        if (!isNaN(num) && num < 1000000 && num > maxNum) {
-          maxNum = num;
+  for (const item of tables) {
+    try {
+      const { data, error } = await supabase.from(item.table).select(item.col);
+      if (!error && data) {
+        for (const row of data as any[]) {
+          const code = (row[item.col] || '').trim();
+          if (code.startsWith(item.prefix)) {
+            const numPart = code.slice(item.prefix.length);
+            const num = parseInt(numPart, 10);
+            // Các mã tuần tự chuẩn hợp lệ nằm trong khoảng 1 -> 99999
+            if (!isNaN(num) && num < 100000 && num > maxSeq) {
+              maxSeq = num;
+            }
+          }
         }
       }
+    } catch {
+      // bỏ qua lỗi nếu bảng chưa có
     }
+  }
 
-    if (maxNum === 0) {
-      maxNum = data.length;
+  if (maxSeq === 0) {
+    maxSeq = 39; // fallback an toàn dựa trên dữ liệu hiện tại
+  }
+
+  return maxSeq + 1;
+}
+
+/**
+ * Lấy mã khách hàng tuần tự KH...
+ */
+async function generateNextCustomerCode(): Promise<string> {
+  try {
+    const { data, error } = await supabase.from('khach_hang').select('ma_khach_hang');
+    if (error || !data || data.length === 0) return 'KH00000001';
+    let maxNum = 0;
+    for (const row of data as any[]) {
+      const code = (row.ma_khach_hang || '').trim();
+      if (code.startsWith('KH')) {
+        const num = parseInt(code.slice(2), 10);
+        if (!isNaN(num) && num < 100000 && num > maxNum) maxNum = num;
+      }
     }
-
-    return `${prefix}${String(maxNum + 1).padStart(8, '0')}`;
+    return `KH${String(maxNum + 1).padStart(8, '0')}`;
   } catch {
-    const ts = Date.now().toString().slice(-8);
-    return `${prefix}${ts}`;
+    return `KH${Date.now().toString().slice(-8)}`;
   }
 }
 
@@ -112,11 +139,7 @@ export const paymentBookingService = {
         customerId = existingCustomer.ma_khach_hang;
         console.log('✅ Khách hàng đã tồn tại:', customerId);
       } else {
-        const newCustomerId = await generateNextCode(
-          'KH',
-          'khach_hang',
-          'ma_khach_hang'
-        );
+        const newCustomerId = await generateNextCustomerCode();
         const { error: custErr } = await supabase.from('khach_hang').insert({
           ma_khach_hang: newCustomerId,
           ho_ten: payload.customerName || 'Khách đặt sân',
@@ -155,11 +178,23 @@ export const paymentBookingService = {
       const dateFormatted = parseBookingDate(payload.bookingDate);
       const { start, end } = parseTimeSlot(payload.timeSlot);
 
-      // 4. Tạo mã đặt sân và thanh toán tuần tự chuẩn xác
-      const [bookingCode, paymentCode] = await Promise.all([
-        generateNextCode('DS', 'dat_san', 'ma_dat_san'),
-        generateNextCode('TT', 'thanh_toan', 'ma_thanh_toan'),
-      ]);
+      // 4. Tạo mã đặt sân, thanh toán và biên nhận ĐỒNG BỘ 100% CÙNG SỐ THỨ TỰ
+      let bookingCode = '';
+      let paymentCode = '';
+      let receiptCode = '';
+
+      try {
+        const nextSeq = await getNextSharedBookingSequence();
+        const seqStr = String(nextSeq).padStart(8, '0');
+        bookingCode = `DS${seqStr}`;
+        paymentCode = `TT${seqStr}`;
+        receiptCode = `BN${seqStr}`;
+      } catch {
+        const fallbackSeq = Date.now().toString().slice(-8);
+        bookingCode = `DS${fallbackSeq}`;
+        paymentCode = `TT${fallbackSeq}`;
+        receiptCode = `BN${fallbackSeq}`;
+      }
 
       const bankRef = `VQR${Date.now().toString().slice(-8)}`;
       console.log('🔑 Mã mới sinh:', { bookingCode, paymentCode, bankRef });
@@ -203,10 +238,8 @@ export const paymentBookingService = {
         return { success: false, error: ttError };
       }
 
-      // 7. Tạo biên nhận tự động sau khi thanh toán thành công
-      let receiptCode = '';
+      // 7. Tạo biên nhận tự động sau khi thanh toán thành công (dùng cùng số thứ tự receiptCode)
       try {
-        receiptCode = await generateNextCode('BN', 'bien_nhan', 'ma_bien_nhan');
         const { error: bnError } = await supabase.from('bien_nhan').insert({
           ma_bien_nhan: receiptCode,
           ma_dat_san: bookingCode,

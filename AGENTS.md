@@ -17,7 +17,7 @@ Before analyzing, designing, writing code, or answering questions in this reposi
    - Chủ sân (Admin) có chức năng Thêm / Sửa / Xóa sân linh hoạt theo nhu cầu cơ sở.
 3. **Phạm vi dự án (Project Scope Exclusion):**
    - KHÔNG áp dụng gói khách hàng VIP / hội viên theo tháng trong phạm vi dự án.
-   - Toàn bộ đặt sân tính theo đơn giá niêm yết tiêu chuẩn, thanh toán 100% qua VietQR lúc đặt sân.
+   - Toàn bộ đặt sân tính theo đơn giá niêm yết tiêu chuẩn, thanh toán 100% qua VietQR lúc đặt sân (đồng bộ giao diện tinh gọn hiển thị "Đang chờ ghi nhận thanh toán qua VietQR…", không hiện giây hoặc thanh chạy, tự động chuyển sau 5s sang màn hình thành công kèm nút Biên nhận).
    - TUYỆT ĐỐI KHÔNG TÍNH PHỤ PHÍ / PHỤ THU QUÁ GIỜ: Nếu khách muốn chơi thêm giờ thì bắt buộc phải đặt một lượt đặt sân mới độc lập.
    - LÚC CHECKOUT: CHỈ THU TIỀN ĐỀN BÙ KHI CÓ HƯ HỎNG trang thiết bị cơ sở vật chất (căn cứ Bảng giá bồi thường niêm yết). Nếu không có hư hỏng thì số tiền thu lúc Checkout = 0 VNĐ.
 4. **Asset & Incident Liability (Bồi thường & Bảo hành):**
