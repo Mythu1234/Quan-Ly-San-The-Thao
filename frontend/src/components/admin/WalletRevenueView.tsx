@@ -345,6 +345,10 @@ export default function WalletRevenueView({ transactions, onProcessRefund, isLoa
     setRefundTransaction(transaction);
   };
 
+  if (isLoading) {
+    return <div role="status" className="flex h-60 items-center justify-center text-sm text-slate-400">Đang tải dữ liệu thống kê…</div>;
+  }
+
   return (
     <main className="relative @container min-w-0 w-full flex-1 space-y-6 overflow-x-hidden bg-white p-4 pb-28 sm:p-6 lg:p-8">
       <header className="flex min-w-0 flex-col gap-4 @4xl:flex-row @4xl:items-end @4xl:justify-between">

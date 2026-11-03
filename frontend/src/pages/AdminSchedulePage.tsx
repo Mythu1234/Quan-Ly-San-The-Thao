@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import QrCodeArtwork from '../components/QrCodeArtwork';
 import CheckoutSettlementView from '../components/admin/CheckoutSettlementView';
+import AdminBookingDialog from '../components/admin/AdminBookingDialog';
 import type { FacilityEquipment, FacilityIncident } from '../types/admin';
 import type { IncidentReporter } from '../utils/incidentStorage';
 import type { CheckoutRequest, CheckoutResult } from '../utils/checkoutSettlement';
@@ -191,6 +192,8 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
   const [bookingErrors, setBookingErrors] = useState<{ name?: string; phone?: string }>({});
   const [showPaymentModal, setShowPaymentModal] = useState<boolean>(false);
   const [adminPaymentCountdown, setAdminPaymentCountdown] = useState<number>(5);
+  const [bookingSaving, setBookingSaving] = useState(false);
+  const [bookingSaveError, setBookingSaveError] = useState('');
   const [pendingBookingData, setPendingBookingData] = useState<BookingDetail | null>(null);
   const [paymentSuccessBooking, setPaymentSuccessBooking] = useState<BookingDetail | null>(null);
   const [showReceipt, setShowReceipt] = useState<boolean>(false);
@@ -595,17 +598,21 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
       status: 'Đã đặt',
     };
 
+    setBookingSaveError('');
     setPendingBookingData(pendingBooking);
     setShowPaymentModal(true);
   };
 
   const handleConfirmPaymentSuccess = async () => {
+    if (bookingSaving) return;
     if (!pendingBookingData) return;
     if (isCourtLocked(pendingBookingData.courtCode || pendingBookingData.court)) {
       window.alert('Sân đang bị khóa, không thể xác nhận đặt sân.');
       return;
     }
 
+    setBookingSaving(true);
+    setBookingSaveError('');
     // Đồng bộ đơn đặt mới lên Supabase Online
     try {
       const startMins = (pendingBookingData.startH ?? 0) * 60 + (pendingBookingData.startM ?? 0);
@@ -636,6 +643,8 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
       setBookingCourt(null);
     } catch (err) {
       console.warn('Chưa lưu được lượt đặt và thanh toán:', err);
+    } finally {
+      setBookingSaving(false);
     }
   };
 
@@ -649,13 +658,13 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
       setAdminPaymentCountdown(5);
       return;
     }
-    if (adminPaymentCountdown <= 0) {
+    if (adminPaymentCountdown <= 0 && !bookingSaveError) {
       handleConfirmPaymentSuccess();
       return;
     }
     const t = setTimeout(() => setAdminPaymentCountdown((c) => c - 1), 1000);
     return () => clearTimeout(t);
-  }, [showPaymentModal, adminPaymentCountdown]);
+  }, [showPaymentModal, adminPaymentCountdown, bookingSaveError]);
 
 
   const handleFinishBooking = () => {
@@ -2488,284 +2497,38 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
         </div>
       )}
 
-      {/* 4. MODAL ĐẶT SÂN TẠI QUẦY (ĐỒNG BỘ GIAO DIỆN CHUẨN KHÁCH HÀNG) */}
       {bookingCourt && (
-        <div className="fixed top-0 bottom-0 left-0 right-0 z-[150] flex items-end sm:items-center justify-center bg-slate-900/60 p-0 sm:p-4 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="w-full max-w-md rounded-t-3xl sm:rounded-3xl bg-slate-50 p-4 sm:p-5 shadow-2xl animate-in slide-in-from-bottom-6 duration-200 max-h-[92vh] overflow-y-auto space-y-4 border border-slate-100 flex flex-col">
-            
-            {/* Mobile Drag Indicator */}
-            <div className="w-12 h-1.5 bg-slate-300 rounded-full mb-1 mx-auto sm:hidden shrink-0" />
-
-            {/* Header */}
-            <div className="flex items-center justify-between pb-2 border-b border-slate-200 shrink-0">
-              <div className="flex items-center gap-2">
-                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700 font-black">
-                  <Calendar className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-black uppercase tracking-wider text-slate-900">CHI TIẾT ĐẶT SÂN</h3>
-                  <p className="text-[10px] text-slate-500 font-medium">Kiểm tra thông tin & tiến hành thanh toán</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setBookingCourt(null)}
-                className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-200/70 hover:bg-slate-200 text-slate-600 transition cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* Booking Form */}
-            <form onSubmit={handleAdminBookingSubmit} className="space-y-4">
-              
-              {/* Card 4: TÓM TẮT ĐƠN ĐẶT SÂN */}
-              <div className="rounded-2xl border border-slate-200 bg-white p-4 space-y-3 shadow-xs">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500 text-xs font-black text-white">4</span>
-                    <h3 className="text-sm font-black uppercase tracking-wider text-slate-900">TÓM TẮT ĐƠN ĐẶT SÂN</h3>
-                  </div>
-                  <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-[10px] font-extrabold uppercase text-emerald-700 border border-emerald-200 flex items-center gap-1">
-                    <CheckCircle2 className="w-3 h-3" /> ĐÃ CHỌN SÂN
-                  </span>
-                </div>
-
-                <div className="space-y-2.5 rounded-xl bg-slate-50 p-3.5 border border-slate-200 text-xs">
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-500">Môn thi đấu</span>
-                    <span className="font-bold text-slate-900">{bookingCourt.sportName}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-500">Sân thi đấu</span>
-                    <span className="font-black text-emerald-700 text-sm">{bookingCourt.name}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-500">Ngày đặt</span>
-                    <span className="font-bold text-slate-900">{formatBookingDateVi(selectedDate)}</span>
-                  </div>
-
-                  {/* Start Time Selector */}
-                  <div className="flex items-center justify-between border-t border-slate-200/80 pt-2">
-                    <span className="text-slate-600 font-bold">Giờ bắt đầu:</span>
-                    <select
-                      value={bookingStartTime}
-                      onChange={(e) => handleBookingStartTimeChange(e.target.value)}
-                      className={`rounded-lg border px-2.5 py-1 text-xs font-black outline-none cursor-pointer transition ${
-                        adminBookingConflict 
-                          ? 'border-red-500 bg-red-50 text-red-700 ring-2 ring-red-200' 
-                          : 'border-slate-300 bg-white text-slate-800 focus:border-emerald-500'
-                      }`}
-                    >
-                      {validStartTimeOptions.length > 0 ? (
-                        validStartTimeOptions.map((t) => (
-                          <option key={t} value={t}>{t}</option>
-                        ))
-                      ) : (
-                        <option value="">Hôm nay đã hết giờ đặt</option>
-                      )}
-                    </select>
-                  </div>
-
-                  {/* End Time Selector */}
-                  <div className="flex items-center justify-between pt-0.5">
-                    <span className="text-slate-600 font-bold">Giờ kết thúc:</span>
-                    <select
-                      value={bookingEndTime}
-                      onChange={(e) => handleBookingEndTimeChange(e.target.value)}
-                      className={`rounded-lg border px-2.5 py-1 text-xs font-black outline-none cursor-pointer transition ${
-                        adminBookingConflict 
-                          ? 'border-red-500 bg-red-50 text-red-700 ring-2 ring-red-200' 
-                          : 'border-slate-300 bg-white text-slate-800 focus:border-emerald-500'
-                      }`}
-                    >
-                      {bookingEndTimeOptions.map((t) => (
-                        <option key={t} value={t}>{t}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Duration Selector */}
-                  <div className="flex items-center justify-between pt-0.5">
-                    <span className="text-slate-600 font-bold">Thời lượng thuê:</span>
-                    <select
-                      value={bookingDuration}
-                      onChange={(e) => handleBookingDurationChange(Number(e.target.value))}
-                      className="rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs font-black text-slate-800 outline-none focus:border-emerald-500 cursor-pointer"
-                    >
-                      {availableDurations.map((dur) => (
-                        <option key={dur} value={dur}>
-                          {dur === 30 ? '30 phút' : dur % 60 === 0 ? `${dur / 60} tiếng` : `${Math.floor(dur / 60)} tiếng 30 phút`}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-500">Khung giờ</span>
-                    <span className={`font-bold px-2 py-0.5 rounded ${
-                      adminBookingConflict
-                        ? 'text-red-700 bg-red-100 border border-red-300'
-                        : 'text-emerald-800 bg-emerald-100/70'
-                    }`}>
-                      {bookingStartTime} – {bookingEndTime} ({bookingDuration === 30 ? '30 phút' : `${bookingDuration / 60} tiếng`})
-                    </span>
-                  </div>
-
-                  {/* 🚨 RED CONFLICT WARNING BANNER */}
-                  {adminBookingConflict && (
-                    <div className="rounded-xl border-2 border-red-500 bg-red-50 p-3 text-xs text-red-700 space-y-1.5 animate-in fade-in duration-150">
-                      <div className="flex items-center gap-1.5 font-black text-red-800 uppercase text-[11px]">
-                        <AlertTriangle className="w-4 h-4 text-red-600 shrink-0" />
-                        <span>KHÔNG THỂ ĐẶT — KHUNG GIỜ ĐÃ BỊ TRÙNG!</span>
-                      </div>
-                      <p className="text-[11px] font-medium text-red-700 leading-relaxed">
-                        Khung giờ <span className="font-black text-red-900 bg-red-100 px-1.5 py-0.5 rounded">{bookingStartTime} – {bookingEndTime}</span> bị trùng với lịch đặt trước trên {bookingCourt.name}:
-                      </p>
-                      <div className="rounded-lg bg-white border border-red-200 px-2.5 py-1 text-[11px] font-black text-red-900">
-                        📌 {adminBookingConflict.customerName} ({adminBookingConflict.time})
-                      </div>
-                      <p className="text-[10px] font-bold text-red-600">
-                        👉 Vui lòng đổi Giờ bắt đầu hoặc Giờ kết thúc để chọn khung giờ còn trống!
-                      </p>
-                    </div>
-                  )}
-
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-500">Đơn giá niêm yết</span>
-                    <span className="font-bold text-slate-700">{bookingCourt.pricePerHour.toLocaleString('vi-VN')}đ / giờ</span>
-                  </div>
-
-                  <div className="flex items-center justify-between border-t border-slate-200 pt-2.5">
-                    <span className="text-slate-700 font-black text-sm">TỔNG THANH TOÁN</span>
-                    <span className={`text-2xl font-black ${adminBookingConflict ? 'text-slate-400 line-through' : 'text-emerald-600'}`}>
-                      {(Math.round(bookingCourt.pricePerHour * (bookingDuration / 60))).toLocaleString('vi-VN')}đ
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Card 5: THÔNG TIN NGƯỜI ĐẶT */}
-              <div className="rounded-2xl border border-slate-200 bg-white p-4 space-y-3 shadow-xs">
-                <div className="flex items-center gap-2">
-                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500 text-xs font-black text-white">5</span>
-                  <h3 className="text-sm font-black uppercase tracking-wider text-slate-900">THÔNG TIN NGƯỜI ĐẶT</h3>
-                </div>
-
-                <div className="space-y-3 text-xs">
-                  <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <label className="font-bold uppercase text-slate-500 text-[10px] tracking-wider">
-                        HỌ VÀ TÊN *
-                      </label>
-                      {bookingErrors.name && (
-                        <span className="text-[10px] font-bold text-red-600 flex items-center gap-1">
-                          <AlertTriangle className="w-3 h-3 shrink-0" /> {bookingErrors.name}
-                        </span>
-                      )}
-                    </div>
-                    <input
-                      type="text"
-                      required
-                      value={bookingCustomerName}
-                      onChange={(e) => {
-                        setBookingCustomerName(e.target.value);
-                        if (bookingErrors.name) setBookingErrors((prev) => ({ ...prev, name: undefined }));
-                      }}
-                      placeholder="Nhập họ và tên..."
-                      className={`w-full rounded-xl border px-3.5 py-3 text-sm text-slate-900 placeholder-slate-400 outline-none transition ${
-                        bookingErrors.name
-                          ? 'border-red-400 bg-red-50/50 focus:border-red-500 ring-2 ring-red-100'
-                          : 'border-slate-200 bg-slate-50 focus:border-emerald-500 focus:bg-white'
-                      }`}
-                    />
-                  </div>
-
-                  <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <label className="font-bold uppercase text-slate-500 text-[10px] tracking-wider">
-                        SỐ ĐIỆN THOẠI *
-                      </label>
-                      {bookingErrors.phone && (
-                        <span className="text-[10px] font-bold text-red-600 flex items-center gap-1">
-                          <AlertTriangle className="w-3 h-3 shrink-0" /> {bookingErrors.phone}
-                        </span>
-                      )}
-                    </div>
-                    <input
-                      type="tel"
-                      required
-                      value={bookingCustomerPhone}
-                      onChange={(e) => {
-                        setBookingCustomerPhone(e.target.value);
-                        if (bookingErrors.phone) setBookingErrors((prev) => ({ ...prev, phone: undefined }));
-                      }}
-                      placeholder="Nhập số điện thoại (10 số)..."
-                      className={`w-full rounded-xl border px-3.5 py-3 text-sm text-slate-900 placeholder-slate-400 outline-none transition ${
-                        bookingErrors.phone
-                          ? 'border-red-400 bg-red-50/50 focus:border-red-500 ring-2 ring-red-100'
-                          : 'border-slate-200 bg-slate-50 focus:border-emerald-500 focus:bg-white'
-                      }`}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="mb-1 block font-bold uppercase text-slate-500 text-[10px] tracking-wider">
-                      GHI CHÚ THÊM (TÙY CHỌN)
-                    </label>
-                    <input
-                      type="text"
-                      value={bookingNote}
-                      onChange={(e) => setBookingNote(e.target.value)}
-                      placeholder="VD: Cần mượn thêm vợt, bóng..."
-                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3 text-sm text-slate-900 placeholder-slate-400 outline-none transition focus:border-emerald-500 focus:bg-white"
-                    />
-                  </div>
-
-                  <label className="flex items-center gap-2 cursor-pointer pt-1">
-                    <input
-                      type="checkbox"
-                      checked={bookingSendZalo}
-                      onChange={(e) => setBookingSendZalo(e.target.checked)}
-                      className="h-4 w-4 rounded border-slate-300 text-emerald-500 focus:ring-emerald-500 cursor-pointer"
-                    />
-                    <span className="text-slate-700 text-xs font-semibold">Gửi vé điện tử & thông báo nhắc lịch qua Zalo/SMS</span>
-                  </label>
-                </div>
-              </div>
-
-              {/* Submit Button & Conflict Alert */}
-              {adminBookingConflict && (
-                <div className="rounded-xl border border-red-200 bg-red-50 p-2.5 text-center text-[11px] font-bold text-red-700 animate-in fade-in flex items-center justify-center gap-1.5">
-                  <AlertTriangle className="w-3.5 h-3.5 text-red-600 shrink-0" />
-                  <span>Khung giờ đã bị trùng lịch! Vui lòng chọn giờ khác để tiếp tục.</span>
-                </div>
-              )}
-
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => setBookingCourt(null)}
-                  className="flex-1 rounded-2xl border border-slate-200 bg-white py-3.5 text-xs font-bold text-slate-600 hover:bg-slate-50 transition cursor-pointer"
-                >
-                  Hủy bỏ
-                </button>
-                <button
-                  type="submit"
-                  disabled={Boolean(adminBookingConflict)}
-                  className={`flex-[2] flex items-center justify-center gap-2 rounded-2xl py-3.5 text-xs font-black uppercase tracking-wider transition ${
-                    adminBookingConflict
-                      ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
-                      : 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-lg shadow-emerald-500/25 cursor-pointer active:scale-95'
-                  }`}
-                >
-                  <CreditCard className="w-4 h-4" />
-                  TIẾN HÀNH THANH TOÁN ({(Math.round(bookingCourt.pricePerHour * (bookingDuration / 60))).toLocaleString('vi-VN')}đ)
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+        <AdminBookingDialog
+          court={bookingCourt}
+          dateLabel={formatBookingDateVi(selectedDate)}
+          startTime={bookingStartTime}
+          endTime={bookingEndTime}
+          duration={bookingDuration}
+          startOptions={validStartTimeOptions}
+          endOptions={bookingEndTimeOptions}
+          durations={availableDurations}
+          customerName={bookingCustomerName}
+          customerPhone={bookingCustomerPhone}
+          note={bookingNote}
+          sendZalo={bookingSendZalo}
+          errors={bookingErrors}
+          conflict={adminBookingConflict}
+          onStartChange={handleBookingStartTimeChange}
+          onEndChange={handleBookingEndTimeChange}
+          onDurationChange={handleBookingDurationChange}
+          onNameChange={value => {
+            setBookingCustomerName(value);
+            if (bookingErrors.name) setBookingErrors(previous => ({ ...previous, name: undefined }));
+          }}
+          onPhoneChange={value => {
+            setBookingCustomerPhone(value);
+            if (bookingErrors.phone) setBookingErrors(previous => ({ ...previous, phone: undefined }));
+          }}
+          onNoteChange={setBookingNote}
+          onSendZaloChange={setBookingSendZalo}
+          onClose={() => setBookingCourt(null)}
+          onSubmit={handleAdminBookingSubmit}
+        />
       )}
 
       {/* 🟡 MODAL THANH TOÁN (PAYMENT BOTTOM SHEET) - GIỐNG HỆT THIẾT KẾ MẪU */}
@@ -2807,6 +2570,7 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
               </p>
             </div>
 
+            {bookingSaveError && <p role="alert" className="mt-4 rounded-xl bg-red-50 p-3 text-xs text-red-700">{bookingSaveError}</p>}
             <div className="w-full mt-6">
               <button
                 type="button"
