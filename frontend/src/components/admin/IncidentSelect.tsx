@@ -8,7 +8,7 @@ const normalize=(text:string)=>text.normalize('NFD').replace(/[\u0300-\u036f]/g,
 
 export default function IncidentSelect({id,value,options,placeholder,searchPlaceholder,searchable=true,compact=false,disabled,onChange}:Props){
  const [open,setOpen]=useState(false),[query,setQuery]=useState(''),[active,setActive]=useState(-1);
- const [position,setPosition]=useState({top:0,left:0,width:320,maxHeight:320});
+ const [position,setPosition]=useState({top:0,left:0,width:320,maxHeight:320,transform:'none'});
  const trigger=useRef<HTMLButtonElement>(null),panel=useRef<HTMLDivElement>(null),search=useRef<HTMLInputElement>(null);
  const listId=useId();
  const selected=options.find(option=>option.value===value);
@@ -21,9 +21,10 @@ export default function IncidentSelect({id,value,options,placeholder,searchPlace
    const rect=trigger.current!.getBoundingClientRect(),viewport=window.visualViewport;
    const height=viewport?.height||window.innerHeight,width=viewport?.width||window.innerWidth;
    const below=height-rect.bottom-12,above=rect.top-12;
-   const maxHeight=Math.min(340,Math.max(150,below>=200||below>=above?below:above));
+   const opensBelow=below>=200||below>=above;
+   const maxHeight=Math.min(340,Math.max(150,opensBelow?below:above));
    const panelWidth=Math.min(rect.width,width-24);
-   setPosition({top:below>=200||below>=above?rect.bottom+6:Math.max(8,rect.top-maxHeight-6),left:Math.max(12,Math.min(rect.left,width-panelWidth-12)),width:panelWidth,maxHeight});
+   setPosition({top:opensBelow?rect.bottom+6:rect.top-6,left:Math.max(12,Math.min(rect.left,width-panelWidth-12)),width:panelWidth,maxHeight,transform:opensBelow?'none':'translateY(-100%)'});
   };
   positionPanel();(search.current||panel.current)?.focus();
   window.addEventListener('resize',positionPanel);window.addEventListener('scroll',positionPanel,true);
