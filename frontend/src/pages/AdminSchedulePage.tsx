@@ -4,7 +4,7 @@ import {
   AlertTriangle, ArrowLeft, ArrowRightLeft, Ban, Calendar, CalendarClock,
   Check, CheckCircle2, RefreshCw, ChevronDown, ChevronLeft, ChevronRight, CircleX, XCircle,
   Clock3, Cloud, CreditCard, Info, LayoutGrid, MapPin, Phone,
-  Download, Printer, ReceiptText, ShieldCheck, Undo2, UserRound, X, Zap
+  Download, Printer, ReceiptText, Search, ShieldCheck, Undo2, UserRound, X, Zap
 } from 'lucide-react';
 import QrCodeArtwork from '../components/QrCodeArtwork';
 import CheckoutSettlementView from '../components/admin/CheckoutSettlementView';
@@ -182,7 +182,57 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
     );
   }, [adminBookings, selectedDate]);
 
-  // Booking Modal State (Đặt sân tại quầy trực tiếp trên lịch)
+  // Tra cứu lịch đặt sân để Check-in nhanh (theo SĐT hoặc Mã đặt sân)
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [isSearchFocused, setIsSearchFocused] = useState<boolean>(false);
+
+  const filteredSearchResults = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return [];
+    const cleanDigits = q.replace(/\D/g, '');
+
+    return allBookings
+      .filter((b) => {
+        const matchCode = (b.code || '').toLowerCase().includes(q);
+        const matchName = (b.customerName || '').toLowerCase().includes(q);
+        const bPhoneClean = (b.phone || '').replace(/\D/g, '');
+        const matchPhone = (cleanDigits.length > 0 && bPhoneClean.includes(cleanDigits)) || (b.phone && b.phone.toLowerCase().includes(q));
+        const matchCourt = (b.court || '').toLowerCase().includes(q) || (b.courtCode || '').toLowerCase().includes(q);
+        return matchCode || matchName || matchPhone || matchCourt;
+      })
+      .sort((a, b) => {
+        const curDateStr = calendarBookingDate(selectedDate);
+        if (a.bookingDate === curDateStr && b.bookingDate !== curDateStr) return -1;
+        if (b.bookingDate === curDateStr && a.bookingDate !== curDateStr) return 1;
+        const score = (status: string) => {
+          if (status === 'Đã đặt') return 1;
+          if (status === 'Đang sử dụng') return 2;
+          if (status === 'Đã kết thúc' || status === 'Hoàn tất') return 3;
+          return 4;
+        };
+        return score(a.status) - score(b.status);
+      });
+  }, [allBookings, searchQuery, selectedDate]);
+
+  const handleSelectSearchResult = (booking: BookingDetail, action: 'checkin' | 'view' = 'checkin') => {
+    if (booking.bookingDate) {
+      const [y, m, d] = booking.bookingDate.split('-').map(Number);
+      if (y && m && d) {
+        setSelectedDate(new Date(y, m - 1, d));
+        setCalendarMonth(new Date(y, m - 1, 1));
+      }
+    }
+
+    if (action === 'checkin') {
+      openCheckinDetail(booking);
+    } else {
+      openBooking(booking);
+    }
+
+    setIsSearchFocused(false);
+  };
+
+    // Booking Modal State (Đặt sân tại quầy trực tiếp trên lịch)
   const [bookingCourt, setBookingCourt] = useState<AdminCourtItem | null>(null);
   const [bookingStartTime, setBookingStartTime] = useState<string>('08:00');
   const [bookingDuration, setBookingDuration] = useState<number>(60);
@@ -1135,11 +1185,17 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
             </div>
           </div>
           <div className="grid grid-cols-2 gap-2">
-            <div className="rounded-lg bg-white p-2.5 ring-1 ring-black/15">
-              <p className="text-[10px] font-bold uppercase tracking-wide text-slate-700">Ngày thi đấu</p>
-              <p className="mt-1 text-[13px] font-black text-slate-900">{isToday(selectedDate) ? 'Hôm nay' : daysOfWeekVi[selectedDate.getDay()]}</p>
-              <p className="text-[10px] font-medium text-slate-400">{selectedDate.toLocaleDateString('vi-VN')}</p>
-            </div>
+            {(() => {
+              const bDate = checkinBooking.bookingDate || calendarBookingDate(selectedDate);
+              const info = getBookingDateDetails(bDate);
+              return (
+                <div className="rounded-lg bg-white p-2.5 ring-1 ring-black/15">
+                  <p className="text-[10px] font-bold uppercase tracking-wide text-slate-700">Ngày thi đấu</p>
+                  <p className="mt-1 text-[13px] font-black text-slate-900">{info.dayOfWeek}</p>
+                  <p className="text-[10px] font-medium text-emerald-700">{info.fullDate || bDate}</p>
+                </div>
+              );
+            })()}
             <div className="rounded-lg bg-white p-2.5 ring-1 ring-black/15">
               <p className="text-[10px] font-bold uppercase tracking-wide text-slate-700">Khung giờ</p>
               <p className="mt-1 text-[13px] font-black text-slate-900">{checkinBooking.time}</p>
@@ -1869,7 +1925,144 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
         {bookingsState.loading&&<p className="p-3 text-xs text-slate-600">Đang tải lịch sân từ máy chủ...</p>}
         {bookingsState.error&&<p role="alert" className="bg-red-50 p-3 text-xs text-red-700">{bookingsState.error}<button onClick={()=>void refreshSharedBookings()} className="ml-2 underline">Thử lại</button></p>}
         {/* 1. TOP TOOLBAR & DATE CONTROLS */}
-        <div className="bg-white border-b border-slate-200 p-2.5 space-y-2 shrink-0 shadow-xs z-30">
+        <div className="bg-white border-b border-slate-200 p-2.5 space-y-2 shrink-0 shadow-xs relative z-[60]">
+          
+          {/* Ô TRA CỨU ĐẶT SÂN CHECK-IN (SĐT / MÃ ĐẶT SÂN) */}
+          <div className="relative">
+            <div className="relative flex items-center">
+              <Search className="absolute left-3 w-4 h-4 text-emerald-600 pointer-events-none" />
+              <input
+                type="text"
+                value={searchQuery}
+                onFocus={() => setIsSearchFocused(true)}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setIsSearchFocused(true);
+                }}
+                placeholder="Tra cứu SĐT hoặc Mã đặt sân để check-in..."
+                className="w-full h-9 pl-9 pr-8 text-xs font-semibold text-slate-900 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 outline-none transition placeholder:text-slate-400 placeholder:font-medium shadow-2xs"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchQuery('');
+                    setIsSearchFocused(false);
+                  }}
+                  className="absolute right-2.5 p-1 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-200 transition cursor-pointer"
+                  title="Xóa tìm kiếm"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+
+            {/* Dropdown kết quả tra cứu */}
+            {isSearchFocused && searchQuery.trim().length > 0 && (
+              <>
+                <div
+                  className="fixed inset-0 z-40"
+                  onClick={() => setIsSearchFocused(false)}
+                />
+                <div className="absolute left-0 right-0 top-10.5 z-50 rounded-2xl bg-white p-2.5 shadow-2xl border border-slate-200 max-h-[360px] overflow-y-auto space-y-2 animate-in fade-in slide-in-from-top-2 duration-150">
+                <div className="flex items-center justify-between px-1 pb-1 border-b border-slate-100 text-[11px] font-bold text-slate-500">
+                  <span>Kết quả tra cứu ({filteredSearchResults.length})</span>
+                  <button
+                    type="button"
+                    onClick={() => setIsSearchFocused(false)}
+                    className="text-slate-400 hover:text-slate-600 text-xs font-semibold cursor-pointer"
+                  >
+                    Đóng ✕
+                  </button>
+                </div>
+
+                {filteredSearchResults.length === 0 ? (
+                  <div className="py-5 text-center text-xs text-slate-500">
+                    <Search className="w-5 h-5 mx-auto mb-1 text-slate-300" />
+                    Không tìm thấy lịch đặt nào với từ khóa <strong className="text-slate-800 font-bold">"{searchQuery}"</strong>
+                  </div>
+                ) : (
+                  <div className="space-y-1.5">
+                    {filteredSearchResults.slice(0, 8).map((b) => {
+                      const isTargetDate = b.bookingDate === calendarBookingDate(selectedDate);
+                      const checkinVal = getCheckinValidation(b);
+                      const isDone = b.status === 'Đã kết thúc' || b.status === 'Hoàn tất';
+                      const isCancelled = b.status === 'Đã hủy' || b.status === 'DA_HUY';
+
+                      return (
+                        <div
+                          key={b.code}
+                          className="flex items-center justify-between gap-2.5 p-2 rounded-xl bg-slate-50 hover:bg-emerald-50/70 border border-slate-200/80 hover:border-emerald-300 transition group cursor-pointer"
+                          onClick={() => handleSelectSearchResult(b, 'view')}
+                        >
+                          <div className="min-w-0 flex-1 space-y-0.5">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="font-mono text-[11px] font-extrabold text-slate-900 bg-white px-1.5 py-0.5 rounded border border-slate-200">
+                                {b.code}
+                              </span>
+                              <span className="text-xs font-black text-slate-900 truncate">
+                                {b.customerName}
+                              </span>
+                              <span className="text-[11px] font-semibold text-slate-500 flex items-center gap-0.5">
+                                <Phone className="w-3 h-3 text-slate-400" />
+                                {b.phone}
+                              </span>
+                            </div>
+
+                            <div className="flex items-center gap-2 text-[11px] font-medium text-slate-600">
+                              <span className="font-bold text-emerald-800">{b.court}</span>
+                              <span>•</span>
+                              <span className="font-bold text-slate-800">{b.time}</span>
+                              <span>•</span>
+                              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${isTargetDate ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-700'}`}>
+                                {b.bookingDate || 'Hôm nay'}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+                            {b.status === 'Đã đặt' && (
+                              <button
+                                type="button"
+                                disabled={!checkinVal.canCheckin}
+                                onClick={() => handleSelectSearchResult(b, 'checkin')}
+                                className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-black shadow-xs transition active:scale-95 cursor-pointer ${
+                                  checkinVal.canCheckin
+                                    ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/30'
+                                    : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                                }`}
+                                title={checkinVal.message || 'Check-in sân ngay'}
+                              >
+                                <CheckCircle2 className="w-3.5 h-3.5" />
+                                <span>Check-in</span>
+                              </button>
+                            )}
+                            {b.status === 'Đang sử dụng' && (
+                              <span className="text-[10px] font-bold px-2 py-1 rounded-lg bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                Đang dùng
+                              </span>
+                            )}
+                            {isDone && (
+                              <span className="text-[10px] font-semibold px-2 py-1 rounded-lg bg-slate-100 text-slate-500">
+                                Hoàn tất
+                              </span>
+                            )}
+                            {isCancelled && (
+                              <span className="text-[10px] font-semibold px-2 py-1 rounded-lg bg-red-100 text-red-700">
+                                Đã hủy
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+              </>
+            )}
+          </div>
+
           {/* Date Picker Bar */}
           <div className="flex items-center justify-between bg-slate-50 rounded-xl p-1.5 border border-slate-200 relative">
             <button 
@@ -2308,6 +2501,13 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
                             const left = ((bStartMin - startTimelineMin) / intervalMode) * slotWidth;
                             const width = Math.max(46, ((bEndMin - bStartMin) / intervalMode) * slotWidth - 3);
 
+                            const hasSearch = Boolean(searchQuery.trim());
+                            const isSearchMatch = hasSearch && (
+                              (b.code || '').toLowerCase().includes(searchQuery.trim().toLowerCase()) ||
+                              (b.customerName || '').toLowerCase().includes(searchQuery.trim().toLowerCase()) ||
+                              (searchQuery.trim().replace(/\D/g, '') && (b.phone || '').replace(/\D/g, '').includes(searchQuery.trim().replace(/\D/g, '')))
+                            );
+
                             if (b.status === 'Đang sử dụng') {
                               return (
                                 <button
@@ -2321,7 +2521,13 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
                                     top: '4px',
                                     bottom: '4px',
                                   }}
-                                  className="absolute z-10 rounded-xl bg-emerald-600 text-white px-2 py-1 flex flex-col justify-center text-left shadow-sm active:scale-[0.99] transition-transform overflow-hidden border border-emerald-500 cursor-pointer"
+                                  className={`absolute z-10 rounded-xl bg-emerald-600 text-white px-2 py-1 flex flex-col justify-center text-left shadow-sm active:scale-[0.99] transition-all overflow-hidden border border-emerald-500 cursor-pointer ${
+                                    isSearchMatch
+                                      ? 'ring-3 ring-amber-400 ring-offset-2 z-30 shadow-xl scale-[1.02]'
+                                      : hasSearch
+                                      ? 'opacity-35 hover:opacity-100'
+                                      : ''
+                                  }`}
                                 >
                                   <div className="flex items-center gap-1 min-w-0">
                                     <span className="h-1.5 w-1.5 rounded-full bg-emerald-100 shrink-0 animate-ping" />
@@ -2347,7 +2553,13 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
                                   top: '4px',
                                   bottom: '4px',
                                 }}
-                                className={`absolute z-10 rounded-xl border px-2 py-1 flex flex-col justify-center text-left shadow-sm active:scale-[0.99] transition-transform overflow-hidden cursor-pointer ${completed?'bg-slate-100 border-slate-300 hover:bg-slate-200':'bg-blue-50 border-blue-300 hover:bg-blue-100/90'}`}
+                                className={`absolute z-10 rounded-xl border px-2 py-1 flex flex-col justify-center text-left shadow-sm active:scale-[0.99] transition-all overflow-hidden cursor-pointer ${completed?'bg-slate-100 border-slate-300 hover:bg-slate-200':'bg-blue-50 border-blue-300 hover:bg-blue-100/90'} ${
+                                    isSearchMatch
+                                      ? 'ring-3 ring-amber-400 ring-offset-2 z-30 shadow-xl scale-[1.02]'
+                                      : hasSearch
+                                      ? 'opacity-35 hover:opacity-100'
+                                      : ''
+                                  }`}
                               >
                                 <span className="text-[10px] font-black text-blue-950 truncate leading-tight">{b.customerName}</span>
                                 <span className="text-[9px] font-bold text-blue-700 truncate leading-tight mt-0.5">
@@ -2508,6 +2720,16 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
                     <p className="text-[10px] font-semibold text-slate-600">Sân & Bộ môn</p>
                     <p className="mt-1 text-[13px] font-bold leading-snug text-slate-900">{selectedBooking.court}</p>
                     <p className="text-[10px] font-medium text-slate-600">{selectedBooking.sport}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-semibold text-slate-600">Ngày thi đấu</p>
+                    <p className="mt-1 text-[13px] font-black leading-snug text-emerald-800">
+                      {(() => {
+                        const bDate = selectedBooking.bookingDate || calendarBookingDate(selectedDate);
+                        const info = getBookingDateDetails(bDate);
+                        return `${info.dayOfWeek} (${info.fullDate || bDate})`;
+                      })()}
+                    </p>
                   </div>
                   <div>
                     <p className="text-[10px] font-semibold text-slate-600">Khung thời gian</p>
@@ -2976,6 +3198,16 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
                 <span className="font-black text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full">{transferBooking.court} ({transferBooking.sport})</span>
               </div>
               <div className="flex justify-between items-center">
+                <span className="text-slate-500">Ngày thi đấu:</span>
+                <span className="font-black text-emerald-800 bg-emerald-50 px-2.5 py-0.5 rounded-md border border-emerald-200">
+                  {(() => {
+                    const bDate = transferBooking.bookingDate || calendarBookingDate(selectedDate);
+                    const info = getBookingDateDetails(bDate);
+                    return `${info.dayOfWeek} (${info.fullDate || bDate})`;
+                  })()}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
                 <span className="text-slate-500">Khung giờ gốc:</span>
                 <span className="font-bold text-slate-900 bg-white px-2 py-0.5 rounded border border-slate-200">{transferBooking.time}</span>
               </div>
@@ -3061,7 +3293,7 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
                 </span>
               </div>
 
-              <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto pr-1">
+              <div className="grid grid-cols-2 gap-2.5 max-h-52 overflow-y-auto p-1">
                 {candidateCourtsForTransfer.map((court) => {
                   const isSelected = selectedTargetCourt?.id === court.id;
                   return (
@@ -3070,12 +3302,12 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
                       type="button"
                       disabled={court.isOccupied}
                       onClick={() => setSelectedTargetCourt(court)}
-                      className={`flex flex-col p-3 rounded-2xl border text-left transition ${
+                      className={`relative flex flex-col p-3 rounded-2xl border-2 text-left transition-all outline-none ${
                         court.isOccupied
-                          ? 'border-slate-200 bg-slate-100 opacity-60 cursor-not-allowed'
+                          ? 'border-slate-200 bg-slate-100 opacity-60 cursor-not-allowed z-0'
                           : isSelected
-                          ? 'border-amber-500 bg-amber-50 ring-2 ring-amber-400'
-                          : 'border-slate-200 bg-white hover:border-amber-300 active:scale-95 cursor-pointer'
+                          ? 'border-amber-500 bg-amber-50/90 shadow-sm z-10'
+                          : 'border-slate-200 bg-white hover:border-amber-400 hover:bg-amber-50/20 active:scale-[0.98] cursor-pointer z-0'
                       }`}
                     >
                       <div className="flex items-center justify-between">
