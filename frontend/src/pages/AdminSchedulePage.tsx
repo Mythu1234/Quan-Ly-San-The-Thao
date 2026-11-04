@@ -966,7 +966,7 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
     const hasRecordedPayment=Number(checkinBooking.paidAmount.replace(/\D/g,''))>0;
 
     return (
-      <div className="flex-1 min-h-0 overflow-y-auto bg-white px-3 py-3">
+      <div className="no-scrollbar flex-1 min-h-0 overflow-y-auto bg-white px-3 py-3">
         {/* Back button */}
         <button
           type="button"

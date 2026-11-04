@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { ChevronLeft, Check, ShieldCheck, Phone } from 'lucide-react';
 import type { FacilityEquipment, EquipmentCategory } from '../../types/admin';
 import { getVietnamToday } from '../../hooks/useVietnamToday';
+import IncidentSelect from './IncidentSelect';
 
 const formatCalendarDate = (date: Date) =>
   `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}/${date.getFullYear()}`;
@@ -147,19 +148,24 @@ export default function AddEquipmentView({ existingCount, initialEquipment, embe
 
           {/* Row 2: Bộ môn + Tình trạng */}
           <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label className="block text-[11px] font-bold text-slate-600 mb-1">Bộ môn <span className="text-red-600">*</span></label>
-              <select
-                required
+            <div className="min-w-0">
+              <label htmlFor="equipment-sport" className="block text-[11px] font-bold text-slate-600 mb-1">Bộ môn <span className="text-red-600">*</span></label>
+              <IncidentSelect
+                id="equipment-sport"
                 value={sportType}
-                onChange={(e) => setSportType(e.target.value as 'CauLong' | 'BongChuyen' | 'BongDa' | 'DungChung')}
-                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-800 outline-none focus:border-emerald-500 focus:bg-white"
-              >
-                <option value="CauLong">🏸 Cầu lông</option>
-                <option value="BongChuyen">🏐 Bóng chuyền</option>
-                <option value="BongDa">⚽ Bóng đá</option>
-                <option value="DungChung">🔧 Thiết bị chung</option>
-              </select>
+                options={[
+                  { value: 'CauLong', label: '🏸 Cầu lông' },
+                  { value: 'BongChuyen', label: '🏐 Bóng chuyền' },
+                  { value: 'BongDa', label: '⚽ Bóng đá' },
+                  { value: 'DungChung', label: '🔧 Thiết bị chung' },
+                ]}
+                placeholder="Chọn bộ môn"
+                searchPlaceholder="Bộ môn"
+                searchable={false}
+                compact
+                disabled={isSaving}
+                onChange={value => setSportType(value as typeof sportType)}
+              />
             </div>
             <div>
               <label className="block text-[11px] font-bold text-slate-600 mb-1">Tình trạng <span className="text-red-600">*</span></label>

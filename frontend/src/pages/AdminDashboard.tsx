@@ -355,7 +355,7 @@ export default function AdminDashboard({ onLogout, currentUser }: { onLogout: ()
         )}
 
         {activeTab === 'vi_thu' && (
-          <div className="min-w-0 w-full flex-1 overflow-y-auto overflow-x-hidden bg-slate-50 relative custom-scrollbar">
+          <div className="no-scrollbar min-h-0 min-w-0 w-full flex-1 overflow-y-auto overflow-x-hidden bg-slate-50 relative">
             <WalletRevenueView
               transactions={transactions}
               onProcessRefund={handleProcessRefund}
@@ -365,7 +365,7 @@ export default function AdminDashboard({ onLogout, currentUser }: { onLogout: ()
         )}
 
         {activeTab === 'co_so_vat_chat' && (
-          <div className="flex-1 overflow-auto bg-slate-50 relative custom-scrollbar">
+          <div className="min-h-0 flex-1 overflow-auto bg-slate-50 relative no-scrollbar">
             <FacilityManagementView
               currentUser={currentUser}
               equipments={equipments}

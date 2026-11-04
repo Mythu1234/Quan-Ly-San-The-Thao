@@ -151,6 +151,8 @@ Các thông tin này là cơ sở cốt lõi để lập trình logic xử lý, 
     $$\text{Tổng tiền thu lúc Checkout} = \text{Phí bồi thường sự cố CSVC do khách làm hỏng (nếu có, mặc định = 0 VNĐ)}$$
     $$\text{Tổng thanh toán lượt đặt} = \text{Tiền thuê sân (đã thanh toán 100% lúc đặt)} + \text{Phí bồi thường CSVC (nếu có)}$$
 
+* **Thanh toán bồi thường tại Check-out:** Sau khi nhập đủ thông tin sự cố và chọn trách nhiệm, nhân viên tick `Thanh toán qua VietQR` để mở mã QR dùng chung với phần đặt sân. Hệ thống mô phỏng ghi nhận thành công sau **7 giây**, tự tạo mã tham chiếu giao dịch và mở nút `Xác nhận Check-out`. Nhân viên phải nhấn xác nhận để lưu quyết toán, thanh toán và báo cáo sự cố; bộ đếm không tự hoàn tất trả sân. Thay đổi thông tin sự cố hoặc số tiền sẽ hủy trạng thái xác nhận thanh toán cũ. Bỏ tick sẽ hủy chờ thanh toán. Sân chịu chi phí hoặc không có hư hỏng thì không cần bước thanh toán bồi thường. Đây là luồng mô phỏng, chưa phải xác minh giao dịch ngân hàng thực tế.
+
 ---
 
 ## 8. QUẢN LÝ CƠ SỞ VẬT CHẤT, BÁO CÁO SỰ CỐ & BẢNG GIÁ ĐỀN BÙ (ASSET & DAMAGE MANAGEMENT)

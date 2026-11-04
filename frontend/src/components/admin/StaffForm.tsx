@@ -2,8 +2,9 @@ import {useState} from 'react';
 import {ArrowLeft,Save} from 'lucide-react';
 import type {Employee} from '../../types/admin';
 import {staffRole} from '../../utils/staffRole';
+import IncidentSelect from './IncidentSelect';
 interface Props {employee?:Employee;onBack:()=>void;onSaveEmployee:(employee:Employee,password?:string)=>Promise<void>|void}
-const inputClass='mt-1 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs text-slate-900 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-50';
+const inputClass='mt-1 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs text-slate-900 outline-none placeholder:font-normal placeholder:text-slate-400 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-50';
 export default function StaffForm({employee,onBack,onSaveEmployee}:Props){
   const [name,setName]=useState(employee?.name||'');const [phone,setPhone]=useState(employee?.phone||'');const [email,setEmail]=useState(employee?.email||'');
   const [role,setRole]=useState<'ADMIN'|'STAFF'>(employee&&staffRole(employee)==='Chủ sân'?'ADMIN':'STAFF');
@@ -21,8 +22,17 @@ export default function StaffForm({employee,onBack,onSaveEmployee}:Props){
       <label className="block text-[11px] font-semibold text-slate-600">Họ và tên *<input required maxLength={100} value={name} onChange={event=>setName(event.target.value)} placeholder="Nhập họ và tên" className={inputClass}/></label>
       <label className="block text-[11px] font-semibold text-slate-600">Số điện thoại *<input required type="tel" pattern="0[35789][0-9]{8}" value={phone} onChange={event=>setPhone(event.target.value)} placeholder="Số điện thoại 10 chữ số" className={inputClass}/></label>
       <label className="block text-[11px] font-semibold text-slate-600">Email *<input required type="email" maxLength={100} value={email} onChange={event=>setEmail(event.target.value)} placeholder="Nhập email tài khoản" className={inputClass}/></label>
-      <div className="grid grid-cols-2 gap-2.5"><label className="text-[11px] font-semibold text-slate-600">Vai trò<select value={role} onChange={event=>setRole(event.target.value as 'ADMIN'|'STAFF')} className={inputClass}><option value="STAFF">Nhân viên</option><option value="ADMIN">Chủ sân</option></select></label><label className="text-[11px] font-semibold text-slate-600">Trạng thái<select value={status} onChange={event=>setStatus(event.target.value as 'active'|'inactive')} className={inputClass}><option value="active">Đang hoạt động</option><option value="inactive">Ngừng hoạt động</option></select></label></div>
-      <div className="border-t border-slate-100 pt-3"><p className="text-xs font-bold text-slate-800">{employee?'Đặt lại mật khẩu':'Mật khẩu đăng nhập'}</p>{employee&&<p className="mt-0.5 text-[10px] text-slate-400">Để trống nếu giữ mật khẩu hiện tại</p>}<div className="mt-2 grid grid-cols-2 gap-2.5"><label className="text-[11px] font-semibold text-slate-600">Mật khẩu mới<input type="password" autoComplete="new-password" required={!employee} minLength={6} maxLength={256} value={password} onChange={event=>setPassword(event.target.value)} className={inputClass}/></label><label className="text-[11px] font-semibold text-slate-600">Xác nhận<input type="password" autoComplete="new-password" required={!employee||!!password} value={confirmation} onChange={event=>setConfirmation(event.target.value)} className={inputClass}/></label></div></div>
+      <div className="grid grid-cols-2 gap-2.5">
+        <div className="min-w-0 space-y-1">
+          <label htmlFor="staff-role" className="block text-[11px] font-semibold text-slate-600">Vai trò</label>
+          <IncidentSelect id="staff-role" value={role} options={[{value:'STAFF',label:'Nhân viên'},{value:'ADMIN',label:'Chủ sân'}]} placeholder="Chọn vai trò" searchPlaceholder="Vai trò" searchable={false} disabled={saving} onChange={value=>setRole(value as typeof role)}/>
+        </div>
+        <div className="min-w-0 space-y-1">
+          <label htmlFor="staff-status" className="block text-[11px] font-semibold text-slate-600">Trạng thái</label>
+          <IncidentSelect id="staff-status" value={status} options={[{value:'active',label:'Đang hoạt động'},{value:'inactive',label:'Ngừng hoạt động'}]} placeholder="Chọn trạng thái" searchPlaceholder="Trạng thái" searchable={false} disabled={saving} onChange={value=>setStatus(value as typeof status)}/>
+        </div>
+      </div>
+      <div className="border-t border-slate-100 pt-3"><p className="text-xs font-bold text-slate-800">{employee?'Đặt lại mật khẩu':'Mật khẩu đăng nhập'}</p>{employee&&<p className="mt-0.5 text-[10px] text-slate-400">Để trống nếu giữ mật khẩu hiện tại</p>}<div className="mt-2 grid grid-cols-2 gap-2.5"><label className="text-[11px] font-semibold text-slate-600">Mật khẩu mới<input type="password" autoComplete="new-password" required={!employee} minLength={6} maxLength={256} value={password} onChange={event=>setPassword(event.target.value)} placeholder="Ít nhất 6 ký tự" className={inputClass}/></label><label className="text-[11px] font-semibold text-slate-600">Xác nhận<input type="password" autoComplete="new-password" required={!employee||!!password} value={confirmation} onChange={event=>setConfirmation(event.target.value)} placeholder="Nhập lại mật khẩu" className={inputClass}/></label></div></div>
     </fieldset>
     {error&&<p role="alert" className="rounded-xl bg-red-50 p-3 text-xs text-red-600">{error}</p>}
     <div className="grid grid-cols-2 gap-2"><button type="button" onClick={onBack} disabled={saving} className="h-10 rounded-xl border border-red-200 bg-red-50 px-4 text-xs font-semibold text-red-700 transition hover:bg-red-100 disabled:opacity-60">Hủy</button><button type="submit" disabled={saving} className="flex h-10 items-center justify-center gap-2 rounded-xl bg-emerald-700 text-xs font-bold text-white hover:bg-emerald-800 disabled:opacity-60"><Save className="h-3.5 w-3.5"/>{saving?'Đang lưu...':'Lưu tài khoản'}</button></div>

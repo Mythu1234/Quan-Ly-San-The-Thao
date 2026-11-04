@@ -73,7 +73,10 @@ export default function AdminBookingDialog(props: Props) {
           </div>
           <footer className="shrink-0 space-y-3 border-t border-slate-100 bg-white px-4 py-3">
             <div className="flex items-center justify-between gap-2"><div><p className="text-xs font-semibold text-slate-700">Tổng thanh toán</p><p className="mt-0.5 text-[10px] text-slate-400">{court.pricePerHour.toLocaleString('vi-VN')}đ/giờ · {durationLabel(props.duration)}</p></div><strong className="text-2xl text-emerald-700">{Math.round(court.pricePerHour * props.duration / 60).toLocaleString('vi-VN')}đ</strong></div>
-            <div className="flex gap-2"><button type="button" onClick={props.onClose} className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-xs font-semibold text-red-600 transition hover:bg-red-100">Hủy bỏ</button><button type="submit" disabled={!!conflict || !props.startOptions.length || !props.endOptions.length} className="flex min-w-0 flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-700 px-2 py-3 text-xs font-bold text-white shadow-sm transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400">Thanh toán qua VietQR<ArrowRight className="h-4 w-4 shrink-0" /></button></div>
+            <div className="grid grid-cols-2 gap-2">
+              <button type="button" onClick={props.onClose} className="flex h-11 min-w-0 items-center justify-center rounded-xl border border-red-100 bg-red-50 px-2 text-xs font-semibold text-red-600 transition hover:bg-red-100">Hủy bỏ</button>
+              <button type="submit" disabled={!!conflict || !props.startOptions.length || !props.endOptions.length} className="flex h-11 min-w-0 items-center justify-center gap-1.5 rounded-xl bg-emerald-700 px-2 text-xs font-bold leading-tight text-white shadow-sm transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400"><span>Thanh toán qua VietQR</span><ArrowRight className="h-3.5 w-3.5 shrink-0" /></button>
+            </div>
           </footer>
         </form>
       </section>

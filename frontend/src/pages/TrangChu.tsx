@@ -7,6 +7,7 @@ import { scheduleBookingsForDate } from '../utils/courtBookingWarnings';
 import { bookingApiService } from '../services/bookingService';
 import { paymentBookingService } from '../services/paymentBookingService';
 import QrCodeArtwork from '../components/QrCodeArtwork';
+import IncidentSelect from '../components/admin/IncidentSelect';
 import EmployeeDashboard from './employee/EmployeeDashboard';
 import VipCustomerDashboard from './VipCustomerDashboard';
 import { addBookingRequest } from '../types/bookingRequest';
@@ -2972,24 +2973,20 @@ export default function TrangChu() {
                   </div>
 
                   <div className="grid grid-cols-2 gap-2.5">
-                    <label className="space-y-1 text-[11px] font-semibold text-slate-500">
-                      <span>Giờ bắt đầu</span>
-                      <select value={selectedStartTime} onChange={e => handleStartTimeChange(e.target.value)} className={`h-10 w-full cursor-pointer rounded-xl border bg-white px-3 text-sm font-bold outline-none transition focus:ring-2 focus:ring-emerald-100 ${conflictBooking ? 'border-red-300 text-red-700' : 'border-slate-200 text-slate-900 focus:border-emerald-600'}`}>
-                        {filteredStartTimeOptions.map(t => <option key={t} value={t}>{t}</option>)}
-                      </select>
-                    </label>
-                    <label className="space-y-1 text-[11px] font-semibold text-slate-500">
-                      <span>Giờ kết thúc</span>
-                      <select value={selectedEndTime} onChange={e => handleEndTimeChange(e.target.value)} className={`h-10 w-full cursor-pointer rounded-xl border bg-white px-3 text-sm font-bold outline-none transition focus:ring-2 focus:ring-emerald-100 ${conflictBooking ? 'border-red-300 text-red-700' : 'border-slate-200 text-slate-900 focus:border-emerald-600'}`}>
-                        {endTimeOptions.map(t => <option key={t} value={t}>{t}</option>)}
-                      </select>
-                    </label>
+                    <div className="min-w-0 space-y-1">
+                      <label htmlFor="customer-booking-start" className="block text-[11px] font-semibold text-slate-500">Giờ bắt đầu</label>
+                      <IncidentSelect id="customer-booking-start" value={selectedStartTime} options={filteredStartTimeOptions.map(value => ({ value, label: value }))} placeholder="Chọn giờ" searchPlaceholder="Giờ bắt đầu" searchable={false} disabled={!filteredStartTimeOptions.length} onChange={handleStartTimeChange} />
+                    </div>
+                    <div className="min-w-0 space-y-1">
+                      <label htmlFor="customer-booking-end" className="block text-[11px] font-semibold text-slate-500">Giờ kết thúc</label>
+                      <IncidentSelect id="customer-booking-end" value={selectedEndTime} options={endTimeOptions.map(value => ({ value, label: value }))} placeholder="Chọn giờ" searchPlaceholder="Giờ kết thúc" searchable={false} disabled={!endTimeOptions.length} onChange={handleEndTimeChange} />
+                    </div>
                   </div>
                   <div className="flex items-center justify-between gap-2">
                     <label htmlFor="booking-duration" className="flex items-center gap-1.5 text-xs font-medium text-slate-500"><Clock className="h-3.5 w-3.5" />Thời lượng</label>
-                    <select id="booking-duration" value={selectedDuration} onChange={e => handleDurationChange(Number(e.target.value))} className="h-9 max-w-[60%] cursor-pointer rounded-lg border border-slate-200 bg-slate-50 px-2 text-xs font-bold text-slate-800 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100">
-                      {availableDurations.map(dur => <option key={dur} value={dur}>{dur === 30 ? '30 phút' : dur % 60 === 0 ? `${dur / 60} tiếng` : `${Math.floor(dur / 60)} tiếng 30 phút`}</option>)}
-                    </select>
+                    <div className="w-36 max-w-[60%]">
+                      <IncidentSelect id="booking-duration" value={String(selectedDuration)} options={availableDurations.map(dur => ({ value: String(dur), label: dur === 30 ? '30 phút' : dur % 60 === 0 ? `${dur / 60} giờ` : `${Math.floor(dur / 60)} giờ 30 phút` }))} placeholder="Chọn thời lượng" searchPlaceholder="Thời lượng" searchable={false} compact onChange={value => handleDurationChange(Number(value))} />
+                    </div>
                   </div>
                   {conflictBooking && (
                     <div role="alert" className="flex gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-700">
