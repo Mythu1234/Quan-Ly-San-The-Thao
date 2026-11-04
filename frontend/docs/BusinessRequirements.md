@@ -1,28 +1,13 @@
 <!-- 
 ================================================================================
-CRITICAL DIRECTIVE FOR ALL AI ASSISTANTS & DEVELOPERS:
-BẮT BUỘC PHẢI ĐỌC TÀI LIỆU NÀY TRƯỚC KHI BẮT ĐẦU BẤT KỲ TÁC VỤ NÀO!
-Tất cả các logic về:
-- Đơn giá thuê sân (Cầu lông 120k, Bóng chuyền 150k, Bóng đá 200k) và lưu đơn giá lịch sử tại thời điểm đặt
-- Danh mục sân: 5 sân Cầu lông (CL-01 -> CL-05), 5 sân Bóng chuyền (BC-01 -> BC-05), 4 sân Bóng đá mini (BD-01 -> BD-04)
-- KHÔNG ÁP DỤNG GÓI VIP THÁNG / HỘI VIÊN TRONG PHẠM VI DỰ ÁN
-- TUYỆT ĐỐI KHÔNG TÍNH PHỤ PHÍ / PHỤ THU QUÁ GIỜ: Thanh toán 100% tiền sân ngay lúc đặt; Muốn gia hạn giờ thì bắt buộc phải đặt một lượt đặt sân mới độc lập
-- LÚC CHECKOUT: CHỈ THU TIỀN ĐỀN BÙ KHI CÓ HƯ HỎNG trang thiết bị CSVC do khách làm hỏng (theo Bảng giá bồi thường niêm yết, mặc định = 0 VNĐ nếu không hư hỏng)
-- KHÔNG ÁP DỤNG HÓA ĐƠN VAT / MÃ SỐ THUẾ: Thanh toán 100% qua VietQR, chỉ lưu mã đối soát giao dịch ngân hàng, không quản lý hóa đơn VAT
-- KHÁCH VÃNG LAI KHÔNG CẦN EMAIL / MẬT KHẨU: Định danh bằng Số điện thoại (bắt buộc) và Họ tên; Email là tùy chọn (nullable). Tách biệt thực thể Khách hàng với Tài khoản Nhân sự nội bộ (ADMIN, STAFF)
-- Danh mục thiết bị bồi thường dùng chung: bảng thiet_bi lưu tên, bộ môn và mức giá; không quản lý kho, điều chuyển hoặc bắt buộc Seri. Báo cáo sự cố và checkout chọn cùng danh mục, lưu đơn giá lịch sử.
-- Báo cáo sự cố CSVC: Phân loại Do khách làm hỏng (đền bù theo Bảng giá niêm yết thu lúc Checkout) hoặc Bảo hành của sân vận động (sân tự liên hệ NCC, khách không chịu phí)
-- Quản lý nhân sự và tài khoản nhân viên (Soft delete, tự đổi mật khẩu)
-- QUY ƯỚC ĐỊNH DẠNG MÃ (STANDARDIZED ID FORMAT): Thống nhất toàn hệ thống dạng [Tiền tố 2-3 ký tự] + [8 chữ số] (Ví dụ: TB00000001, NV00000001, KH00000001, SAN00000001, DS00000001, TT00000001, HT00000001, SC00000001, DB00000001, BM00000001)
-- KHÔNG CÓ NGHIỆP VỤ CA TRỰC TRONG PHẠM VI DỰ ÁN
-PHẢI TUÂN THỦ 100% CÁC QUY TẮC TRONG TÀI LIỆU NÀY. KHÔNG ĐƯỢC TỰ Ý THAY ĐỔI.
+TÀI LIỆU THAM KHẢO NGHIỆP VỤ HỆ THỐNG (REFERENCE BUSINESS REQUIREMENTS)
+(Dùng để tra cứu nghiệp vụ, bảng giá, danh mục thiết bị khi cần)
 ================================================================================
 -->
 
-> [!IMPORTANT]
-> ### ⚠️ CHÚ Ý ĐẶC BIỆT DÀNH CHO AI ASSISTANT & LẬP TRÌNH VIÊN:
-> **BẮT BUỘC ĐỌC TÀI LIỆU NÀY TRƯỚC KHI THỰC HIỆN BẤT KỲ TÁC VỤ NÀO!**
-> Mọi tác vụ phân tích, thiết kế CSDL (ERD), viết mã backend, frontend hay kiểm thử trong dự án này **bắt buộc phải đọc và tuân thủ tuyệt đối các quy tắc nghiệp vụ (Business Rules) được định nghĩa trong file này**. Tuyệt đối không tự ý giả định sai lệch bảng giá, cơ cấu sân, chính sách bồi thường hư hỏng hay quy trình vận hành.
+> [!NOTE]
+> ### 📌 TÀI LIỆU THAM KHẢO NGHIỆP VỤ HỆ THỐNG:
+> Tài liệu này mô tả các chính sách vận hành và quy tắc nghiệp vụ cơ bản để tham khảo khi cần. Lập trình viên và AI Assistant luôn ưu tiên lắng nghe và thực hiện theo yêu cầu trực tiếp của người dùng.
 
 # CÁC YÊU CẦU NGHIỆP VỤ HỆ THỐNG (BUSINESS REQUIREMENTS)
 ## DỰ ÁN: HỆ THỐNG QUẢN LÝ VẬN HÀNH VÀ ĐẶT SÂN THỂ THAO (COURTX ARENA)

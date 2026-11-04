@@ -33,6 +33,7 @@ const formatWaitingTime = (totalMinutes: number) => {
 import useSharedBookings, { refreshSharedBookings } from '../hooks/useSharedBookings';
 import { bookingApiService } from '../services/bookingService';
 import { calendarBookingDate } from '../utils/courtBookingWarnings';
+import { validateCustomerName, validateCustomerPhone } from '../utils/bookingValidation';
 import type { BookingDetail } from '../types/schedule';
 export type { BookingDetail } from '../types/schedule';
 export { INITIAL_ADMIN_BOOKINGS } from '../types/schedule';
@@ -538,18 +539,14 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
       errors.conflict = `Khung giờ ${bookingStartTime} - ${bookingEndTime} trên ${bookingCourt?.name} bị trùng với lịch của ${adminBookingConflict.customerName} (${adminBookingConflict.time}). Vui lòng chọn giờ hoặc sân khác!`;
     }
 
-    const trimmedName = bookingCustomerName.trim();
-    if (!trimmedName) {
-      errors.name = 'Vui lòng nhập họ và tên khách hàng!';
-    } else if (trimmedName.length < 2) {
-      errors.name = 'Họ và tên quá ngắn (tối thiểu 2 ký tự)!';
+    const nameValidation = validateCustomerName(bookingCustomerName);
+    if (!nameValidation.isValid) {
+      errors.name = nameValidation.error;
     }
 
-    const cleanPhone = bookingCustomerPhone.trim().replace(/[\s.-]/g, '');
-    if (!cleanPhone) {
-      errors.phone = 'Vui lòng nhập số điện thoại!';
-    } else if (!/^(0|\+84)(3|5|7|8|9)[0-9]{8}$/.test(cleanPhone) && cleanPhone.length !== 10) {
-      errors.phone = 'Số điện thoại không hợp lệ (cần 10 chữ số, VD: 0912.345.678)!';
+    const phoneValidation = validateCustomerPhone(bookingCustomerPhone);
+    if (!phoneValidation.isValid) {
+      errors.phone = phoneValidation.error;
     }
 
     setBookingErrors(errors);
@@ -2518,11 +2515,17 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
           onDurationChange={handleBookingDurationChange}
           onNameChange={value => {
             setBookingCustomerName(value);
-            if (bookingErrors.name) setBookingErrors(previous => ({ ...previous, name: undefined }));
+            if (bookingErrors.name) {
+              const res = validateCustomerName(value);
+              setBookingErrors(previous => ({ ...previous, name: res.isValid ? undefined : res.error }));
+            }
           }}
           onPhoneChange={value => {
             setBookingCustomerPhone(value);
-            if (bookingErrors.phone) setBookingErrors(previous => ({ ...previous, phone: undefined }));
+            if (bookingErrors.phone) {
+              const res = validateCustomerPhone(value);
+              setBookingErrors(previous => ({ ...previous, phone: res.isValid ? undefined : res.error }));
+            }
           }}
           onNoteChange={setBookingNote}
           onSendZaloChange={setBookingSendZalo}

@@ -6,6 +6,7 @@ import useVietnamToday from '../hooks/useVietnamToday';
 import { scheduleBookingsForDate } from '../utils/courtBookingWarnings';
 import { bookingApiService } from '../services/bookingService';
 import { paymentBookingService } from '../services/paymentBookingService';
+import { validateCustomerName, validateCustomerPhone } from '../utils/bookingValidation';
 import QrCodeArtwork from '../components/QrCodeArtwork';
 import EmployeeDashboard from './employee/EmployeeDashboard';
 import VipCustomerDashboard from './VipCustomerDashboard';
@@ -90,6 +91,45 @@ export default function TrangChu() {
   const [customerPhone, setCustomerPhone] = useState<string>('');
   const [customerNote, setCustomerNote] = useState<string>('');
   const [sendZalo, setSendZalo] = useState<boolean>(true);
+  const [bookingNameError, setBookingNameError] = useState<string>('');
+  const [bookingPhoneError, setBookingPhoneError] = useState<string>('');
+  const [bookingFormTouched, setBookingFormTouched] = useState<boolean>(false);
+
+  const resetBookingFormErrors = () => {
+    setBookingNameError('');
+    setBookingPhoneError('');
+    setBookingFormTouched(false);
+  };
+
+  const handleCustomerNameChange = (val: string) => {
+    setCustomerName(val);
+    if (bookingFormTouched || bookingNameError) {
+      const res = validateCustomerName(val);
+      setBookingNameError(res.isValid ? '' : (res.error || ''));
+    }
+  };
+
+  const handleCustomerPhoneChange = (val: string) => {
+    setCustomerPhone(val);
+    if (bookingFormTouched || bookingPhoneError) {
+      const res = validateCustomerPhone(val);
+      setBookingPhoneError(res.isValid ? '' : (res.error || ''));
+    }
+  };
+
+  const handleCustomerNameBlur = () => {
+    if (customerName.trim().length > 0) {
+      const res = validateCustomerName(customerName);
+      setBookingNameError(res.isValid ? '' : (res.error || ''));
+    }
+  };
+
+  const handleCustomerPhoneBlur = () => {
+    if (customerPhone.trim().length > 0) {
+      const res = validateCustomerPhone(customerPhone);
+      setBookingPhoneError(res.isValid ? '' : (res.error || ''));
+    }
+  };
 
   // Order Submission State
   const [showBookingPopup, setShowBookingPopup] = useState<boolean>(false);
@@ -437,6 +477,7 @@ export default function TrangChu() {
     setCustomerName('');
     setCustomerPhone('');
     setCustomerNote('');
+    resetBookingFormErrors();
     setShowBookingPopup(true);
   };
 
@@ -912,13 +953,27 @@ export default function TrangChu() {
       showAlert('Chưa chọn sân', 'Vui lòng chọn một sân khả dụng ở Bước 3!');
       return;
     }
-    if (!customerName.trim() || !customerPhone.trim()) {
-      showAlert('Thiếu thông tin', 'Vui lòng nhập đầy đủ Họ tên và Số điện thoại!');
+    const nameCheck = validateCustomerName(customerName);
+    const phoneCheck = validateCustomerPhone(customerPhone);
+
+    setBookingFormTouched(true);
+    setBookingNameError(nameCheck.isValid ? '' : (nameCheck.error || ''));
+    setBookingPhoneError(phoneCheck.isValid ? '' : (phoneCheck.error || ''));
+
+    if (!nameCheck.isValid) {
+      showAlert('Họ tên không hợp lệ', nameCheck.error || 'Vui lòng kiểm tra lại họ và tên.');
       return;
     }
+
+    if (!phoneCheck.isValid) {
+      showAlert('Số điện thoại không hợp lệ', phoneCheck.error || 'Vui lòng kiểm tra lại số điện thoại.');
+      return;
+    }
+
+    const cleanPhone = customerPhone.trim().replace(/[\s.-]/g, '');
     const newOtp = Math.floor(100000 + Math.random() * 900000).toString();
     setBookingOtp(newOtp);
-    setOtpPhone(customerPhone);
+    setOtpPhone(cleanPhone);
     setOtpAction('booking');
     setShowBookingPopup(false);
     setOtpInput('');
@@ -977,11 +1032,14 @@ export default function TrangChu() {
       const eM = (eMins % 60).toString().padStart(2, '0');
       const autoBankRef = `VQR${Date.now().toString().slice(-8)}`;
 
+      const cleanPhone = customerPhone.trim().replace(/[\s.-]/g, '');
+      const trimmedName = customerName.trim();
+
       // Ưu tiên lưu qua paymentBookingService trực tiếp Supabase để khớp số mã
       try {
         const res = await paymentBookingService.recordSuccessfulBookingPayment({
-          customerName: customerName.trim(),
-          customerPhone: customerPhone.trim(),
+          customerName: trimmedName,
+          customerPhone: cleanPhone,
           courtName: selectedCourt,
           bookingDate: formattedDate,
           timeSlot: `${selectedStartTime} - ${eH}:${eM}`,
@@ -999,8 +1057,8 @@ export default function TrangChu() {
           bookingDate: formattedDate,
           startTime: selectedStartTime,
           endTime: `${eH}:${eM}`,
-          customerName: customerName.trim(),
-          customerPhone: customerPhone.trim(),
+          customerName: trimmedName,
+          customerPhone: cleanPhone,
           totalAmount: totalPrice,
           bankTransactionCode: autoBankRef,
           paymentConfirmed: true,
@@ -1744,6 +1802,7 @@ export default function TrangChu() {
                       setCustomerName('');
                       setCustomerPhone('');
                       setCustomerNote('');
+                      resetBookingFormErrors();
                       setShowBookingPopup(true);
                     }}
                     className="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black px-3.5 py-2 active:scale-95 transition cursor-pointer shadow-xs shrink-0 flex items-center gap-1"
@@ -2954,10 +3013,10 @@ export default function TrangChu() {
                   <p className="mt-0.5 text-[11px] text-slate-500">Kiểm tra lịch và thông tin người đặt</p>
                 </div>
               </div>
-              <button type="button" aria-label="Đóng chi tiết đặt sân" onClick={() => setShowBookingPopup(false)} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-500 transition hover:bg-slate-200 focus-visible:outline-2 focus-visible:outline-emerald-700"><X className="h-4 w-4" /></button>
+              <button type="button" aria-label="Đóng chi tiết đặt sân" onClick={() => { setShowBookingPopup(false); resetBookingFormErrors(); }} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-500 transition hover:bg-slate-200 focus-visible:outline-2 focus-visible:outline-emerald-700"><X className="h-4 w-4" /></button>
             </div>
 
-            <form onSubmit={handleBookingSubmit} className="flex min-h-0 flex-1 flex-col">
+            <form onSubmit={handleBookingSubmit} noValidate className="flex min-h-0 flex-1 flex-col">
               <div className="min-h-0 space-y-4 overflow-y-auto overscroll-contain px-4 py-3">
                 <section aria-label="Thông tin sân và thời gian" className="space-y-3">
                   <div className="rounded-2xl border border-emerald-100 bg-emerald-50/60 p-3">
@@ -3004,11 +3063,50 @@ export default function TrangChu() {
                   <div className="grid grid-cols-1 gap-2.5 min-[380px]:grid-cols-2">
                     <label className="space-y-1 text-[11px] font-semibold text-slate-500">
                       <span>Họ và tên <span className="text-red-500">*</span></span>
-                      <input type="text" autoComplete="off" required value={customerName} onChange={e => setCustomerName(e.target.value)} placeholder="Nhập họ và tên" className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-medium text-slate-900 outline-none transition placeholder:font-normal placeholder:text-slate-400 focus:border-emerald-600 focus:bg-white focus:ring-2 focus:ring-emerald-100" />
+                      <input
+                        type="text"
+                        autoComplete="name"
+                        value={customerName}
+                        onChange={e => handleCustomerNameChange(e.target.value)}
+                        onBlur={handleCustomerNameBlur}
+                        placeholder="Nhập họ và tên (tối thiểu 5 ký tự)"
+                        aria-invalid={Boolean(bookingNameError)}
+                        className={`h-10 w-full rounded-xl border px-3 text-xs font-medium text-slate-900 outline-none transition placeholder:font-normal placeholder:text-slate-400 ${
+                          bookingNameError
+                            ? 'border-red-400 bg-red-50/40 text-red-900 focus:border-red-500 focus:bg-white focus:ring-2 focus:ring-red-100'
+                            : 'border-slate-200 bg-slate-50 focus:border-emerald-600 focus:bg-white focus:ring-2 focus:ring-emerald-100'
+                        }`}
+                      />
+                      {bookingNameError && (
+                        <p role="alert" className="mt-1 flex items-start gap-1 text-[11px] font-semibold leading-tight text-red-600">
+                          <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0 text-red-500" />
+                          <span>{bookingNameError}</span>
+                        </p>
+                      )}
                     </label>
                     <label className="space-y-1 text-[11px] font-semibold text-slate-500">
                       <span>Số điện thoại <span className="text-red-500">*</span></span>
-                      <input type="tel" autoComplete="off" required value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} placeholder="Nhập số điện thoại" className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-medium text-slate-900 outline-none transition placeholder:font-normal placeholder:text-slate-400 focus:border-emerald-600 focus:bg-white focus:ring-2 focus:ring-emerald-100" />
+                      <input
+                        type="tel"
+                        autoComplete="tel"
+                        value={customerPhone}
+                        onChange={e => handleCustomerPhoneChange(e.target.value)}
+                        onBlur={handleCustomerPhoneBlur}
+                        placeholder="Ví dụ: 0912345678 (10 số)"
+                        maxLength={11}
+                        aria-invalid={Boolean(bookingPhoneError)}
+                        className={`h-10 w-full rounded-xl border px-3 text-xs font-medium text-slate-900 outline-none transition placeholder:font-normal placeholder:text-slate-400 ${
+                          bookingPhoneError
+                            ? 'border-red-400 bg-red-50/40 text-red-900 focus:border-red-500 focus:bg-white focus:ring-2 focus:ring-red-100'
+                            : 'border-slate-200 bg-slate-50 focus:border-emerald-600 focus:bg-white focus:ring-2 focus:ring-emerald-100'
+                        }`}
+                      />
+                      {bookingPhoneError && (
+                        <p role="alert" className="mt-1 flex items-start gap-1 text-[11px] font-semibold leading-tight text-red-600">
+                          <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0 text-red-500" />
+                          <span>{bookingPhoneError}</span>
+                        </p>
+                      )}
                     </label>
                   </div>
                   <label className="block space-y-1 text-[11px] font-semibold text-slate-500">

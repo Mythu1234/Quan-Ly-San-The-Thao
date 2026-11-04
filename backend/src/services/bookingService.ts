@@ -30,6 +30,18 @@ export async function createPaidBooking(request:any) {
   if(!request||typeof request!=='object'||typeof request.bankTransactionCode!=='string'||!request.bankTransactionCode.trim()||request.paymentConfirmed!==true) {
     throw Object.assign(Error('Nhập mã giao dịch và xác nhận đã đối soát tiền thực nhận qua VietQR.'),{status:400});
   }
+  if (typeof request.customerName === 'string') {
+    const trimmed = request.customerName.trim();
+    if (!trimmed || trimmed.length < 5) {
+      throw Object.assign(Error('Họ và tên khách hàng phải có tối thiểu 5 ký tự.'), { status: 400 });
+    }
+  }
+  if (typeof request.customerPhone === 'string') {
+    const clean = request.customerPhone.trim().replace(/[\s.-]/g, '');
+    if (!/^(03|05|07|08|09)\d{8}$/.test(clean)) {
+      throw Object.assign(Error('Số điện thoại phải có đúng 10 chữ số (bắt đầu bằng 03, 05, 07, 08, 09).'), { status: 400 });
+    }
+  }
   const {data,error}=await supabase.rpc('courtx_create_paid_booking',{p_request:request});
   if(error?.code==='PGRST202')throw Object.assign(Error('Cần chạy migration 20261103_booking_payment.sql trong Supabase SQL Editor để lưu đơn và thanh toán đồng thời.'),{status:503});
   if(error)databaseError(error);

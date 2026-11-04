@@ -246,7 +246,6 @@ export default function AdminDashboard({ onLogout, currentUser }: { onLogout: ()
               >
                 <Users className="w-4 h-4" /> Nhân viên
               </div>
-              <button type="button" onClick={()=>handleTabChange('ho_so')} className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-sm font-bold transition ${activeTab==='ho_so'?'bg-emerald-700 text-white shadow-sm':'text-slate-600 hover:bg-slate-50'}`}><UserIcon className="h-4 w-4"/>Hồ sơ cá nhân</button>
               <div
                 onClick={() => handleTabChange('vi_thu')}
                 className={`flex items-center gap-3 px-3 py-3 rounded-xl font-bold text-sm cursor-pointer ${activeTab === 'vi_thu' ? 'bg-emerald-700 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50'}`}
@@ -259,8 +258,19 @@ export default function AdminDashboard({ onLogout, currentUser }: { onLogout: ()
               >
                 <Dumbbell className="w-4 h-4" /> Cơ sở vật chất
               </div>
+              <button
+                type="button"
+                onClick={() => handleTabChange('ho_so')}
+                className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-sm font-bold transition cursor-pointer ${activeTab === 'ho_so' ? 'bg-emerald-700 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50'}`}
+              >
+                <UserIcon className="h-4 w-4" /> Hồ sơ cá nhân
+              </button>
             </div>
-            <div className="p-4 border-t border-slate-100 flex items-center justify-between bg-slate-50">
+            <div
+              onClick={() => handleTabChange('ho_so')}
+              className="p-4 border-t border-slate-100 flex items-center justify-between bg-slate-50 cursor-pointer hover:bg-emerald-50/50 transition"
+              title="Xem Hồ sơ cá nhân"
+            >
               <div className="flex items-center gap-2">
                 <div className="w-9 h-9 rounded-full bg-emerald-100 flex items-center justify-center border border-emerald-200">
                   <UserIcon className="w-4 h-4 text-emerald-700" />
