@@ -6,7 +6,6 @@ import {
   CalendarDays,
   Check,
   CheckCircle2,
-  ChevronDown,
   Clock3,
   Download,
   Eye,
@@ -19,6 +18,7 @@ import {
   X,
 } from 'lucide-react';
 import type { Transaction } from '../../types/admin';
+import IncidentSelect from './IncidentSelect';
 
 interface WalletRevenueViewProps {
   transactions: Transaction[];
@@ -153,6 +153,17 @@ function StatusPill({ status, compact = false }: { status: Transaction['status']
 }
 
 export default function WalletRevenueView({ transactions, onProcessRefund, isLoading = false }: WalletRevenueViewProps) {
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center h-60 gap-4 text-slate-400">
+        <svg className="animate-spin h-8 w-8 text-emerald-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+        </svg>
+        <p className="text-sm font-medium">Đang tải dữ liệu thống kê…</p>
+      </div>
+    );
+  }
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [sportFilter, setSportFilter] = useState('all');
   const [reportPeriod, setReportPeriod] = useState<ReportPeriod>('day');
@@ -334,6 +345,10 @@ export default function WalletRevenueView({ transactions, onProcessRefund, isLoa
     setRefundTransaction(transaction);
   };
 
+  if (isLoading) {
+    return <div role="status" className="flex h-60 items-center justify-center text-sm text-slate-400">Đang tải dữ liệu thống kê…</div>;
+  }
+
   return (
     <main className="relative @container min-w-0 w-full flex-1 space-y-6 overflow-x-hidden bg-white p-4 pb-28 sm:p-6 lg:p-8">
       <header className="flex min-w-0 flex-col gap-4 @4xl:flex-row @4xl:items-end @4xl:justify-between">
@@ -350,10 +365,9 @@ export default function WalletRevenueView({ transactions, onProcessRefund, isLoa
           </p>
         </div>
 
-        <div className="flex min-w-0 flex-nowrap items-center gap-1.5 sm:gap-2 overflow-x-auto pb-1 sm:pb-0 @4xl:shrink-0">
+        <div className="no-scrollbar flex min-w-0 flex-nowrap items-center gap-1.5 sm:gap-2 overflow-x-auto pb-1 sm:pb-0 @4xl:shrink-0">
           <div role="group" aria-label="Chọn kỳ thống kê" className="inline-flex shrink-0 rounded-lg border border-slate-200 bg-slate-100/80 p-0.5 shadow-sm">
             {([
-              ['day', 'Ngày'],
               ['week', 'Tuần'],
               ['month', 'Tháng'],
             ] as [ReportPeriod, string][]).map(([value, label]) => (
@@ -361,7 +375,7 @@ export default function WalletRevenueView({ transactions, onProcessRefund, isLoa
                 key={value}
                 type="button"
                 aria-pressed={reportPeriod === value}
-                onClick={() => setReportPeriod(value)}
+                onClick={() => setReportPeriod(current => current === value ? 'day' : value)}
                 className={`h-8 rounded-md px-2.5 sm:px-3 text-xs font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 ${
                   reportPeriod === value
                     ? 'bg-emerald-800 text-white shadow-sm'
@@ -375,13 +389,17 @@ export default function WalletRevenueView({ transactions, onProcessRefund, isLoa
 
           <label className="flex h-8.5 shrink-0 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2 sm:px-2.5 text-xs font-medium text-slate-700 shadow-sm focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-100 w-[122px] sm:w-36">
             <CalendarDays className="h-3.5 w-3.5 shrink-0 text-emerald-700" />
-            <span className="sr-only">Chọn ngày neo cho kỳ thống kê</span>
+            <span className="sr-only">Chọn ngày thống kê</span>
             <input
               type="date"
               value={selectedDate}
-              onChange={(event) => setSelectedDate(event.target.value)}
+              onChange={(event) => {
+                if (!event.target.value) return;
+                setSelectedDate(event.target.value);
+                setReportPeriod('day');
+              }}
               className="min-w-0 flex-1 bg-transparent text-xs outline-none"
-              aria-label="Chọn ngày neo cho kỳ thống kê"
+              aria-label="Chọn ngày thống kê"
             />
           </label>
 
@@ -398,7 +416,7 @@ export default function WalletRevenueView({ transactions, onProcessRefund, isLoa
 
       <section
         aria-label={`Số liệu ${periodLabel.toLowerCase()} ${rangeLabel}`}
-        className="flex min-w-0 snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain pb-2"
+        className="no-scrollbar flex min-w-0 snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain pb-2"
       >
         <MetricCard
           icon={<ReceiptText />}
@@ -455,7 +473,7 @@ export default function WalletRevenueView({ transactions, onProcessRefund, isLoa
             <div
               role="img"
               aria-label={`Biểu đồ giá trị đặt sân theo ngày, tổng ${formatCurrency(bookingAmount)}`}
-              className="mt-3 overflow-x-auto pb-1"
+              className="no-scrollbar mt-3 overflow-x-auto pb-1"
             >
               <div className={`flex h-32 min-w-0 items-end gap-1.5 border-b border-slate-200 px-1 sm:gap-2 ${chartData.length > 10 ? 'min-w-[900px]' : ''}`}>
                 {chartData.map(({ date, amount }, index) => {
@@ -549,7 +567,7 @@ export default function WalletRevenueView({ transactions, onProcessRefund, isLoa
               {filteredTransactions.length} / {periodTransactions.length} giao dịch · {rangeLabel}
             </p>
           </div>
-          <div className="flex min-w-0 flex-nowrap items-center gap-1.5 sm:gap-2 overflow-x-auto scrollbar-none pb-0.5 sm:pb-0 shrink-0">
+          <div className="no-scrollbar flex min-w-0 flex-nowrap items-center gap-1.5 sm:gap-2 overflow-x-auto pb-0.5 sm:pb-0 shrink-0">
             <div role="group" aria-label="Lọc theo trạng thái" className="inline-flex shrink-0 min-w-0 gap-0.5 rounded-lg bg-slate-100 p-0.5">
               {([
                 ['all', 'Tất cả'],
@@ -563,26 +581,26 @@ export default function WalletRevenueView({ transactions, onProcessRefund, isLoa
                   aria-pressed={statusFilter === value}
                   onClick={() => setStatusFilter(value)}
                   className={`h-7 shrink-0 rounded-md px-1.5 sm:px-2.5 text-[10.5px] sm:text-[11px] font-bold whitespace-nowrap transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 ${
-                    statusFilter === value ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'
+                    statusFilter === value ? 'bg-emerald-700 text-white shadow-sm' : 'text-slate-600 hover:bg-emerald-50 hover:text-emerald-800'
                   }`}
                 >
                   {label}
                 </button>
               ))}
             </div>
-            <label className="relative flex h-7 shrink-0 items-center">
-              <span className="sr-only">Lọc theo bộ môn</span>
-              <select
+            <div className="w-36 shrink-0">
+              <label htmlFor="transaction-sport-filter" className="sr-only">Lọc theo bộ môn</label>
+              <IncidentSelect
+                id="transaction-sport-filter"
                 value={sportFilter}
-                onChange={(event) => setSportFilter(event.target.value)}
-                aria-label="Lọc theo bộ môn"
-                className="h-7 w-[132px] sm:w-36 shrink-0 appearance-none rounded-lg border border-slate-200 bg-white py-0.5 pl-2.5 pr-6 text-[11px] font-semibold text-slate-700 outline-none focus:border-emerald-500"
-              >
-                <option value="all">Tất cả bộ môn</option>
-                {sports.map((sport) => <option key={sport} value={sport}>{sport}</option>)}
-              </select>
-              <ChevronDown className="pointer-events-none absolute right-1.5 h-3.5 w-3.5 text-slate-400" />
-            </label>
+                onChange={setSportFilter}
+                options={[{value:'all',label:'Tất cả bộ môn'},...sports.map(sport=>({value:sport,label:sport}))]}
+                placeholder="Tất cả bộ môn"
+                searchPlaceholder="Lọc theo bộ môn"
+                searchable={false}
+                compact
+              />
+            </div>
           </div>
         </div>
 
@@ -599,7 +617,7 @@ export default function WalletRevenueView({ transactions, onProcessRefund, isLoa
             </p>
           </div>
         ) : (
-          <div className="w-full min-w-0 overflow-x-auto">
+          <div className="no-scrollbar w-full min-w-0 overflow-x-auto">
             <table className="w-full min-w-[560px] table-fixed border-collapse border border-slate-200 text-left @4xl:min-w-0">
               <thead>
                 <tr className="bg-slate-50/80 text-[11px] font-extrabold uppercase tracking-wide text-slate-500">
@@ -966,18 +984,6 @@ function DetailRow({
   value: string;
   wide?: boolean;
 }) {
-  if (isLoading) {
-    return (
-      <div className="flex flex-col items-center justify-center h-60 gap-4 text-slate-400">
-        <svg className="animate-spin h-8 w-8 text-emerald-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-        </svg>
-        <p className="text-sm font-medium">Đang tải dữ liệu thống kê…</p>
-      </div>
-    );
-  }
-
   return (
     <div className={`flex min-w-0 items-start gap-2 rounded-xl border border-slate-100 bg-slate-50/70 p-2.5 ${wide ? 'sm:col-span-2' : ''}`}>
       <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-white text-slate-500 shadow-sm ring-1 ring-slate-200/70 [&>svg]:h-3.5 [&>svg]:w-3.5">

@@ -57,6 +57,15 @@ for (const reporter of [{name:'Chủ sân thử nghiệm',role:'Chủ sân',phon
   assert.equal(reloaded.reporterName,reporter.name);
 }
 const legacy = {id:'old',title:'Nội dung báo cáo',description:'Nguyên văn\nkhông thay đổi',reportedAt:'07:15',reporterName:'Người lập',imageUrl:photo,timelineLogs:[{id:'update',title:'Sửa chữa',description:'Đang sửa',time:'08:00'}]};
+const duplicates={...legacy,images:[photo,photo],damageItems:[{imageUrl:photo}],timelineLogs:[
+ {id:'REPORT-draft',title:legacy.title,description:legacy.description,time:'07:15',images:[photo]},
+ {id:'later',title:'Ảnh bổ sung',description:'Sau khi kiểm tra',time:'2026-11-03T18:20:17.565Z',images:[photo,updatePhoto,updatePhoto]}
+]};
+const deduplicated=getIncidentTimeline(duplicates);
+assert.equal(deduplicated.flatMap(log=>log.images||[]).length,2,'each distinct photo appears once across report and updates');
+assert.equal(deduplicated.length,2,'initial report does not become a duplicate journal entry');
+assert.ok(deduplicated[0].time.includes('01:20:17'),'ISO log time is displayed in Vietnam time');
+assert.equal(deduplicated.at(-1).images[0],photo,'original photo stays on the original report');
 assert.equal(getIncidentTimeline(legacy).at(-1).description,legacy.description);
 assert.equal(getIncidentTimeline(legacy).at(-1).images[0],photo);
 const cached = {...legacy, updatedAt:'2026-11-01T10:00:00Z'};

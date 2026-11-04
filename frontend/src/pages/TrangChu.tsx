@@ -7,6 +7,7 @@ import { scheduleBookingsForDate } from '../utils/courtBookingWarnings';
 import { bookingApiService } from '../services/bookingService';
 import { paymentBookingService } from '../services/paymentBookingService';
 import QrCodeArtwork from '../components/QrCodeArtwork';
+import IncidentSelect from '../components/admin/IncidentSelect';
 import EmployeeDashboard from './employee/EmployeeDashboard';
 import VipCustomerDashboard from './VipCustomerDashboard';
 import { addBookingRequest } from '../types/bookingRequest';
@@ -1084,6 +1085,12 @@ Thời gian xuất phiếu:  ${new Date().toLocaleString('vi-VN')}
     setOtpAction('cancel');
     setOtpInput('');
     setOtpError(false);
+    setSmsToast({
+      sender: 'COURTX-OTP',
+      phone: targetPhone,
+      message: `Mã OTP xác thực hủy đơn ${ticket.code} của quý khách là: ${newOtp} (hiệu lực 60s).`,
+      otp: newOtp,
+    });
     setShowOTP(true);
   };
 
@@ -1097,9 +1104,66 @@ Thời gian xuất phiếu:  ${new Date().toLocaleString('vi-VN')}
     setCancelConfirmation(ticket);
   };
 
-  const completeCancellation = (_ticket: unknown, _refundEligible: boolean) => {
+  const completeCancellation = async (ticket: any, refundEligible: boolean) => {
     setCancelConfirmation(null);
-    showAlert('Hỗ trợ hủy đặt sân','Vui lòng liên hệ quầy để xác thực và xử lý hủy, hoàn tiền.');
+    setPopup({
+      type: 'processing',
+      title: 'Đang xử lý hủy đặt sân...',
+      message: 'Hệ thống đang giải phóng khung giờ và xử lý lệnh hoàn tiền qua VietQR...',
+    });
+
+    try {
+      const rawRefund = refundEligible
+        ? (ticket.rawTotal || Number(String(ticket.total || '').replace(/\D/g, '')) || 120000)
+        : 0;
+
+      const reason = refundEligible
+        ? 'Khách hàng tự hủy trên website trước >= 24h (Đủ điều kiện hoàn tiền 100%)'
+        : 'Khách hàng tự hủy trên website dưới 24h (Không đủ điều kiện hoàn tiền)';
+
+      const res = await bookingApiService.cancelBooking({
+        code: ticket.code,
+        isEligible: refundEligible,
+        reason,
+        customerPhone: ticket.phone,
+        customerName: ticket.name,
+        refundAmount: rawRefund,
+      });
+
+      if (!res.success) {
+        throw new Error(res.message);
+      }
+
+      // Cập nhật trạng thái hiển thị ngay trên danh sách tra cứu
+      setLookupResults((prev) =>
+        prev.map((t) =>
+          t.code === ticket.code
+            ? {
+                ...t,
+                status: 'ĐÃ HỦY',
+                canCancel: false,
+                refundAmount: refundEligible ? `${rawRefund.toLocaleString('vi-VN')}đ` : '0đ',
+                refundStatus: refundEligible ? 'Đã hoàn tiền' : 'Không hoàn tiền',
+              }
+            : t
+        )
+      );
+
+      setPopup({
+        type: 'cancel-success',
+        title: 'Hủy đặt sân thành công!',
+        message: `Lịch đặt mã ${ticket.code} (${ticket.court}) đã được hủy và giải phóng thành công.`,
+        policyMessage: refundEligible
+          ? `Hủy trước ≥ 24h: Hệ thống đã tạo lệnh tự động hoàn tiền 100% (${rawRefund.toLocaleString('vi-VN')} VNĐ) qua VietQR cho quý khách.`
+          : 'Hủy trước dưới 24h: Theo quy định, lượt đặt này không được hoàn tiền. Khung giờ đã được giải phóng cho khách khác.',
+      });
+    } catch (err: any) {
+      setPopup({
+        type: 'alert',
+        title: 'Lỗi hủy đặt sân',
+        message: err?.message || 'Không thể hủy đơn lúc này. Vui lòng liên hệ quầy sân để được hỗ trợ.',
+      });
+    }
   };
 
   if (isAdminLoggedIn) {
@@ -1854,7 +1918,7 @@ Thời gian xuất phiếu:  ${new Date().toLocaleString('vi-VN')}
                           disabled={!lookupResult.canCancel || lookupResult.status === 'ĐÃ HỦY'}
                           className={'w-full rounded-xl border py-2.5 text-xs font-bold active:scale-95 transition ' + (lookupResult.status === 'ĐÃ HỦY' ? 'border-slate-200 text-slate-400 bg-slate-50' : 'border-red-200 text-red-600 hover:bg-red-50')}
                         >
-                          {lookupResult.status === 'ĐÃ HỦY' ? 'Đã hủy' : lookupResult.canCancel ? 'Hủy vé' : 'Liên hệ quầy để hủy đặt sân'}
+                          {lookupResult.status === 'ĐÃ HỦY' ? 'Đã hủy' : lookupResult.canCancel ? 'Hủy vé' : 'Không thể hủy (Đã quá giờ)'}
                         </button>
                       </div>
                     </div>
@@ -2940,24 +3004,20 @@ Thời gian xuất phiếu:  ${new Date().toLocaleString('vi-VN')}
                   </div>
 
                   <div className="grid grid-cols-2 gap-2.5">
-                    <label className="space-y-1 text-[11px] font-semibold text-slate-500">
-                      <span>Giờ bắt đầu</span>
-                      <select value={selectedStartTime} onChange={e => handleStartTimeChange(e.target.value)} className={`h-10 w-full cursor-pointer rounded-xl border bg-white px-3 text-sm font-bold outline-none transition focus:ring-2 focus:ring-emerald-100 ${conflictBooking ? 'border-red-300 text-red-700' : 'border-slate-200 text-slate-900 focus:border-emerald-600'}`}>
-                        {filteredStartTimeOptions.map(t => <option key={t} value={t}>{t}</option>)}
-                      </select>
-                    </label>
-                    <label className="space-y-1 text-[11px] font-semibold text-slate-500">
-                      <span>Giờ kết thúc</span>
-                      <select value={selectedEndTime} onChange={e => handleEndTimeChange(e.target.value)} className={`h-10 w-full cursor-pointer rounded-xl border bg-white px-3 text-sm font-bold outline-none transition focus:ring-2 focus:ring-emerald-100 ${conflictBooking ? 'border-red-300 text-red-700' : 'border-slate-200 text-slate-900 focus:border-emerald-600'}`}>
-                        {endTimeOptions.map(t => <option key={t} value={t}>{t}</option>)}
-                      </select>
-                    </label>
+                    <div className="min-w-0 space-y-1">
+                      <label htmlFor="customer-booking-start" className="block text-[11px] font-semibold text-slate-500">Giờ bắt đầu</label>
+                      <IncidentSelect id="customer-booking-start" value={selectedStartTime} options={filteredStartTimeOptions.map(value => ({ value, label: value }))} placeholder="Chọn giờ" searchPlaceholder="Giờ bắt đầu" searchable={false} disabled={!filteredStartTimeOptions.length} onChange={handleStartTimeChange} />
+                    </div>
+                    <div className="min-w-0 space-y-1">
+                      <label htmlFor="customer-booking-end" className="block text-[11px] font-semibold text-slate-500">Giờ kết thúc</label>
+                      <IncidentSelect id="customer-booking-end" value={selectedEndTime} options={endTimeOptions.map(value => ({ value, label: value }))} placeholder="Chọn giờ" searchPlaceholder="Giờ kết thúc" searchable={false} disabled={!endTimeOptions.length} onChange={handleEndTimeChange} />
+                    </div>
                   </div>
                   <div className="flex items-center justify-between gap-2">
                     <label htmlFor="booking-duration" className="flex items-center gap-1.5 text-xs font-medium text-slate-500"><Clock className="h-3.5 w-3.5" />Thời lượng</label>
-                    <select id="booking-duration" value={selectedDuration} onChange={e => handleDurationChange(Number(e.target.value))} className="h-9 max-w-[60%] cursor-pointer rounded-lg border border-slate-200 bg-slate-50 px-2 text-xs font-bold text-slate-800 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100">
-                      {availableDurations.map(dur => <option key={dur} value={dur}>{dur === 30 ? '30 phút' : dur % 60 === 0 ? `${dur / 60} tiếng` : `${Math.floor(dur / 60)} tiếng 30 phút`}</option>)}
-                    </select>
+                    <div className="w-36 max-w-[60%]">
+                      <IncidentSelect id="booking-duration" value={String(selectedDuration)} options={availableDurations.map(dur => ({ value: String(dur), label: dur === 30 ? '30 phút' : dur % 60 === 0 ? `${dur / 60} giờ` : `${Math.floor(dur / 60)} giờ 30 phút` }))} placeholder="Chọn thời lượng" searchPlaceholder="Thời lượng" searchable={false} compact onChange={value => handleDurationChange(Number(value))} />
+                    </div>
                   </div>
                   {conflictBooking && (
                     <div role="alert" className="flex gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-700">

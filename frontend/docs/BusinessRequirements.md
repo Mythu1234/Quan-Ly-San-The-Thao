@@ -10,7 +10,7 @@ Tất cả các logic về:
 - LÚC CHECKOUT: CHỈ THU TIỀN ĐỀN BÙ KHI CÓ HƯ HỎNG trang thiết bị CSVC do khách làm hỏng (theo Bảng giá bồi thường niêm yết, mặc định = 0 VNĐ nếu không hư hỏng)
 - KHÔNG ÁP DỤNG HÓA ĐƠN VAT / MÃ SỐ THUẾ: Thanh toán 100% qua VietQR, chỉ lưu mã đối soát giao dịch ngân hàng, không quản lý hóa đơn VAT
 - KHÁCH VÃNG LAI KHÔNG CẦN EMAIL / MẬT KHẨU: Định danh bằng Số điện thoại (bắt buộc) và Họ tên; Email là tùy chọn (nullable). Tách biệt thực thể Khách hàng với Tài khoản Nhân sự nội bộ (ADMIN, STAFF)
-- Quản lý thiết bị từng chiếc (Asset Serial) gắn trực tiếp với từng sân; lưu thông tin Nhà cung cấp trực tiếp tại thiết bị (không quản lý bảng bảo hành sửa chữa riêng)
+- Danh mục thiết bị bồi thường dùng chung: bảng thiet_bi lưu tên, bộ môn và mức giá; không quản lý kho, điều chuyển hoặc bắt buộc Seri. Báo cáo sự cố và checkout chọn cùng danh mục, lưu đơn giá lịch sử.
 - Báo cáo sự cố CSVC: Phân loại Do khách làm hỏng (đền bù theo Bảng giá niêm yết thu lúc Checkout) hoặc Bảo hành của sân vận động (sân tự liên hệ NCC, khách không chịu phí)
 - Quản lý nhân sự và tài khoản nhân viên (Soft delete, tự đổi mật khẩu)
 - QUY ƯỚC ĐỊNH DẠNG MÃ (STANDARDIZED ID FORMAT): Thống nhất toàn hệ thống dạng [Tiền tố 2-3 ký tự] + [8 chữ số] (Ví dụ: TB00000001, NV00000001, KH00000001, SAN00000001, DS00000001, TT00000001, HT00000001, SC00000001, DB00000001, BM00000001)
@@ -151,13 +151,18 @@ Các thông tin này là cơ sở cốt lõi để lập trình logic xử lý, 
     $$\text{Tổng tiền thu lúc Checkout} = \text{Phí bồi thường sự cố CSVC do khách làm hỏng (nếu có, mặc định = 0 VNĐ)}$$
     $$\text{Tổng thanh toán lượt đặt} = \text{Tiền thuê sân (đã thanh toán 100% lúc đặt)} + \text{Phí bồi thường CSVC (nếu có)}$$
 
+* **Thanh toán bồi thường tại Check-out:** Sau khi nhập đủ thông tin sự cố và chọn trách nhiệm, nhân viên tick `Thanh toán qua VietQR` để mở mã QR dùng chung với phần đặt sân. Hệ thống mô phỏng ghi nhận thành công sau **7 giây**, tự tạo mã tham chiếu giao dịch và mở nút `Xác nhận Check-out`. Nhân viên phải nhấn xác nhận để lưu quyết toán, thanh toán và báo cáo sự cố; bộ đếm không tự hoàn tất trả sân. Thay đổi thông tin sự cố hoặc số tiền sẽ hủy trạng thái xác nhận thanh toán cũ. Bỏ tick sẽ hủy chờ thanh toán. Sân chịu chi phí hoặc không có hư hỏng thì không cần bước thanh toán bồi thường. Đây là luồng mô phỏng, chưa phải xác minh giao dịch ngân hàng thực tế.
+
 ---
 
 ## 8. QUẢN LÝ CƠ SỞ VẬT CHẤT, BÁO CÁO SỰ CỐ & BẢNG GIÁ ĐỀN BÙ (ASSET & DAMAGE MANAGEMENT)
 
-1. **Quản lý theo từng cá thể tài sản (Asset Tracking):**
-   * Tuyệt đối **không ghi số lượng tổng gộp** (Ví dụ: Không ghi "Vợt: 10 cái").
-   * Mỗi tài sản là một bản ghi độc lập, có **Mã thiết bị** và **Mã Seri / Asset Tag** riêng biệt để phục vụ dán mã QR kiểm kê và theo dõi bảo hành.
+1. **Danh mục thiết bị và giá bồi thường (cập nhật theo yêu cầu chủ dự án):**
+   * `thiet_bi` là danh mục dùng chung cho bảng giá, báo cáo sự cố và checkout; mỗi mục có mã, tên, bộ môn và mức giá bồi thường.
+   * Mã danh mục được chuẩn hóa từ `TB00000001`; giá mua lưu tại `gia_mua` (chưa biết thì NULL), giá bồi thường lưu tại `gia_boi_thuong`. Không lấy giá bồi thường làm giá mua khi thiếu dữ liệu.
+   * Không quản lý tồn kho, điều chuyển, cấp phát theo lượt đặt hoặc bắt buộc nhập Seri. Thông tin nhà cung cấp/bảo hành là tùy chọn.
+   * Các mục trùng được gộp; dữ liệu thiết bị cũ được lưu lại trong lịch sử sự cố/quyết toán trước khi loại khỏi danh mục.
+   * `bang_gia_den_bu` giữ liên kết tương thích để bảo toàn giao dịch và đơn giá đã áp dụng. Thêm thiết bị phải lưu đồng thời thiết bị và mức giá, không sinh hai danh sách tên riêng.
 2. **Thông tin Nhà cung cấp & Bảo hành (Lưu trực tiếp tại thiết bị):**
    * Mỗi thiết bị lưu trữ trực tiếp: Tên nhà cung cấp (`nha_cung_cap`), Hotline nhà cung cấp (`sdt_ncc`), Ngày đưa vào sử dụng và Thời hạn bảo hành (`han_bao_hanh`).
    * Hệ thống **không thiết kế bảng phiếu bảo hành/sửa chữa riêng** để tinh gọn quy trình; khi có sự cố cần bảo hành, nhân viên tra cứu trực tiếp thông tin NCC từ thiết bị.
@@ -166,10 +171,9 @@ Các thông tin này là cơ sở cốt lõi để lập trình logic xử lý, 
    * `dang_su_dung`: Thiết bị đang phục vụ khách trên sân.
    * `bao_tri`: Thiết bị đang trong quá trình bảo dưỡng hoặc gửi NCC bảo hành.
    * `hong`: Thiết bị gặp sự cố hư hại, không thể sử dụng.
-4. **Phân bổ vị trí thiết bị cố định theo sân (Option B):**
-   * Thiết bị được gán cố định với từng sân cụ thể (`ma_san`) (ví dụ: Bộ trụ lưới CL-01 gắn với Sân CL-01; Thảm vinyl gắn với Sân BC-02...).
-   * Thiết bị dùng chung (Dàn đèn LED trần, Ghế trọng tài, Máy lau sàn) có `ma_san = NULL` (lưu tại khu vực dùng chung / Kho chung).
-   * Không sử dụng bảng trung gian cấp phát mượn/trả di động riêng lẻ theo từng ca chơi.
+4. **Sân được ghi nhận trên từng báo cáo:**
+   * Danh mục thiết bị không gắn cố định với một sân. Báo cáo sự cố ghi sân/khu vực và lượt đặt liên quan.
+   * Một loại thiết bị có thể được báo hỏng tại nhiều sân; không đổi tình trạng của toàn bộ danh mục khi chỉ một sân gặp sự cố.
 5. **Ghi nhận Sự cố hư hỏng & Phân loại Trách nhiệm (Master - Detail Incident Reporting):**
    * Khi phát sinh hư hại trang thiết bị hoặc mặt sân, nhân viên lập biên bản sự cố tổng (`bao_cao_su_co`) và danh sách các món hư hại (`chi_tiet_su_co`).
    * **Bảo toàn đơn giá đền bù lịch sử:** Bảng `chi_tiet_su_co` lưu vết `don_gia_ap_dung` tại thời điểm xảy ra sự cố và `so_luong_hu_hai` để tính `thanh_tien`, đảm bảo khi bảng giá niêm yết thay đổi thì biên bản cũ không bị sai lệch số tiền phạt.
@@ -181,7 +185,7 @@ Các thông tin này là cơ sở cốt lõi để lập trình logic xử lý, 
      * **Trường hợp 2: Bảo hành của sân vận động / Hao mòn tự nhiên (`BAO_HANH_SAN_VAN_DONG`):**
        - Sự cố phát sinh do khấu hao tự nhiên, lỗi linh kiện nhà sản xuất, chập điện giàn đèn trần hoặc hết hạn bảo dưỡng.
        - Sân vận động tự chi trả 100% chi phí sửa chữa. Khách hàng **không phải thanh toán bất kỳ khoản bồi thường nào**.
-       - Nhân viên cập nhật trạng thái thiết bị sang `hong` hoặc `bao_tri` và tra cứu thông tin NCC lưu tại thiết bị để liên hệ xử lý.
+       - Nhân viên cập nhật tiến độ xử lý trên báo cáo sự cố và tra cứu thông tin NCC nếu có; không thu bồi thường của khách.
 6. **Bảng giá niêm yết bồi thường vật tư / trang thiết bị hư hại (Damage Compensation Price List):**
    Hệ thống quy định bảng giá bồi thường chuẩn hóa công khai để áp dụng thu tiền minh bạch khi khách làm hỏng:
 

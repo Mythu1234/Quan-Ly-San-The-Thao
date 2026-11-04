@@ -30,6 +30,18 @@ beforeEach(async()=>{
 });
 after(()=>db.close());
 const checkin=()=>sql("SELECT courtx_checkin('DS00000001','2026-11-03')");
+
+test('catalogue equipment and price save atomically, and checkout preserves its shared catalogue status',async()=>{
+ const code=await rpc('courtx_save_equipment',{name:'Catalogue item',sportType:'CauLong',isCatalogItem:true,
+  compensationPrice:35000,serialNumber:'DM-catalogue-test',currentLocation:'Kho chung',status:'san_sang'});
+ const price=(await sql("SELECT * FROM bang_gia_den_bu WHERE mo_ta_hu_hai=$1",['asset:'+code])).rows[0];
+ assert.equal(Number(price.don_gia_den_bu),35000);
+ assert.equal(await scalar('SELECT thong_tin_bo_sung->>\'compensationPrice\' FROM thiet_bi WHERE ma_thiet_bi=$1',[code]),'35000');
+ await checkin();
+ const result=await rpc('courtx_checkout',request([{...report(),equipmentCode:undefined,compensationItemId:price.ma_danh_muc_den_bu}],35000));
+ assert.equal(Number(result.receipt.amountPaid),35000);
+ assert.equal(await scalar('SELECT trang_thai FROM thiet_bi WHERE ma_thiet_bi=$1',[code]),'san_sang');
+});
 test('check-in requires paid booking and an unlocked, available court; repeated check-in is safe',async()=>{
   await sql("UPDATE san SET trang_thai='bao_tri'");
   await assert.rejects(checkin(),/khóa/);
@@ -70,6 +82,19 @@ test('customer damage uses database price; payment/price failures roll back repo
   assert.deepEqual(await rpc('courtx_checkout',request([report()],150000)),result);
   assert.equal(await scalar('SELECT count(*)::int FROM thanh_toan'),2);
 });
+test('incident timeline photos persist without replacing the report, court or historical price',async()=>{
+  const id=await rpc('courtx_save_incident',report('BAO_HANH_SAN_VAN_DONG'));
+  const before=(await sql('SELECT * FROM bao_cao_su_co WHERE ma_su_co=$1',[id])).rows[0];
+  const photo='data:image/png;base64,iVBORw0KGgo=';
+  await sql('SELECT courtx_patch_incident($1,$2::jsonb)',[id,JSON.stringify({newLog:{id:'LOG-NEW',title:'Đã kiểm tra',description:'Ghi nhận hiện trường',images:[photo]}})]);
+  const after=(await sql('SELECT * FROM bao_cao_su_co WHERE ma_su_co=$1',[id])).rows[0];
+  assert.equal(after.thong_tin_bo_sung.timelineLogs[0].images[0],photo);
+  assert.equal(after.thong_tin_bo_sung.courtName,before.thong_tin_bo_sung.courtName);
+  assert.deepEqual(after.thong_tin_bo_sung.images,before.thong_tin_bo_sung.images);
+  assert.equal(Number(after.tong_tien_den_bu),0);
+  assert.equal(Number(await scalar('SELECT don_gia_ap_dung FROM chi_tiet_su_co WHERE ma_su_co=$1',[id])),150000);
+});
+
 test('venue liability has no compensation payment but retains damage history and images',async()=>{
   await checkin();
   await rpc('courtx_checkout',request([report('BAO_HANH_SAN_VAN_DONG')]));

@@ -2,8 +2,8 @@ import { supabase } from '../lib/supabaseClient.js';
 import type { FacilityEquipment, CourtStatusItem, FacilityIncident, IncidentTimelineLog } from '../types/facility.js';
 import type { CheckoutResult } from '../types/checkout.js';
 
-const equipmentSelect = '*,san(*,bo_mon(*))';
-const incidentSelect = '*,nhan_vien(ma_nhan_vien,ho_ten,so_dien_thoai,vai_tro),dat_san(ngay_dat,san(*)),chi_tiet_su_co(*,thiet_bi(*,san(*)),bang_gia_den_bu(*))';
+const equipmentSelect = '*';
+const incidentSelect = '*,nhan_vien(ma_nhan_vien,ho_ten,so_dien_thoai,vai_tro),dat_san(ngay_dat,san(*)),chi_tiet_su_co(*,thiet_bi(*),bang_gia_den_bu(*))';
 const statusLabels: Record<string,string> = {san_sang:'Sẵn sàng',dang_su_dung:'Đang sử dụng',bao_tri:'Bảo trì',hong:'Hỏng'};
 const sportId = (name = ''): 'badminton'|'volleyball'|'football' => /chuyền/i.test(name)?'volleyball':/đá/i.test(name)?'football':'badminton';
 const displayDate = (value?: string) => value ? value.slice(0,10).split('-').reverse().join('/') : '';
@@ -21,31 +21,39 @@ export function mapCourt(row: any): CourtStatusItem {
 }
 export function mapEquipment(row: any): FacilityEquipment {
   const extra = row.thong_tin_bo_sung || {};
+  const optionalPrice=(value:unknown)=>value===null||value===undefined?undefined:Number(value);
   return {...extra,id:row.ma_thiet_bi,code:row.ma_thiet_bi,name:row.ten_thiet_bi,
+    purchasePrice:optionalPrice(row.gia_mua!==undefined?row.gia_mua:extra.purchasePrice),
+    compensationPrice:optionalPrice(row.gia_boi_thuong!==undefined?row.gia_boi_thuong:extra.compensationPrice),
     category:extra.category || 'dung_cu',categoryLabel:extra.categoryLabel || 'Dụng cụ',
     sportType:extra.sportType || (row.san ? {badminton:'CauLong',volleyball:'BongChuyen',football:'BongDa'}[sportId(row.san.bo_mon?.ten_bo_mon)]:'DungChung'),
     currentLocation:row.san?.ten_san || 'Kho chung',status:row.trang_thai,statusLabel:statusLabels[row.trang_thai],healthRate:extra.healthRate || 'Đang theo dõi',
-    purchaseDate:displayDate(row.ngay_mua),warrantyExpire:displayDate(row.han_bao_hanh),serialNumber:row.so_seri || '',supplier:row.nha_cung_cap || '',supplierPhone:row.sdt_ncc || ''};
+    purchaseDate:displayDate(row.ngay_mua),warrantyExpire:displayDate(row.han_bao_hanh),serialNumber:extra.isCatalogItem&&row.so_seri?.startsWith('DM-')?'':row.so_seri || '',supplier:row.nha_cung_cap || '',supplierPhone:row.sdt_ncc || ''};
 }
 export function mapIncident(row: any): FacilityIncident {
   const extra = row.thong_tin_bo_sung || {}, details = row.chi_tiet_su_co || [], first = details[0];
   const court = row.dat_san?.san || first?.thiet_bi?.san;
-  const status = row.trang_thai_xu_ly==='DA_XU_LY'?'da_khac_phuc':extra.status==='dang_sua_chua'?'dang_sua_chua':'cho_xu_ly';
+  const status = row.trang_thai_xu_ly==='DA_XU_LY'?'da_khac_phuc':row.trang_thai_xu_ly==='DANG_SUA_CHUA'||(row.trang_thai_xu_ly==='CHO_BOI_THUONG'&&extra.status==='dang_sua_chua')?'dang_sua_chua':'cho_xu_ly';
   return {...extra,id:row.ma_su_co,bookingCode:row.ma_dat_san || undefined,bookingDate:row.dat_san?.ngay_dat,
-    courtId:court?.ma_san || extra.courtId,courtName:court?.ten_san || extra.courtName || 'Kho chung',
-    equipmentCode:first?.ma_thiet_bi || undefined,equipmentName:first?.thiet_bi?.ten_thiet_bi || first?.bang_gia_den_bu?.ten_vat_tu || extra.equipmentName,
+    courtId:court?.ma_san || extra.courtId,courtName:court?.ten_san || (extra.courtName==='Kho chung'?'':extra.courtName) || '',
+    equipmentCode:first?.ma_thiet_bi || undefined,equipmentName:first?.bang_gia_den_bu?.ten_vat_tu || first?.thiet_bi?.ten_thiet_bi || extra.equipmentName,
     compensationItemId:first?.ma_danh_muc_den_bu,compensationPrice:details.reduce((sum:number,d:any)=>sum+Number(d.don_gia_ap_dung)*Number(d.so_luong_hu_hai),0),
     liability:row.nguyen_nhan,compensationAmount:Number(row.tong_tien_den_bu),
     compensationPaymentStatus:extra.compensationPaymentStatus || (Number(row.tong_tien_den_bu)===0?'not_required':'pending'),
-    title:extra.title || `Sự cố ${first?.thiet_bi?.ten_thiet_bi || first?.bang_gia_den_bu?.ten_vat_tu || row.ma_su_co}`,
+    title:extra.title || `Sự cố ${first?.bang_gia_den_bu?.ten_vat_tu || first?.thiet_bi?.ten_thiet_bi || row.ma_su_co}`,
     description:extra.description || details.map((item:any)=>item.mo_ta_chi_tiet).filter(Boolean).join('\n'),
     severity:extra.severity || 'trung_binh',severityLabel:extra.severityLabel || 'Trung bình',status,
     statusLabel:status==='da_khac_phuc'?'Đã khắc phục':status==='dang_sua_chua'?'Đang sửa chữa':'Chờ xử lý',
     reporterName:row.nhan_vien?.ho_ten || extra.reporterName || '',reporterPhone:row.nhan_vien?.so_dien_thoai || '',
     reporterRole:row.nhan_vien?.vai_tro==='ADMIN'?'Chủ sân':'Nhân viên',
     reportedAt:new Date(row.ngay_tao).toLocaleString('vi-VN',{timeZone:'Asia/Ho_Chi_Minh'}),createdAt:row.ngay_tao,
-    damageItems:extra.damageItems || details.map((item:any)=>({id:item.ma_chi_tiet,equipmentCode:item.ma_thiet_bi,
-      title:item.thiet_bi?.ten_thiet_bi || item.bang_gia_den_bu?.ten_vat_tu,description:item.mo_ta_chi_tiet,riskBadge:'Hư hỏng',riskColor:'amber'})),
+    damageItems:details.map((item:any,index:number)=>{
+      const saved=extra.damageItems?.find((entry:any)=>entry.id===item.ma_chi_tiet)
+        || (extra.damageItems?.length===details.length?extra.damageItems[index]:{}) || {};
+      return {...saved,id:item.ma_chi_tiet,equipmentCode:item.ma_thiet_bi || undefined,
+        title:item.bang_gia_den_bu?.ten_vat_tu || item.thiet_bi?.ten_thiet_bi || saved.title,
+        description:saved.description || item.mo_ta_chi_tiet,riskBadge:saved.riskBadge || 'Hư hỏng',riskColor:saved.riskColor || 'amber'};
+    }),
     images:extra.images || [],timelineLogs:extra.timelineLogs || []};
 }
 
@@ -125,12 +133,24 @@ export class FacilityRepository {
   async getCompensationPrices() {
     const {data,error}=await supabase.from('bang_gia_den_bu').select('*,bo_mon(ten_bo_mon)').order('ma_danh_muc_den_bu');
     if(error)databaseError(error);
-    return (data||[]).filter((row:any)=>!row.da_an).map((row:any)=>({id:row.ma_danh_muc_den_bu,name:row.ten_vat_tu,price:Number(row.don_gia_den_bu),
-      sport:row.bo_mon?sportId(row.bo_mon.ten_bo_mon):'common',equipmentId:row.mo_ta_hu_hai?.startsWith('asset:')?row.mo_ta_hu_hai.slice(6):undefined}));
+    const equipments=await this.getAllEquipments();
+    const catalog=equipments.filter(item=>item.isCatalogItem);
+    return (data||[]).filter((row:any)=>!row.da_an).flatMap((row:any)=>{
+      const equipment=catalog.find(item=>item.compensationItemId===row.ma_danh_muc_den_bu||row.mo_ta_hu_hai===`asset:${item.id}`);
+      if(catalog.length&&!equipment)return [];
+      return [{id:row.ma_danh_muc_den_bu,name:equipment?.name||row.ten_vat_tu,price:Number(equipment?.compensationPrice??row.don_gia_den_bu),
+        sport:equipment?({CauLong:'badminton',BongChuyen:'volleyball',BongDa:'football'} as Record<string,string>)[equipment.sportType]||'common':row.bo_mon?sportId(row.bo_mon.ten_bo_mon):'common',
+        equipmentId:equipment?.id||(row.mo_ta_hu_hai?.startsWith('asset:')?row.mo_ta_hu_hai.slice(6):undefined)}];
+    });
   }
   async hideCompensationPrice(id:string) {
+    const catalog=(await this.getAllEquipments()).filter(item=>item.isCatalogItem);
+    const price=await supabase.from('bang_gia_den_bu').select('mo_ta_hu_hai').eq('ma_danh_muc_den_bu',id).maybeSingle();
+    if(price.error)databaseError(price.error);
+    const equipment=catalog.find(item=>item.compensationItemId===id||price.data?.mo_ta_hu_hai===`asset:${item.id}`);
     const {error}=await supabase.from('bang_gia_den_bu').update({da_an:true}).eq('ma_danh_muc_den_bu',id);
     if(error)databaseError(error);
+    if(equipment)await this.deleteEquipment(equipment.id);
   }
   async expandCheckout(value:any):Promise<CheckoutResult> {
     const [incidents,equipments]=await Promise.all([this.getAllIncidents(),this.getAllEquipments()]);

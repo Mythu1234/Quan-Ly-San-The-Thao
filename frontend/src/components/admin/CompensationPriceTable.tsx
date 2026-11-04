@@ -134,7 +134,8 @@ export default function CompensationPriceTable({
           name={viewingItem.name}
           sportLabel={sport.label}
           compensationPrice={viewingItem.price}
-          equipment={viewingItem.equipment && equipments.find((equipment) => equipment.id === viewingItem.equipment?.id)}
+          equipment={viewingItem.equipment}
+          onUpdated={equipment=>setViewingItem(current=>current?{...current,equipment,name:equipment.name,price:equipment.compensationPrice??current.price}:null)}
           onClose={() => setViewingItem(null)}
         />
       )}

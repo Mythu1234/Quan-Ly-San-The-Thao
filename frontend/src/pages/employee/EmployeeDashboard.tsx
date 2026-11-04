@@ -182,7 +182,7 @@ export default function EmployeeDashboard({ onLogout, currentUser }: { onLogout:
 
         {/* 🟢 2. CƠ SỞ VẬT CHẤT TAB (Giống chủ) */}
         {activeTab === 'co_so_vat_chat' && (
-          <div className="flex-1 overflow-auto bg-slate-50 relative custom-scrollbar">
+          <div className="min-h-0 flex-1 overflow-auto bg-slate-50 relative no-scrollbar">
             <FacilityManagementView
               currentUser={currentUser}
               equipments={equipments}

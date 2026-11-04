@@ -3,7 +3,7 @@ import { facilityRepository as repository } from '../repositories/facilityReposi
 
 const labels:Record<string,string>={tru_luoi:'Trụ & Lưới',tham_san:'Mặt thảm',chieu_sang:'Chiếu sáng',dung_cu:'Dụng cụ',ve_sinh:'Vệ sinh'};
 function validatePrices(dto:UpdateEquipmentDTO) {
-  for(const price of [dto.purchasePrice,dto.compensationPrice]) if(price!==undefined && (!Number.isSafeInteger(price)||price<0)) throw Error('Giá thiết bị phải là số nguyên không âm.');
+  for(const price of [dto.purchasePrice,dto.compensationPrice]) if(price!==undefined && price!==null && (!Number.isSafeInteger(price)||price<0)) throw Error('Giá thiết bị phải là số nguyên không âm.');
 }
 export class FacilityService {
   async getDashboardStats() {
@@ -27,9 +27,15 @@ export class FacilityService {
   }
   async createEquipment(dto:CreateEquipmentDTO) {
     validatePrices(dto);
-    if(!dto.name?.trim()||!dto.serialNumber?.trim())throw Error('Nhập tên và số Seri / Asset Tag của thiết bị.');
+    if(!dto.name?.trim())throw Error('Nhập tên thiết bị.');
+    if(!Number.isSafeInteger(dto.compensationPrice)||Number(dto.compensationPrice)<=0)throw Error('Nhập mức giá bồi thường lớn hơn 0.');
+    const nameKey=(value:string)=>value.normalize('NFC').trim().replace(/\s+/g,' ').toLocaleLowerCase('vi-VN');
+    const existing=await repository.getAllEquipments();
+    if(existing.some(item=>item.isCatalogItem&&item.sportType===(dto.sportType||'DungChung')&&nameKey(item.name)===nameKey(dto.name)))
+      throw Object.assign(Error('Thiết bị này đã có trong danh mục của bộ môn. Vui lòng dùng mục hiện có.'),{status:409});
     const equipment:FacilityEquipment={...dto,id:'',code:'',name:dto.name.trim(),category:dto.category||'dung_cu',categoryLabel:labels[dto.category]||'Dụng cụ',
-      sportType:dto.sportType||'DungChung',currentLocation:dto.currentLocation||'Kho chung',status:'san_sang',statusLabel:'Sẵn sàng',
+      isCatalogItem:true,serialNumber:dto.serialNumber?.trim()||`DM-${crypto.randomUUID()}`,
+      sportType:dto.sportType||'DungChung',currentLocation:'Kho chung',status:'san_sang',statusLabel:'Sẵn sàng',
       healthRate:dto.healthRate||'Mới 100%',purchaseDate:dto.purchaseDate||'',warrantyExpire:dto.warrantyExpire||''};
     return repository.saveEquipment(equipment);
   }

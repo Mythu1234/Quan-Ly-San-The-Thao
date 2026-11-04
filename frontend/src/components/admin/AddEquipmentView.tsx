@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { ChevronLeft, Check, ShieldCheck, Phone } from 'lucide-react';
 import type { FacilityEquipment, EquipmentCategory } from '../../types/admin';
 import { getVietnamToday } from '../../hooks/useVietnamToday';
+import IncidentSelect from './IncidentSelect';
 
 const formatCalendarDate = (date: Date) =>
   `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}/${date.getFullYear()}`;
@@ -22,27 +23,30 @@ const isValidDateInput = (value: string) => {
 
 interface AddEquipmentViewProps {
   existingCount: number;
+  initialEquipment?: FacilityEquipment;
+  embedded?: boolean;
+  onSavingChange?: (saving: boolean) => void;
   onBack: () => void;
   onAddEquipment: (newEq: FacilityEquipment) => void | Promise<void>;
 }
 
-export default function AddEquipmentView({ existingCount, onBack, onAddEquipment }: AddEquipmentViewProps) {
+export default function AddEquipmentView({ existingCount, initialEquipment, embedded=false, onSavingChange, onBack, onAddEquipment }: AddEquipmentViewProps) {
   const nextNum = existingCount + 1;
   const defaultCode = `TB${String(nextNum).padStart(8, '0')}`;
 
-  const [name, setName] = useState('');
-  const [sportType, setSportType] = useState<'CauLong' | 'BongChuyen' | 'BongDa' | 'DungChung'>('CauLong');
-  const [healthRate, setHealthRate] = useState('Mới 100%');
-  const [purchasePrice, setPurchasePrice] = useState('');
-  const [compensationPrice, setCompensationPrice] = useState('');
+  const [name, setName] = useState(initialEquipment?.name||'');
+  const [sportType, setSportType] = useState<'CauLong' | 'BongChuyen' | 'BongDa' | 'DungChung'>(()=>initialEquipment&&['CauLong','BongChuyen','BongDa','DungChung'].includes(initialEquipment.sportType)?initialEquipment.sportType as 'CauLong'|'BongChuyen'|'BongDa'|'DungChung':'CauLong');
+  const [healthRate, setHealthRate] = useState(initialEquipment?.healthRate||'Mới 100%');
+  const [purchasePrice, setPurchasePrice] = useState(String(initialEquipment?.purchasePrice??''));
+  const [compensationPrice, setCompensationPrice] = useState(String(initialEquipment?.compensationPrice??''));
   const [initialToday] = useState(getVietnamToday);
-  const [purchaseDate, setPurchaseDate] = useState(() => formatCalendarDate(initialToday));
-  const [warrantyExpire, setWarrantyExpire] = useState('');
-  const [supplier, setSupplier] = useState('');
-  const [supplierPhone, setSupplierPhone] = useState('');
-  const [warrantyAddress, setWarrantyAddress] = useState('');
-  const [serialNumber, setSerialNumber] = useState('');
-  const [notes, setNotes] = useState('');
+  const [purchaseDate, setPurchaseDate] = useState(() => initialEquipment?initialEquipment.purchaseDate:formatCalendarDate(initialToday));
+  const [warrantyExpire, setWarrantyExpire] = useState(initialEquipment?.warrantyExpire||'');
+  const [supplier, setSupplier] = useState(initialEquipment?.supplier||'');
+  const [supplierPhone, setSupplierPhone] = useState(initialEquipment?.supplierPhone||'');
+  const [warrantyAddress, setWarrantyAddress] = useState(initialEquipment?.warrantyAddress||'');
+  const [serialNumber, setSerialNumber] = useState(initialEquipment?.serialNumber||'');
+  const [notes, setNotes] = useState(initialEquipment?.notes||'');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -50,7 +54,6 @@ export default function AddEquipmentView({ existingCount, onBack, onAddEquipment
     e.preventDefault();
     if (isSaving) return;
     if (!name.trim()) { setErrorMessage('Vui lòng nhập tên thiết bị!'); return; }
-    if (!serialNumber.trim()) { setErrorMessage('Vui lòng nhập số Seri / Asset Tag của từng thiết bị!'); return; }
     if (!sportType) { setErrorMessage('Vui lòng chọn bộ môn!'); return; }
     if (!healthRate.trim()) { setErrorMessage('Vui lòng nhập tình trạng thiết bị!'); return; }
     if ((purchaseDate && !isValidDateInput(purchaseDate)) || (warrantyExpire && !isValidDateInput(warrantyExpire))) {
@@ -58,8 +61,8 @@ export default function AddEquipmentView({ existingCount, onBack, onAddEquipment
       return;
     }
     const price = Number(compensationPrice);
-    const buyPrice = purchasePrice.trim() === '' ? undefined : Number(purchasePrice);
-    if (buyPrice !== undefined && (!Number.isSafeInteger(buyPrice) || buyPrice < 0)) {
+    const buyPrice = purchasePrice.trim() === '' ? null : Number(purchasePrice);
+    if (buyPrice !== null && (!Number.isSafeInteger(buyPrice) || buyPrice < 0)) {
       setErrorMessage('Vui lòng nhập giá mua là số nguyên không âm!');
       return;
     }
@@ -69,8 +72,9 @@ export default function AddEquipmentView({ existingCount, onBack, onAddEquipment
     }
 
     const newEquipment: FacilityEquipment = {
-      id: `EQ${String(nextNum).padStart(2, '0')}`,
-      code: defaultCode,
+      ...initialEquipment,
+      id: initialEquipment?.id||'',
+      code: initialEquipment?.code||defaultCode,
       name: name.trim(),
       category: 'dung_cu' as EquipmentCategory,
       categoryLabel: 'Dụng cụ',
@@ -83,38 +87,40 @@ export default function AddEquipmentView({ existingCount, onBack, onAddEquipment
       purchasePrice: buyPrice,
       compensationPrice: price,
       warrantyExpire,
-      supplier: supplier.trim() || undefined,
-      supplierPhone: supplierPhone.trim() || undefined,
-      warrantyAddress: warrantyAddress.trim() || undefined,
-      serialNumber: serialNumber.trim() || undefined,
-      notes: notes.trim() || undefined,
+      supplier: supplier.trim(),
+      supplierPhone: supplierPhone.trim(),
+      warrantyAddress: warrantyAddress.trim(),
+      serialNumber: serialNumber.trim(),
+      notes: notes.trim(),
     };
 
     setIsSaving(true);
+    onSavingChange?.(true);
     try {
       await onAddEquipment(newEquipment);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Chưa lưu được thiết bị. Vui lòng thử lại.');
     } finally {
       setIsSaving(false);
+      onSavingChange?.(false);
     }
 
   };
 
   return (
-    <div className="flex-1 space-y-3 p-3 w-full max-w-full min-w-0">
+    <div className={`flex-1 space-y-3 w-full max-w-full min-w-0 ${embedded?'':'p-3'}`}>
 
       {/* Header */}
-      <div className="flex items-center gap-2">
-        <button type="button" onClick={onBack}
+      {!embedded&&<div className="flex items-center gap-2">
+        <button type="button" disabled={isSaving} onClick={onBack}
           className="flex h-8 w-8 items-center justify-center rounded-full bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 transition active:scale-95 cursor-pointer shadow-2xs"
         >
           <ChevronLeft className="w-5 h-5 stroke-[2.5]" />
         </button>
         <h1 className="text-lg font-black tracking-tight text-slate-900">
-          Thêm thiết bị <span className="text-emerald-600">mới</span>
+          {initialEquipment?'Chỉnh sửa thiết bị':<>Thêm thiết bị <span className="text-emerald-600">mới</span></>}
         </h1>
-      </div>
+      </div>}
 
       <form onSubmit={handleSubmit} className="space-y-3">
         {errorMessage && (
@@ -142,19 +148,24 @@ export default function AddEquipmentView({ existingCount, onBack, onAddEquipment
 
           {/* Row 2: Bộ môn + Tình trạng */}
           <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label className="block text-[11px] font-bold text-slate-600 mb-1">Bộ môn <span className="text-red-600">*</span></label>
-              <select
-                required
+            <div className="min-w-0">
+              <label htmlFor="equipment-sport" className="block text-[11px] font-bold text-slate-600 mb-1">Bộ môn <span className="text-red-600">*</span></label>
+              <IncidentSelect
+                id="equipment-sport"
                 value={sportType}
-                onChange={(e) => setSportType(e.target.value as 'CauLong' | 'BongChuyen' | 'BongDa' | 'DungChung')}
-                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-800 outline-none focus:border-emerald-500 focus:bg-white"
-              >
-                <option value="CauLong">🏸 Cầu lông</option>
-                <option value="BongChuyen">🏐 Bóng chuyền</option>
-                <option value="BongDa">⚽ Bóng đá</option>
-                <option value="DungChung">🔧 Thiết bị chung</option>
-              </select>
+                options={[
+                  { value: 'CauLong', label: '🏸 Cầu lông' },
+                  { value: 'BongChuyen', label: '🏐 Bóng chuyền' },
+                  { value: 'BongDa', label: '⚽ Bóng đá' },
+                  { value: 'DungChung', label: '🔧 Thiết bị chung' },
+                ]}
+                placeholder="Chọn bộ môn"
+                searchPlaceholder="Bộ môn"
+                searchable={false}
+                compact
+                disabled={isSaving}
+                onChange={value => setSportType(value as typeof sportType)}
+              />
             </div>
             <div>
               <label className="block text-[11px] font-bold text-slate-600 mb-1">Tình trạng <span className="text-red-600">*</span></label>
@@ -278,7 +289,7 @@ export default function AddEquipmentView({ existingCount, onBack, onAddEquipment
 
         {/* Buttons */}
         <div className="grid grid-cols-2 gap-3 pt-1">
-          <button type="button" onClick={onBack}
+          <button type="button" disabled={isSaving} onClick={onBack}
             className="rounded-xl border border-red-200 bg-red-50 py-2.5 text-xs font-bold text-red-700 hover:bg-red-100 active:scale-95 transition cursor-pointer"
           >
             Hủy bỏ

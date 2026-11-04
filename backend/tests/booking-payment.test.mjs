@@ -28,7 +28,7 @@ test('booking and VietQR payment persist together with database IDs and historic
   assert.equal(await create(),'DS00000001');assert.equal(await scalar('SELECT count(*)::int FROM thanh_toan'),1);
 });
 test('missing confirmation, bank reference, wrong price, occupied or locked court cannot create paid bookings',async()=>{
-  for(const patch of [{paymentConfirmed:false},{bankTransactionCode:''},{totalAmount:1}])await assert.rejects(create({...request(),...patch}));
+  for(const patch of [{paymentConfirmed:false},{bankTransactionCode:''},{totalAmount:1},{bookingDate:'2000-01-01'}])await assert.rejects(create({...request(),...patch}));
   assert.equal(await scalar('SELECT count(*)::int FROM dat_san'),0);
   await db.exec("UPDATE san SET trang_thai='bao_tri'");await assert.rejects(create(),/khóa/);
   await db.exec("UPDATE san SET trang_thai='san_sang'");await create();

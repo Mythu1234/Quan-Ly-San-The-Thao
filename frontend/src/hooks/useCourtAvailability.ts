@@ -6,7 +6,7 @@ import { facilityApiService } from '../services/facilityService';
 const listeners = new Set<() => void>();
 let subscribers = 0;
 let polling: ReturnType<typeof setInterval> | undefined;
-const refresh = async () => {
+export const refreshCourtAvailability = async () => {
   try {
     setSharedCourtStatuses(await facilityApiService.getCourts());
   } catch { /* Retain saved states while offline. */ }
@@ -16,8 +16,8 @@ export const normalizeCourtCode = (value: string) =>
 let courts: CourtStatusItem[] = [];
 export function setSharedCourtStatuses(action: SetStateAction<CourtStatusItem[]>) {
   const next = typeof action === 'function' ? action(courts) : action;
-  // Legacy API courts without sport codes must not replace the current court catalogue.
-  const valid = next.filter(c => normalizeCourtCode(c.code || c.id || c.name));
+  // SAN... is a database ID, not a sport code. Keep real API courts even when code is absent.
+  const valid = next.filter(c => c.id && c.name).map(c=>({...c,code:normalizeCourtCode(c.code||'')||normalizeCourtCode(c.name)||c.code}));
   if (JSON.stringify(valid) === JSON.stringify(courts)) return;
   courts = valid;
   listeners.forEach(listener => listener());
@@ -25,7 +25,7 @@ export function setSharedCourtStatuses(action: SetStateAction<CourtStatusItem[]>
 
 export function isCourtLocked(value: string) {
   const code = normalizeCourtCode(value);
-  return courts.some(c => c.isLocked && normalizeCourtCode(c.code || c.id || c.name) === code);
+  return !!code && courts.some(c => c.isLocked && normalizeCourtCode(c.code || c.name || c.id) === code);
 }
 
 export default function useCourtAvailability() {
@@ -34,15 +34,15 @@ export default function useCourtAvailability() {
     return () => { listeners.delete(listener); };
   }, () => courts);
   useEffect(() => {
+    void refreshCourtAvailability();
     if (subscribers++ === 0) {
-      void refresh();
-      polling = setInterval(() => { void refresh(); }, 5000);
-      window.addEventListener('focus', refresh);
+      polling = setInterval(() => { void refreshCourtAvailability(); }, 5000);
+      window.addEventListener('focus', refreshCourtAvailability);
     }
     return () => {
       if (--subscribers === 0) {
         clearInterval(polling);
-        window.removeEventListener('focus', refresh);
+        window.removeEventListener('focus', refreshCourtAvailability);
       }
     };
   }, []);
