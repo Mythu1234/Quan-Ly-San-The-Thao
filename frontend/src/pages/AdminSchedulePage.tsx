@@ -3,7 +3,7 @@ import {
   AlertTriangle, ArrowLeft, ArrowRightLeft, Ban, Calendar, CalendarClock,
   Check, CheckCircle2, RefreshCw, ChevronDown, ChevronLeft, ChevronRight, CircleX, XCircle,
   Clock3, Cloud, CreditCard, Info, LayoutGrid, MapPin, Phone,
-  Printer, ReceiptText, ShieldCheck, Undo2, UserRound, X, Zap
+  Download, Printer, ReceiptText, ShieldCheck, Undo2, UserRound, X, Zap
 } from 'lucide-react';
 import QrCodeArtwork from '../components/QrCodeArtwork';
 import CheckoutSettlementView from '../components/admin/CheckoutSettlementView';
@@ -197,6 +197,38 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
   const [pendingBookingData, setPendingBookingData] = useState<BookingDetail | null>(null);
   const [paymentSuccessBooking, setPaymentSuccessBooking] = useState<BookingDetail | null>(null);
   const [showReceipt, setShowReceipt] = useState<boolean>(false);
+
+  const handleDownloadAdminReceipt = () => {
+    if (!paymentSuccessBooking) return;
+    const lines = [
+      '=====================================================',
+      '         COURTX ARENA - BIÊN NHẬN ĐẶT SÂN',
+      '               Hóa đơn điện tử',
+      '=====================================================',
+      `Mã biên nhận (Vé): ${paymentSuccessBooking.code}`,
+      `Mã thanh toán:     ${paymentSuccessBooking.paymentCode || paymentSuccessBooking.code.replace('DS', 'TT')}`,
+      `Khách hàng:        ${paymentSuccessBooking.customerName}`,
+      `Số điện thoại:     ${paymentSuccessBooking.phone}`,
+      `Bộ môn & Sân:      ${paymentSuccessBooking.sport} · ${paymentSuccessBooking.court}`,
+      `Thời gian:         ${formatBookingDateVi(selectedDate)} · ${paymentSuccessBooking.time}`,
+      `Phương thức:       VietQR (100%)`,
+      '-----------------------------------------------------',
+      `Tổng tiền:         ${paymentSuccessBooking.total}`,
+      `Trạng thái:        Đã thanh toán`,
+      '=====================================================',
+      'Vui lòng xuất trình biên nhận khi nhận sân.',
+      '=====================================================',
+    ];
+    const blob = new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `BienNhan-${paymentSuccessBooking.code}-${Date.now()}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
 
   const START_TIME_OPTIONS = useMemo(() => {
     const list: string[] = [];
@@ -2826,14 +2858,25 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
                   <p className="text-[11px] text-slate-500">CourtX Arena · Hóa đơn điện tử</p>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() => setShowReceipt(false)}
-                className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700 cursor-pointer transition"
-                aria-label="Đóng biên nhận"
-              >
-                <X className="h-5 w-5" />
-              </button>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={handleDownloadAdminReceipt}
+                  className="rounded-lg p-1 text-slate-400 hover:bg-emerald-100 hover:text-emerald-700 cursor-pointer transition"
+                  aria-label="Tải xuống biên nhận"
+                  title="Tải xuống biên nhận (.txt)"
+                >
+                  <Download className="h-5 w-5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowReceipt(false)}
+                  className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700 cursor-pointer transition"
+                  aria-label="Đóng biên nhận"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
             </div>
 
             {/* Chi tiết biên nhận */}
