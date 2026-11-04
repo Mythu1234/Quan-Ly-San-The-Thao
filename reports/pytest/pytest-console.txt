@@ -1,0 +1,77 @@
+============================= test session starts =============================
+platform win32 -- Python 3.12.2, pytest-9.0.3, pluggy-1.6.0 -- C:\Program Files (x86)\python.exe
+cachedir: .pytest_cache
+rootdir: E:\Quan-Ly-San-The-Thao
+configfile: pytest.ini
+testpaths: tests_pytest
+plugins: anyio-4.14.2
+collecting ... collected 61 items
+
+tests_pytest/test_backend_node_suites.py::test_backend_inventory_contains_all_42_declared_cases PASSED [  1%]
+tests_pytest/test_backend_node_suites.py::test_backend_node_suite[booking-payment] PASSED [  3%]
+tests_pytest/test_backend_node_suites.py::test_backend_node_suite[customer-lookup] PASSED [  4%]
+tests_pytest/test_backend_node_suites.py::test_backend_node_suite[equipment-catalog] PASSED [  6%]
+tests_pytest/test_backend_node_suites.py::test_backend_node_suite[equipment-court-removal] PASSED [  8%]
+tests_pytest/test_backend_node_suites.py::test_backend_node_suite[equipment-prices-and-codes] PASSED [  9%]
+tests_pytest/test_backend_node_suites.py::test_backend_node_suite[facility-database] PASSED [ 11%]
+tests_pytest/test_backend_node_suites.py::test_backend_node_suite[incident-processing-status] PASSED [ 13%]
+tests_pytest/test_backend_node_suites.py::test_backend_node_suite[normalize-booking-codes] PASSED [ 14%]
+tests_pytest/test_backend_node_suites.py::test_backend_node_suite[normalize-customer-codes] PASSED [ 16%]
+tests_pytest/test_backend_node_suites.py::test_backend_node_suite[rental-payment] PASSED [ 18%]
+tests_pytest/test_backend_node_suites.py::test_backend_node_suite[staff-auth] PASSED [ 19%]
+tests_pytest/test_business_contracts.py::test_standard_hourly_price[C\u1ea7u l\xf4ng] PASSED [ 21%]
+tests_pytest/test_business_contracts.py::test_standard_hourly_price[B\xf3ng chuy\u1ec1n] PASSED [ 22%]
+tests_pytest/test_business_contracts.py::test_standard_hourly_price[B\xf3ng \u0111\xe1 mini] PASSED [ 24%]
+tests_pytest/test_business_contracts.py::test_initial_court_catalogue_contains_each_required_court[S\xe2n CL-01] PASSED [ 26%]
+tests_pytest/test_business_contracts.py::test_initial_court_catalogue_contains_each_required_court[S\xe2n CL-02] PASSED [ 27%]
+tests_pytest/test_business_contracts.py::test_initial_court_catalogue_contains_each_required_court[S\xe2n CL-03] PASSED [ 29%]
+tests_pytest/test_business_contracts.py::test_initial_court_catalogue_contains_each_required_court[S\xe2n CL-04] PASSED [ 31%]
+tests_pytest/test_business_contracts.py::test_initial_court_catalogue_contains_each_required_court[S\xe2n CL-05] PASSED [ 32%]
+tests_pytest/test_business_contracts.py::test_initial_court_catalogue_contains_each_required_court[S\xe2n BC-01] PASSED [ 34%]
+tests_pytest/test_business_contracts.py::test_initial_court_catalogue_contains_each_required_court[S\xe2n BC-02] PASSED [ 36%]
+tests_pytest/test_business_contracts.py::test_initial_court_catalogue_contains_each_required_court[S\xe2n BC-03] PASSED [ 37%]
+tests_pytest/test_business_contracts.py::test_initial_court_catalogue_contains_each_required_court[S\xe2n BC-04] PASSED [ 39%]
+tests_pytest/test_business_contracts.py::test_initial_court_catalogue_contains_each_required_court[S\xe2n BC-05] PASSED [ 40%]
+tests_pytest/test_business_contracts.py::test_initial_court_catalogue_contains_each_required_court[S\xe2n BD-01] PASSED [ 42%]
+tests_pytest/test_business_contracts.py::test_initial_court_catalogue_contains_each_required_court[S\xe2n BD-02] PASSED [ 44%]
+tests_pytest/test_business_contracts.py::test_initial_court_catalogue_contains_each_required_court[S\xe2n BD-03] PASSED [ 45%]
+tests_pytest/test_business_contracts.py::test_initial_court_catalogue_contains_each_required_court[S\xe2n BD-04] PASSED [ 47%]
+tests_pytest/test_business_contracts.py::test_initial_court_catalogue_has_exact_required_set PASSED [ 49%]
+tests_pytest/test_business_contracts.py::test_internal_roles_are_admin_and_staff PASSED [ 50%]
+tests_pytest/test_business_contracts.py::test_customer_profile_is_passwordless PASSED [ 52%]
+tests_pytest/test_business_contracts.py::test_booking_schema_has_persistent_foreign_keys PASSED [ 54%]
+tests_pytest/test_business_contracts.py::test_booking_persists_historical_rate_and_total PASSED [ 55%]
+tests_pytest/test_business_contracts.py::test_booking_hours_and_half_hour_boundaries_are_enforced PASSED [ 57%]
+tests_pytest/test_business_contracts.py::test_overlapping_booking_is_rejected_in_database PASSED [ 59%]
+tests_pytest/test_business_contracts.py::test_booking_requires_full_confirmed_vietqr_payment PASSED [ 60%]
+tests_pytest/test_business_contracts.py::test_no_overtime_surcharge_transaction_type_exists PASSED [ 62%]
+tests_pytest/test_business_contracts.py::test_vat_invoice_and_tax_code_are_out_of_scope PASSED [ 63%]
+tests_pytest/test_business_contracts.py::test_checkout_only_creates_compensation_payment_when_amount_is_positive PASSED [ 65%]
+tests_pytest/test_business_contracts.py::test_incident_liability_has_only_customer_and_venue_branches PASSED [ 67%]
+tests_pytest/test_business_contracts.py::test_checkout_recalls_equipment_without_resetting_damage_state PASSED [ 68%]
+tests_pytest/test_business_contracts.py::test_staff_delete_is_soft_deactivation PASSED [ 70%]
+tests_pytest/test_business_contracts.py::test_staff_passwords_use_salted_scrypt PASSED [ 72%]
+tests_pytest/test_business_contracts.py::test_customer_phone_otp_guards_booking_and_cancellation PASSED [ 73%]
+tests_pytest/test_business_contracts.py::test_cancellation_refund_xor_uses_24_hour_boundary PASSED [ 75%]
+tests_pytest/test_business_contracts.py::test_payment_hold_countdown_and_40_second_reminder PASSED [ 77%]
+tests_pytest/test_business_contracts.py::test_payment_hold_is_persisted_and_released_server_side XFAILiry RPC currently exists.) [ 78%]
+tests_pytest/test_business_contracts.py::test_realtime_payment_confirm_and_cancel_events PASSED [ 80%]
+tests_pytest/test_business_contracts.py::test_git_history_exceeds_minimum_15_commits PASSED [ 81%]
+tests_pytest/test_business_contracts.py::test_vip_monthly_dashboard_has_no_active_login_transition PASSED [ 83%]
+tests_pytest/test_business_contracts.py::test_shift_management_is_not_exposed_by_backend XFAILt management is excluded.) [ 85%]
+tests_pytest/test_business_contracts.py::test_all_booking_flows_use_standard_rates_without_discounts XFAILounts instead of standard rates.) [ 86%]
+tests_pytest/test_frontend_verification_scripts.py::test_frontend_verification_script[BookingReceipt] PASSED [ 88%]
+tests_pytest/test_frontend_verification_scripts.py::test_frontend_verification_script[CheckoutFlow] PASSED [ 90%]
+tests_pytest/test_frontend_verification_scripts.py::test_frontend_verification_script[CourtAvailability] PASSED [ 91%]
+tests_pytest/test_frontend_verification_scripts.py::test_frontend_verification_script[CourtLockWarnings] PASSED [ 93%]
+tests_pytest/test_frontend_verification_scripts.py::test_frontend_verification_script[FacilityApi] PASSED [ 95%]
+tests_pytest/test_frontend_verification_scripts.py::test_frontend_verification_script[IncidentFlow] PASSED [ 96%]
+tests_pytest/test_production_builds.py::test_production_build[backend] PASSED [ 98%]
+tests_pytest/test_production_builds.py::test_production_build[frontend] PASSED [100%]
+
+- generated xml file: E:\Quan-Ly-San-The-Thao\reports\pytest\pytest-results.xml -
+=========================== short test summary info ===========================
+XFAIL tests_pytest/test_business_contracts.py::test_payment_hold_is_persisted_and_released_server_side - Known gap: the 60-second hold is UI state; no server-side hold row/expiry RPC currently exists.
+XFAIL tests_pytest/test_business_contracts.py::test_shift_management_is_not_exposed_by_backend - Known scope deviation: backend still exposes /api/shifts although shift management is excluded.
+XFAIL tests_pytest/test_business_contracts.py::test_all_booking_flows_use_standard_rates_without_discounts - Known scope deviation: event booking currently applies percentage discounts instead of standard rates.
+======================= 58 passed, 3 xfailed in 50.63s ========================
