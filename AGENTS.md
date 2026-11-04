@@ -16,7 +16,7 @@
    - 5 Sân Cầu lông: `Sân CL-01` đến `Sân CL-05`
    - 5 Sân Bóng chuyền: `Sân BC-01` đến `Sân BC-05`
    - 4 Sân Bóng đá mini: `Sân BD-01` đến `Sân BD-04`
-   - Quản trị viên (Admin) có thể Thêm / Sửa / Xóa sân linh hoạt.
+   - Chủ sân (Admin) có thể Thêm / Sửa / Xóa sân linh hoạt.
 3. **Phạm vi nghiệp vụ:**
    - Đặt sân và thanh toán qua VietQR.
    - Bồi thường sự cố trang thiết bị căn cứ danh mục giá niêm yết (nếu có hỏng hóc do khách).

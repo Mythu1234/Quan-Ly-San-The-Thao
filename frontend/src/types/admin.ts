@@ -835,8 +835,8 @@ export interface FacilityEquipment {
   statusLabel: string;      // Sẵn sàng, Đang sử dụng, Bảo trì, Hỏng
   healthRate: string;       // Mới 95%, Tốt, Cần bảo trì ngay, Đạt 500 Lux...
   purchaseDate: string;     // Ngày nhập
-  purchasePrice?: number | null;   // Giá mua (VNĐ); null khi chưa nhập
-  compensationPrice?: number; // Giá bồi thường niêm yết (VNĐ)
+  purchasePrice?: number | null;   // Giá mua (VND); null khi chưa nhập
+  compensationPrice?: number; // Giá bồi thường niêm yết (VND)
   warrantyExpire: string;   // Hạn bảo hành
   supplier?: string;        // Hãng / Nhà cung cấp bảo hành
   supplierPhone?: string;   // Hotline bảo hành

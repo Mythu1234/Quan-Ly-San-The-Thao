@@ -35,7 +35,7 @@ export default function IncidentReportsList({ incidents, onView, onDelete, onCre
       </button>)}
     </div>
     {visible.length === 0 && <p className="rounded-xl border border-slate-200 p-4 text-center text-xs text-slate-500">Chưa có sự cố trong mục này.</p>}
-    <div key={filter} role="region" aria-label="Danh sách sự cố" tabIndex={visible.length > 4 ? 0 : undefined} className={`grid auto-rows-[112px] gap-2 ${visible.length > 4 ? 'max-h-[472px] overflow-y-auto overscroll-contain pr-1 custom-scrollbar' : ''}`}>
+    <div key={filter} role="region" aria-label="Danh sách sự cố" tabIndex={visible.length > 4 ? 0 : undefined} className={`grid auto-rows-[112px] gap-2 ${visible.length > 4 ? 'incident-list-scroll max-h-[472px] overflow-y-auto overscroll-contain pr-1' : ''}`}>
     {visible.map(incident => <article key={incident.id} className="min-h-0 space-y-1 rounded-xl border border-slate-200 bg-white px-3 py-2">
       <div className="flex items-center justify-between gap-2">
         <span className="rounded-lg bg-slate-100 px-2 py-1 text-[11px] font-bold text-slate-900">#{incident.id}</span>
@@ -54,7 +54,7 @@ export default function IncidentReportsList({ incidents, onView, onDelete, onCre
       <p className="truncate text-[11px] text-slate-600" title={incident.description}>{incident.description}</p>
       <div className="flex items-center justify-between gap-2 text-[10px]">
         <span className={incident.status === 'da_khac_phuc' ? 'text-emerald-700' : 'text-amber-700'}>{incident.statusLabel}</span>
-        <span className="font-semibold text-emerald-800">Giá áp dụng: {(incident.compensationPrice || 0).toLocaleString('vi-VN')}đ{incident.liability === 'BAO_HANH_SAN_VAN_DONG' ? ' · Sân chịu' : ' · Khách chịu'}</span>
+        <span className="font-semibold text-emerald-800">Giá áp dụng: {(incident.compensationPrice || 0).toLocaleString('vi-VN')} VND{incident.liability === 'BAO_HANH_SAN_VAN_DONG' ? ' · Sân chịu' : ' · Khách chịu'}</span>
       </div>
     </article>)}
     </div>

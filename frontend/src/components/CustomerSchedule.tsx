@@ -15,21 +15,21 @@ export interface CourtItem {
 }
 
 export const STANDARD_15_COURTS: CourtItem[] = [
-  // 5 Sân Cầu lông (CL-01 -> CL-05): 120.000 VNĐ / giờ
+  // 5 Sân Cầu lông (CL-01 -> CL-05): 120.000 VND / giờ
   { id: 'SAN_CL_01', code: 'CL-01', name: 'Sân CL-01', sportId: 'badminton', sportName: 'Cầu Lông', pricePerHour: 120000 },
   { id: 'SAN_CL_02', code: 'CL-02', name: 'Sân CL-02', sportId: 'badminton', sportName: 'Cầu Lông', pricePerHour: 120000 },
   { id: 'SAN_CL_03', code: 'CL-03', name: 'Sân CL-03', sportId: 'badminton', sportName: 'Cầu Lông', pricePerHour: 120000 },
   { id: 'SAN_CL_04', code: 'CL-04', name: 'Sân CL-04', sportId: 'badminton', sportName: 'Cầu Lông', pricePerHour: 120000 },
   { id: 'SAN_CL_05', code: 'CL-05', name: 'Sân CL-05', sportId: 'badminton', sportName: 'Cầu Lông', pricePerHour: 120000 },
 
-  // 5 Sân Bóng chuyền (BC-01 -> BC-05): 150.000 VNĐ / giờ
+  // 5 Sân Bóng chuyền (BC-01 -> BC-05): 150.000 VND / giờ
   { id: 'SAN_BC_01', code: 'BC-01', name: 'Sân BC-01', sportId: 'volleyball', sportName: 'Bóng Chuyền', pricePerHour: 150000 },
   { id: 'SAN_BC_02', code: 'BC-02', name: 'Sân BC-02', sportId: 'volleyball', sportName: 'Bóng Chuyền', pricePerHour: 150000 },
   { id: 'SAN_BC_03', code: 'BC-03', name: 'Sân BC-03', sportId: 'volleyball', sportName: 'Bóng Chuyền', pricePerHour: 150000 },
   { id: 'SAN_BC_04', code: 'BC-04', name: 'Sân BC-04', sportId: 'volleyball', sportName: 'Bóng Chuyền', pricePerHour: 150000 },
   { id: 'SAN_BC_05', code: 'BC-05', name: 'Sân BC-05', sportId: 'volleyball', sportName: 'Bóng Chuyền', pricePerHour: 150000 },
 
-  // 5 Sân Bóng đá mini (BD-01 -> BD-05): 200.000 VNĐ / giờ
+  // 5 Sân Bóng đá mini (BD-01 -> BD-05): 200.000 VND / giờ
   { id: 'SAN_BD_01', code: 'BD-01', name: 'Sân BD-01', sportId: 'football', sportName: 'Bóng Đá Mini', pricePerHour: 200000 },
   { id: 'SAN_BD_02', code: 'BD-02', name: 'Sân BD-02', sportId: 'football', sportName: 'Bóng Đá Mini', pricePerHour: 200000 },
   { id: 'SAN_BD_03', code: 'BD-03', name: 'Sân BD-03', sportId: 'football', sportName: 'Bóng Đá Mini', pricePerHour: 200000 },
@@ -296,14 +296,14 @@ export default function CustomerSchedule({
       {/* Compact Toolbar when Header Controls are hidden (Inline Booking Mode) */}
       {hideHeaderControls && (
         <div className="space-y-0 border-b border-slate-200 bg-white">
-          <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 text-[10px]">
+          <div className="flex flex-wrap items-center justify-between gap-1.5 p-2 text-[9px]">
             <div className="flex items-center gap-1.5">
               {initialSport && initialSport !== 'all' && (
                 <button
                   type="button"
                   onClick={() => setSelectedSport(initialSport)}
                   className={`px-2.5 py-1 rounded-lg font-black transition cursor-pointer ${
-                    selectedSport !== 'all' ? 'bg-emerald-600 text-white shadow-2xs' : 'bg-slate-100 text-slate-600'
+                    selectedSport !== 'all' ? 'bg-emerald-700 text-white shadow-2xs' : 'bg-emerald-50 text-emerald-800'
                   }`}
                 >
                   Sân môn đang chọn
@@ -313,7 +313,7 @@ export default function CustomerSchedule({
                 type="button"
                 onClick={() => setSelectedSport('all')}
                 className={`px-2.5 py-1 rounded-lg font-black transition cursor-pointer ${
-                  selectedSport === 'all' ? 'bg-slate-900 text-white shadow-2xs' : 'bg-slate-100 text-slate-600'
+                  selectedSport === 'all' ? 'bg-emerald-700 text-white shadow-2xs' : 'bg-emerald-50 text-emerald-800'
                 }`}
               >
                 {initialSport && initialSport !== 'all' ? 'Xem tất cả sân đang mở' : `Tất cả ${STANDARD_15_COURTS.filter(c => !isCourtLocked(c.code)).length} sân đang mở`}
@@ -337,7 +337,7 @@ export default function CustomerSchedule({
           </div>
 
           {/* Quick Shift Navigation & Zoom Toggle Toolbar */}
-          <div className="flex flex-wrap items-center justify-between gap-1.5 px-2.5 py-1.5 bg-slate-50 border-t border-slate-100 text-[10px]">
+          <div className="flex flex-wrap items-center justify-between gap-1 px-2 py-1.5 bg-slate-50 border-t border-slate-100 text-[9px]">
             <div className="flex items-center gap-1 overflow-x-auto no-scrollbar">
               {showMorningShift && (
                 <button
@@ -578,7 +578,7 @@ export default function CustomerSchedule({
       {/* 2. TIMELINE MATRIX GRID (15 INDEPENDENT COURTS) */}
       <div 
         ref={scrollRef} 
-        className={`overflow-auto bg-slate-50 relative custom-scrollbar border-b border-slate-200 ${
+        className={`no-scrollbar overflow-auto bg-slate-50 relative border-b border-slate-200 ${
           isInlineBookingMode ? 'max-h-[460px] rounded-xl border border-slate-200' : 'flex-1'
         }`}
       >
@@ -671,7 +671,7 @@ export default function CustomerSchedule({
                             {isSelectedSecond ? (
                               <div
                                 style={{ width: `${slotWidth / 2}px` }}
-                                onClick={() => handleSlotClick(court.sportId, court.name, tSecond, `${(court.pricePerHour / 2).toLocaleString('vi-VN')}đ`)}
+                                onClick={() => handleSlotClick(court.sportId, court.name, tSecond, `${(court.pricePerHour / 2).toLocaleString('vi-VN')} VND`)}
                                 className="h-full bg-emerald-500 text-white flex flex-col items-center justify-center text-center p-0.5 shadow-inner cursor-pointer"
                               >
                                 <span className="text-[7.5px] font-black uppercase">CHỌN</span>
@@ -679,7 +679,7 @@ export default function CustomerSchedule({
                             ) : (
                               <div
                                 style={{ width: `${slotWidth / 2}px` }}
-                                onClick={() => handleSlotClick(court.sportId, court.name, tSecond, `${(court.pricePerHour / 2).toLocaleString('vi-VN')}đ`)}
+                                onClick={() => handleSlotClick(court.sportId, court.name, tSecond, `${(court.pricePerHour / 2).toLocaleString('vi-VN')} VND`)}
                                 className="h-full bg-amber-50/80 hover:bg-amber-100 flex flex-col items-center justify-center text-center cursor-pointer transition active:scale-95 group p-0.5"
                                 title={`Bấm để chọn ${court.name} lúc ${tSecond} (nửa tiếng)`}
                               >
@@ -700,7 +700,7 @@ export default function CustomerSchedule({
                             {isSelectedFirst ? (
                               <div
                                 style={{ width: `${slotWidth / 2}px` }}
-                                onClick={() => handleSlotClick(court.sportId, court.name, t, `${(court.pricePerHour / 2).toLocaleString('vi-VN')}đ`)}
+                                onClick={() => handleSlotClick(court.sportId, court.name, t, `${(court.pricePerHour / 2).toLocaleString('vi-VN')} VND`)}
                                 className="h-full bg-emerald-500 text-white flex flex-col items-center justify-center text-center p-0.5 shadow-inner cursor-pointer border-r border-emerald-600"
                               >
                                 <span className="text-[7.5px] font-black uppercase">CHỌN</span>
@@ -708,7 +708,7 @@ export default function CustomerSchedule({
                             ) : (
                               <div
                                 style={{ width: `${slotWidth / 2}px` }}
-                                onClick={() => handleSlotClick(court.sportId, court.name, t, `${(court.pricePerHour / 2).toLocaleString('vi-VN')}đ`)}
+                                onClick={() => handleSlotClick(court.sportId, court.name, t, `${(court.pricePerHour / 2).toLocaleString('vi-VN')} VND`)}
                                 className="h-full bg-amber-50/80 hover:bg-amber-100 flex flex-col items-center justify-center text-center cursor-pointer transition active:scale-95 group p-0.5 border-r border-amber-200/60"
                                 title={`Bấm để chọn ${court.name} lúc ${t} (nửa tiếng)`}
                               >
@@ -747,7 +747,7 @@ export default function CustomerSchedule({
                           <div 
                             key={cIdx} 
                             style={{ width: `${slotWidth}px` }} 
-                            onClick={() => handleSlotClick(court.sportId, court.name, selectedTimeStr || t, `${court.pricePerHour.toLocaleString('vi-VN')}đ`)}
+                            onClick={() => handleSlotClick(court.sportId, court.name, selectedTimeStr || t, `${court.pricePerHour.toLocaleString('vi-VN')} VND`)}
                             className="shrink-0 border-r border-emerald-600 bg-emerald-500 text-white flex flex-col items-center justify-center text-center p-0.5 shadow-inner shadow-emerald-700/30 cursor-pointer animate-in zoom-in-95 duration-150"
                           >
                             <span className="text-[8.5px] font-black uppercase flex items-center justify-center gap-0.5 leading-none">
@@ -761,7 +761,7 @@ export default function CustomerSchedule({
                         <div 
                           key={cIdx} 
                           style={{ width: `${slotWidth}px` }} 
-                          onClick={() => handleSlotClick(court.sportId, court.name, t, `${court.pricePerHour.toLocaleString('vi-VN')}đ`)}
+                          onClick={() => handleSlotClick(court.sportId, court.name, t, `${court.pricePerHour.toLocaleString('vi-VN')} VND`)}
                           className="shrink-0 border-r border-amber-200/70 bg-amber-50/70 hover:bg-amber-100 hover:border-amber-400 flex flex-col items-center justify-center text-center cursor-pointer transition active:scale-95 group p-0.5"
                           title={`Bấm để chọn ${court.name} lúc ${t}`}
                         >
@@ -793,7 +793,7 @@ export default function CustomerSchedule({
                           <div 
                             key={cIdx} 
                             style={{ width: `${slotWidth}px` }} 
-                            onClick={() => handleSlotClick(court.sportId, court.name, selectedTimeStr || t, `${(court.pricePerHour / 2).toLocaleString('vi-VN')}đ`)}
+                            onClick={() => handleSlotClick(court.sportId, court.name, selectedTimeStr || t, `${(court.pricePerHour / 2).toLocaleString('vi-VN')} VND`)}
                             className="shrink-0 border-r border-emerald-600 bg-emerald-500 text-white flex flex-col items-center justify-center text-center p-0.5 shadow-inner shadow-emerald-700/30 cursor-pointer animate-in zoom-in-95 duration-150"
                           >
                             <span className="text-[8.5px] font-black uppercase flex items-center justify-center gap-0.5 leading-none">
@@ -807,7 +807,7 @@ export default function CustomerSchedule({
                         <div 
                           key={cIdx} 
                           style={{ width: `${slotWidth}px` }} 
-                          onClick={() => handleSlotClick(court.sportId, court.name, t, `${(court.pricePerHour / 2).toLocaleString('vi-VN')}đ`)}
+                          onClick={() => handleSlotClick(court.sportId, court.name, t, `${(court.pricePerHour / 2).toLocaleString('vi-VN')} VND`)}
                           className="shrink-0 border-r border-amber-200/70 bg-amber-50/70 hover:bg-amber-100 hover:border-amber-400 flex flex-col items-center justify-center text-center cursor-pointer transition active:scale-95 group p-0.5"
                           title={`Bấm để chọn ${court.name} lúc ${t}`}
                         >

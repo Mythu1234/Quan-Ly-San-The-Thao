@@ -1,9 +1,11 @@
+import { supabase } from '../lib/supabaseClient';
+import { downloadBookingReceipt, printBookingReceipt, type BookingReceiptData } from '../utils/bookingReceipt';
 import { useMemo, useRef, useState, useEffect } from 'react';
 import {
   AlertTriangle, ArrowLeft, ArrowRightLeft, Ban, Calendar, CalendarClock,
   Check, CheckCircle2, RefreshCw, ChevronDown, ChevronLeft, ChevronRight, CircleX, XCircle,
   Clock3, Cloud, CreditCard, Info, LayoutGrid, MapPin, Phone,
-  Printer, ReceiptText, ShieldCheck, Undo2, UserRound, X, Zap
+  Bell, Download, Printer, ReceiptText, Search, ShieldCheck, Undo2, UserRound, X, Zap
 } from 'lucide-react';
 import QrCodeArtwork from '../components/QrCodeArtwork';
 import CheckoutSettlementView from '../components/admin/CheckoutSettlementView';
@@ -49,21 +51,21 @@ export interface AdminCourtItem {
 }
 
 export const STANDARD_ADMIN_COURTS: AdminCourtItem[] = [
-  // 5 Sân Cầu lông (CL-01 -> CL-05): 120.000 VNĐ / giờ
+  // 5 Sân Cầu lông (CL-01 -> CL-05): 120.000 VND / giờ
   { id: 'SAN_CL_01', code: 'CL-01', name: 'Sân CL-01', sportId: 'badminton', sportName: 'Cầu Lông', pricePerHour: 120000, priceLabel: '120k/h' },
   { id: 'SAN_CL_02', code: 'CL-02', name: 'Sân CL-02', sportId: 'badminton', sportName: 'Cầu Lông', pricePerHour: 120000, priceLabel: '120k/h' },
   { id: 'SAN_CL_03', code: 'CL-03', name: 'Sân CL-03', sportId: 'badminton', sportName: 'Cầu Lông', pricePerHour: 120000, priceLabel: '120k/h' },
   { id: 'SAN_CL_04', code: 'CL-04', name: 'Sân CL-04', sportId: 'badminton', sportName: 'Cầu Lông', pricePerHour: 120000, priceLabel: '120k/h' },
   { id: 'SAN_CL_05', code: 'CL-05', name: 'Sân CL-05', sportId: 'badminton', sportName: 'Cầu Lông', pricePerHour: 120000, priceLabel: '120k/h' },
 
-  // 5 Sân Bóng chuyền (BC-01 -> BC-05): 150.000 VNĐ / giờ
+  // 5 Sân Bóng chuyền (BC-01 -> BC-05): 150.000 VND / giờ
   { id: 'SAN_BC_01', code: 'BC-01', name: 'Sân BC-01', sportId: 'volleyball', sportName: 'Bóng Chuyền', pricePerHour: 150000, priceLabel: '150k/h' },
   { id: 'SAN_BC_02', code: 'BC-02', name: 'Sân BC-02', sportId: 'volleyball', sportName: 'Bóng Chuyền', pricePerHour: 150000, priceLabel: '150k/h' },
   { id: 'SAN_BC_03', code: 'BC-03', name: 'Sân BC-03', sportId: 'volleyball', sportName: 'Bóng Chuyền', pricePerHour: 150000, priceLabel: '150k/h' },
   { id: 'SAN_BC_04', code: 'BC-04', name: 'Sân BC-04', sportId: 'volleyball', sportName: 'Bóng Chuyền', pricePerHour: 150000, priceLabel: '150k/h' },
   { id: 'SAN_BC_05', code: 'BC-05', name: 'Sân BC-05', sportId: 'volleyball', sportName: 'Bóng Chuyền', pricePerHour: 150000, priceLabel: '150k/h' },
 
-  // 4 Sân Bóng đá mini (BD-01 -> BD-04): 200.000 VNĐ / giờ
+  // 4 Sân Bóng đá mini (BD-01 -> BD-04): 200.000 VND / giờ
   { id: 'SAN_BD_01', code: 'BD-01', name: 'Sân BD-01', sportId: 'football', sportName: 'Bóng Đá Mini', pricePerHour: 200000, priceLabel: '200k/h' },
   { id: 'SAN_BD_02', code: 'BD-02', name: 'Sân BD-02', sportId: 'football', sportName: 'Bóng Đá Mini', pricePerHour: 200000, priceLabel: '200k/h' },
   { id: 'SAN_BD_03', code: 'BD-03', name: 'Sân BD-03', sportId: 'football', sportName: 'Bóng Đá Mini', pricePerHour: 200000, priceLabel: '200k/h' },
@@ -182,7 +184,57 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
     );
   }, [adminBookings, selectedDate]);
 
-  // Booking Modal State (Đặt sân tại quầy trực tiếp trên lịch)
+  // Tra cứu lịch đặt sân để Check-in nhanh (theo SĐT hoặc Mã đặt sân)
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [isSearchFocused, setIsSearchFocused] = useState<boolean>(false);
+
+  const filteredSearchResults = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return [];
+    const cleanDigits = q.replace(/\D/g, '');
+
+    return allBookings
+      .filter((b) => {
+        const matchCode = (b.code || '').toLowerCase().includes(q);
+        const matchName = (b.customerName || '').toLowerCase().includes(q);
+        const bPhoneClean = (b.phone || '').replace(/\D/g, '');
+        const matchPhone = (cleanDigits.length > 0 && bPhoneClean.includes(cleanDigits)) || (b.phone && b.phone.toLowerCase().includes(q));
+        const matchCourt = (b.court || '').toLowerCase().includes(q) || (b.courtCode || '').toLowerCase().includes(q);
+        return matchCode || matchName || matchPhone || matchCourt;
+      })
+      .sort((a, b) => {
+        const curDateStr = calendarBookingDate(selectedDate);
+        if (a.bookingDate === curDateStr && b.bookingDate !== curDateStr) return -1;
+        if (b.bookingDate === curDateStr && a.bookingDate !== curDateStr) return 1;
+        const score = (status: string) => {
+          if (status === 'Đã đặt') return 1;
+          if (status === 'Đang sử dụng') return 2;
+          if (status === 'Đã kết thúc' || status === 'Hoàn tất') return 3;
+          return 4;
+        };
+        return score(a.status) - score(b.status);
+      });
+  }, [allBookings, searchQuery, selectedDate]);
+
+  const handleSelectSearchResult = (booking: BookingDetail, action: 'checkin' | 'view' = 'checkin') => {
+    if (booking.bookingDate) {
+      const [y, m, d] = booking.bookingDate.split('-').map(Number);
+      if (y && m && d) {
+        setSelectedDate(new Date(y, m - 1, d));
+        setCalendarMonth(new Date(y, m - 1, 1));
+      }
+    }
+
+    if (action === 'checkin') {
+      openCheckinDetail(booking);
+    } else {
+      openBooking(booking);
+    }
+
+    setIsSearchFocused(false);
+  };
+
+    // Booking Modal State (Đặt sân tại quầy trực tiếp trên lịch)
   const [bookingCourt, setBookingCourt] = useState<AdminCourtItem | null>(null);
   const [bookingStartTime, setBookingStartTime] = useState<string>('08:00');
   const [bookingDuration, setBookingDuration] = useState<number>(60);
@@ -192,12 +244,33 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
   const [bookingSendZalo, setBookingSendZalo] = useState<boolean>(true);
   const [bookingErrors, setBookingErrors] = useState<{ name?: string; phone?: string }>({});
   const [showPaymentModal, setShowPaymentModal] = useState<boolean>(false);
-  const [adminPaymentCountdown, setAdminPaymentCountdown] = useState<number>(5);
+  const [adminPaymentCountdown, setAdminPaymentCountdown] = useState<number>(60);
+  const [adminPaymentSessionId, setAdminPaymentSessionId] = useState<string>('');
   const [bookingSaving, setBookingSaving] = useState(false);
   const [bookingSaveError, setBookingSaveError] = useState('');
   const [pendingBookingData, setPendingBookingData] = useState<BookingDetail | null>(null);
   const [paymentSuccessBooking, setPaymentSuccessBooking] = useState<BookingDetail | null>(null);
   const [showReceipt, setShowReceipt] = useState<boolean>(false);
+
+  const getAdminReceiptData = (): BookingReceiptData | null => paymentSuccessBooking ? ({
+    bookingCode: paymentSuccessBooking.code,
+    paymentCode: paymentSuccessBooking.paymentCode || '',
+    customerName: paymentSuccessBooking.customerName,
+    customerPhone: paymentSuccessBooking.phone,
+    sport: paymentSuccessBooking.sport,
+    court: paymentSuccessBooking.court,
+    date: formatBookingDateVi(selectedDate),
+    time: paymentSuccessBooking.time,
+    total: paymentSuccessBooking.total,
+  }) : null;
+  const handleDownloadAdminReceipt = () => {
+    const receipt = getAdminReceiptData();
+    if (receipt) downloadBookingReceipt(receipt);
+  };
+  const handlePrintAdminReceipt = () => {
+    const receipt = getAdminReceiptData();
+    if (receipt) printBookingReceipt(receipt);
+  };
 
   const START_TIME_OPTIONS = useMemo(() => {
     const list: string[] = [];
@@ -597,6 +670,7 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
 
     setBookingSaveError('');
     setPendingBookingData(pendingBooking);
+    setAdminPaymentSessionId('PAY_ADMIN_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6));
     setShowPaymentModal(true);
   };
 
@@ -645,23 +719,114 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
     }
   };
 
+  // URL xác nhận thanh toán mô phỏng cho điện thoại quét QR
+  const adminMobilePaymentUrl = useMemo(() => {
+    if (!showPaymentModal || !pendingBookingData || !adminPaymentSessionId) return '';
+    let host = typeof window !== 'undefined' ? window.location.hostname : '192.168.1.81';
+    if (host === 'localhost' || host === '127.0.0.1') {
+      host = '192.168.1.81';
+    }
+    const port = typeof window !== 'undefined' && window.location.port ? ':' + window.location.port : '';
+    const protocol = typeof window !== 'undefined' ? window.location.protocol : 'http:';
+    const q = new URLSearchParams({
+      view: 'phone-payment',
+      session: adminPaymentSessionId,
+      court: pendingBookingData.court,
+      amount: pendingBookingData.total.replace(/\D/g, ''),
+      phone: pendingBookingData.phone,
+      time: pendingBookingData.time,
+      name: pendingBookingData.customerName,
+    });
+    return protocol + '//' + host + port + '/?' + q.toString();
+  }, [showPaymentModal, pendingBookingData, adminPaymentSessionId]);
+
+  // Lắng nghe tín hiệu xác nhận từ điện thoại qua Supabase Realtime & LocalStorage
+  useEffect(() => {
+    if (!showPaymentModal || !adminPaymentSessionId) return;
+
+    const channel = supabase.channel('payment_session_' + adminPaymentSessionId);
+    channel
+      .on('broadcast', { event: 'PAYMENT_CONFIRMED' }, () => {
+        void handleConfirmPaymentSuccess();
+      })
+      .on('broadcast', { event: 'PAYMENT_CANCELLED' }, () => {
+        handleExecuteAdminCancelSubprocess();
+      })
+      .subscribe();
+
+    const interval = setInterval(() => {
+      try {
+        const item = localStorage.getItem('courtx_confirmed_' + adminPaymentSessionId);
+        if (item) {
+          localStorage.removeItem('courtx_confirmed_' + adminPaymentSessionId);
+          void handleConfirmPaymentSuccess();
+        }
+      } catch {
+        // ignore
+      }
+    }, 600);
+
+    return () => {
+      clearInterval(interval);
+      void channel.unsubscribe();
+    };
+  }, [showPaymentModal, adminPaymentSessionId]);
+
+  // TOBE_CHAY.bpmn: Quản lý logic Thanh toán theo sơ đồ BPMN TOBE
+  const [showAdminCancelSubprocessModal, setShowAdminCancelSubprocessModal] = useState<boolean>(false);
+  const [adminPaymentTechnicalError, setAdminPaymentTechnicalError] = useState<string | null>(null);
+  const [adminPaymentNotification, setAdminPaymentNotification] = useState<string | null>(null);
+
   const handleCancelPayment = () => {
-    setShowPaymentModal(false);
-    setAdminPaymentCountdown(5);
+    setShowAdminCancelSubprocessModal(true);
   };
 
+  const handleExecuteAdminCancelSubprocess = () => {
+    setShowAdminCancelSubprocessModal(false);
+    setShowPaymentModal(false);
+    setPendingBookingData(null);
+    setAdminPaymentCountdown(60);
+    setAdminPaymentTechnicalError(null);
+    setAdminPaymentNotification(null);
+  };
+
+  const handleRetryAdminPayment = () => {
+    setAdminPaymentTechnicalError(null);
+    setAdminPaymentCountdown(60);
+  };
+
+  const handleCancelAfterAdminPaymentError = () => {
+    setAdminPaymentTechnicalError(null);
+    setShowPaymentModal(false);
+    setPendingBookingData(null);
+    setAdminPaymentCountdown(60);
+  };
+
+  const handleTriggerAdmin10MinTimeout = () => {
+    setShowPaymentModal(false);
+    setPendingBookingData(null);
+    setAdminPaymentCountdown(60);
+    setAdminPaymentTechnicalError(null);
+    setAdminPaymentNotification(null);
+  };
+
+  // Tự động kiểm tra thời gian thanh toán theo TOBE_CHAY.bpmn (40s nhắc nhở, 1 phút hết hạn)
   useEffect(() => {
-    if (!showPaymentModal) {
-      setAdminPaymentCountdown(5);
+    if (!showPaymentModal || adminPaymentTechnicalError || showAdminCancelSubprocessModal) {
       return;
     }
-    if (adminPaymentCountdown <= 0 && !bookingSaveError) {
-      handleConfirmPaymentSuccess();
+    // Khi trôi qua 40s (còn 20s: adminPaymentCountdown === 20): tự động kích hoạt Boundary Timer nhắc nhở
+    if (adminPaymentCountdown === 20 && !adminPaymentNotification) {
+      setAdminPaymentNotification('🔔 Nhắc nhở thanh toán (sau 40s): Sân đang tạm giữ sắp hết hạn trong 20 giây, vui lòng hoàn tất chuyển khoản VietQR!');
+    }
+    // Khi hết 1 phút (60s): tự động kích hoạt Boundary Timer hết hạn giữ sân
+    if (adminPaymentCountdown <= 0) {
+      handleTriggerAdmin10MinTimeout();
       return;
     }
     const t = setTimeout(() => setAdminPaymentCountdown((c) => c - 1), 1000);
     return () => clearTimeout(t);
-  }, [showPaymentModal, adminPaymentCountdown, bookingSaveError]);
+  }, [showPaymentModal, adminPaymentCountdown, bookingSaveError, adminPaymentTechnicalError, showAdminCancelSubprocessModal, adminPaymentNotification]);
 
 
   const handleFinishBooking = () => {
@@ -860,30 +1025,97 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
   };
 
   // Điều kiện kiểm tra Hủy đặt sân
-  const getCancelValidation = (booking: BookingDetail | null) => {
-    if (!booking) return { canCancel: false, message: '', isEligibleRefund: false };
+  // Điều kiện kiểm tra Điều chuyển / Đổi sân
+  const getTransferValidation = (booking: BookingDetail | null) => {
+    if (!booking) return { canTransfer: false, message: '' };
 
-    if (booking.status === 'ĐÃ HỦY' || booking.status === 'Đã hủy') {
-      return { canCancel: false, message: 'Lịch đặt sân này đã bị hủy trước đó!', isEligibleRefund: false };
+    const statusNormalized = (booking.status || '').toUpperCase().trim();
+    if (statusNormalized === 'ĐÃ HỦY' || statusNormalized === 'DA HUY' || statusNormalized === 'DA_HUY') {
+      return { canTransfer: false, message: 'Lịch đặt sân này đã bị hủy trước đó!' };
     }
-    if (booking.status === 'Đang sử dụng') {
-      return { canCancel: false, message: 'Sân đang có khách thi đấu, không thể hủy! Vui lòng chọn Đổi sân hoặc Trả sân.', isEligibleRefund: false };
-    }
-    if (booking.status === 'Đã kết thúc' || booking.status === 'Hoàn tất') {
-      return { canCancel: false, message: 'Lượt đặt sân này đã kết thúc, không thể hủy!', isEligibleRefund: false };
+    if (
+      statusNormalized === 'ĐÃ KẾT THÚC' ||
+      statusNormalized === 'DA KET THUC' ||
+      statusNormalized === 'DA_KET_THUC' ||
+      statusNormalized === 'HOÀN TẤT' ||
+      statusNormalized === 'HOAN TAT' ||
+      statusNormalized === 'HOAN_TAT'
+    ) {
+      return { canTransfer: false, message: 'Lượt đặt sân này đã kết thúc, không thể đổi sân!' };
     }
 
     const bookingD = booking.bookingDate || calendarBookingDate(selectedDate);
     const startH = booking.startH ?? 0;
     const startM = booking.startM ?? 0;
-    const [bYear, bMonth, bDay] = bookingD.split('-').map(Number);
+    const bStart = startH * 60 + startM;
+    const bEnd = (booking.endH ?? 0) * 60 + (booking.endM ?? 0);
+    const dur = bEnd > bStart ? bEnd - bStart : 60;
+    const [bYear, bMonth, bDay] = (bookingD || '').split('-').map(Number);
+    if (!bYear || !bMonth || !bDay) {
+      return { canTransfer: false, message: 'Không xác định được thời gian đặt sân!' };
+    }
+    const startDateTime = new Date(bYear, bMonth - 1, bDay, startH, startM, 0).getTime();
+    const endDateTime = new Date(bYear, bMonth - 1, bDay, Math.floor((bStart + dur) / 60), (bStart + dur) % 60, 0).getTime();
+    const nowTime = currentTime.getTime();
+
+    // Nếu trạng thái là 'Đã đặt' mà đã qua giờ bắt đầu -> lịch quá khứ, không thể đổi sân
+    if (statusNormalized === 'ĐÃ ĐẶT' || statusNormalized === 'DA DAT' || statusNormalized === 'DA_DAT') {
+      if (nowTime >= startDateTime) {
+        return {
+          canTransfer: false,
+          message: 'Lịch đặt sân đã quá giờ thi đấu trong quá khứ, không thể đổi sân!',
+        };
+      }
+    }
+
+    // Nếu trạng thái là 'Đang sử dụng' mà đã quá giờ kết thúc -> không thể đổi sân, chỉ trả sân
+    if (statusNormalized === 'ĐANG SỬ DỤNG' || statusNormalized === 'DANG SU DUNG' || statusNormalized === 'DANG_SU_DUNG') {
+      if (nowTime >= endDateTime) {
+        return {
+          canTransfer: false,
+          message: 'Ca thi đấu đã kết thúc, vui lòng thực hiện Trả sân thay vì Đổi sân!',
+        };
+      }
+    }
+
+    return { canTransfer: true, message: '' };
+  };
+
+  const getCancelValidation = (booking: BookingDetail | null) => {
+    if (!booking) return { canCancel: false, message: '', isEligibleRefund: false };
+
+    const statusNormalized = (booking.status || '').toUpperCase().trim();
+    if (statusNormalized === 'ĐÃ HỦY' || statusNormalized === 'DA HUY' || statusNormalized === 'DA_HUY') {
+      return { canCancel: false, message: 'Lịch đặt sân này đã bị hủy trước đó!', isEligibleRefund: false };
+    }
+    if (statusNormalized === 'ĐANG SỬ DỤNG' || statusNormalized === 'DANG SU DUNG' || statusNormalized === 'DANG_SU_DUNG') {
+      return { canCancel: false, message: 'Sân đang có khách thi đấu, không thể hủy! Vui lòng chọn Đổi sân hoặc Kết thúc / Trả sân.', isEligibleRefund: false };
+    }
+    if (
+      statusNormalized === 'ĐÃ KẾT THÚC' ||
+      statusNormalized === 'DA KET THUC' ||
+      statusNormalized === 'DA_KET_THUC' ||
+      statusNormalized === 'HOÀN TẤT' ||
+      statusNormalized === 'HOAN TAT' ||
+      statusNormalized === 'HOAN_TAT'
+    ) {
+      return { canCancel: false, message: 'Lượt đặt sân này đã kết thúc trong quá khứ, không thể hủy!', isEligibleRefund: false };
+    }
+
+    const bookingD = booking.bookingDate || calendarBookingDate(selectedDate);
+    const startH = booking.startH ?? 0;
+    const startM = booking.startM ?? 0;
+    const [bYear, bMonth, bDay] = (bookingD || '').split('-').map(Number);
+    if (!bYear || !bMonth || !bDay) {
+      return { canCancel: false, message: 'Không xác định được thời gian đặt sân!', isEligibleRefund: false };
+    }
     const startDateTime = new Date(bYear, bMonth - 1, bDay, startH, startM, 0).getTime();
     const nowTime = currentTime.getTime();
 
     if (nowTime >= startDateTime) {
       return {
         canCancel: false,
-        message: 'Lượt đặt sân đã bắt đầu hoặc đã qua giờ thi đấu, không thể hủy trực tuyến!',
+        message: 'Lịch đặt sân đã bắt đầu hoặc đã qua giờ thi đấu trong quá khứ, không thể hủy!',
         isEligibleRefund: false,
       };
     }
@@ -963,7 +1195,7 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
     const hasRecordedPayment=Number(checkinBooking.paidAmount.replace(/\D/g,''))>0;
 
     return (
-      <div className="flex-1 min-h-0 overflow-y-auto bg-white px-3 py-3">
+      <div className="no-scrollbar flex-1 min-h-0 overflow-y-auto bg-white px-3 py-3">
         {/* Back button */}
         <button
           type="button"
@@ -1044,11 +1276,17 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
             </div>
           </div>
           <div className="grid grid-cols-2 gap-2">
-            <div className="rounded-lg bg-white p-2.5 ring-1 ring-black/15">
-              <p className="text-[10px] font-bold uppercase tracking-wide text-slate-700">Ngày thi đấu</p>
-              <p className="mt-1 text-[13px] font-black text-slate-900">{isToday(selectedDate) ? 'Hôm nay' : daysOfWeekVi[selectedDate.getDay()]}</p>
-              <p className="text-[10px] font-medium text-slate-400">{selectedDate.toLocaleDateString('vi-VN')}</p>
-            </div>
+            {(() => {
+              const bDate = checkinBooking.bookingDate || calendarBookingDate(selectedDate);
+              const info = getBookingDateDetails(bDate);
+              return (
+                <div className="rounded-lg bg-white p-2.5 ring-1 ring-black/15">
+                  <p className="text-[10px] font-bold uppercase tracking-wide text-slate-700">Ngày thi đấu</p>
+                  <p className="mt-1 text-[13px] font-black text-slate-900">{info.dayOfWeek}</p>
+                  <p className="text-[10px] font-medium text-emerald-700">{info.fullDate || bDate}</p>
+                </div>
+              );
+            })()}
             <div className="rounded-lg bg-white p-2.5 ring-1 ring-black/15">
               <p className="text-[10px] font-bold uppercase tracking-wide text-slate-700">Khung giờ</p>
               <p className="mt-1 text-[13px] font-black text-slate-900">{checkinBooking.time}</p>
@@ -1103,44 +1341,68 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
         })()}
 
         {/* Action buttons */}
-        {checkinError&&<p role="alert" className="mb-3 rounded-lg bg-red-50 p-3 text-xs text-red-700">{checkinError}</p>}
-        <div className="mb-4 grid grid-cols-2 gap-2">
-          <button
-            type="button"
-            disabled={checkinSaving||!getCheckinValidation(checkinBooking).canCheckin}
-            onClick={async () => {
-              if(checkinSaving||!getCheckinValidation(checkinBooking).canCheckin)return;
-              setCheckinSaving(true);setCheckinError('');
-              try {
-                await bookingApiService.checkIn(checkinBooking.code,checkinBooking.bookingDate || calendarBookingDate(selectedDate));
-                await refreshSharedBookings();
-                window.dispatchEvent(new Event('courtx:facility-changed'));
-                setCheckinBooking(null);onCheckoutModeChange?.(false);
-              }catch(error){setCheckinError(error instanceof Error?error.message:'Chưa check-in được.');}
-              finally{setCheckinSaving(false);}
-            }}
-            className={`flex h-10 min-w-0 items-center justify-center gap-1.5 rounded-xl px-3 text-[11px] font-black shadow-sm transition ${
-              getCheckinValidation(checkinBooking).canCheckin
-                ? 'bg-emerald-700 text-white hover:bg-emerald-800 active:scale-[0.98] cursor-pointer'
-                : 'bg-slate-200 text-slate-400 cursor-not-allowed'
-            }`}
-          >
-            <CheckCircle2 className="h-4 w-4 shrink-0" />
-            <span className="truncate">{checkinSaving?'Đang lưu...':'Check-In Sân'}</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setCancelBooking(checkinBooking);
-              setCheckinBooking(null);
-              onCheckoutModeChange?.(true);
-            }}
-            className="flex h-10 min-w-0 items-center justify-center gap-1.5 rounded-xl bg-red-50 px-3 text-[11px] font-black text-red-700 ring-1 ring-red-200 transition hover:bg-red-100 active:scale-[0.98]"
-          >
-            <CircleX className="h-4 w-4 shrink-0" />
-            <span className="truncate">Hủy đặt sân</span>
-          </button>
-        </div>
+        {checkinError && <p role="alert" className="mb-3 rounded-lg bg-red-50 p-3 text-xs text-red-700">{checkinError}</p>}
+        {(() => {
+          const cancelVal = getCancelValidation(checkinBooking);
+          const checkinVal = getCheckinValidation(checkinBooking);
+          const canCancel = cancelVal.canCancel;
+          return (
+            <div className="mb-4 grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                disabled={checkinSaving || !checkinVal.canCheckin}
+                onClick={async () => {
+                  if (checkinSaving || !checkinVal.canCheckin) return;
+                  setCheckinSaving(true);
+                  setCheckinError('');
+                  try {
+                    await bookingApiService.checkIn(checkinBooking.code, checkinBooking.bookingDate || calendarBookingDate(selectedDate));
+                    await refreshSharedBookings();
+                    window.dispatchEvent(new Event('courtx:facility-changed'));
+                    setCheckinBooking(null);
+                    onCheckoutModeChange?.(false);
+                  } catch (error) {
+                    setCheckinError(error instanceof Error ? error.message : 'Chưa check-in được.');
+                  } finally {
+                    setCheckinSaving(false);
+                  }
+                }}
+                className={`flex h-10 min-w-0 items-center justify-center gap-1.5 rounded-xl px-3 text-[11px] font-black shadow-sm transition ${
+                  checkinVal.canCheckin
+                    ? 'bg-emerald-700 text-white hover:bg-emerald-800 active:scale-[0.98] cursor-pointer'
+                    : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                }`}
+              >
+                <CheckCircle2 className="h-4 w-4 shrink-0" />
+                <span className="truncate">{checkinSaving ? 'Đang lưu...' : 'Check-In Sân'}</span>
+              </button>
+              {canCancel ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCancelBooking(checkinBooking);
+                    setCheckinBooking(null);
+                    onCheckoutModeChange?.(true);
+                  }}
+                  className="flex h-10 min-w-0 items-center justify-center gap-1.5 rounded-xl bg-red-50 px-3 text-[11px] font-black text-red-700 ring-1 ring-red-200 transition hover:bg-red-100 active:scale-[0.98] cursor-pointer"
+                >
+                  <CircleX className="h-4 w-4 shrink-0" />
+                  <span className="truncate">Hủy đặt sân</span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  disabled
+                  title={cancelVal.message || 'Lịch đặt trong quá khứ không thể hủy'}
+                  className="flex h-10 min-w-0 items-center justify-center gap-1.5 rounded-xl bg-slate-100 px-3 text-[11px] font-bold text-slate-400 ring-1 ring-slate-200 cursor-not-allowed"
+                >
+                  <CircleX className="h-4 w-4 shrink-0 text-slate-400" />
+                  <span className="truncate">Hủy đặt sân</span>
+                </button>
+              )}
+            </div>
+          );
+        })()}
       </div>
     );
   };
@@ -1597,6 +1859,31 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
 
         {(() => {
           const val = getCancelValidation(cancelBooking);
+          if (!val.canCancel) {
+            return (
+              <section className="mb-4 rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-100">
+                <div className="mb-3 flex items-start gap-3 rounded-lg bg-red-50 p-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-100 text-red-700">
+                    <AlertTriangle className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-[14px] font-black text-red-950">Không thể hủy lịch đặt này</h3>
+                    <p className="mt-1 text-[12px] font-medium leading-relaxed text-red-700">
+                      {val.message || 'Lịch đặt sân trong quá khứ hoặc đang sử dụng không thể hủy.'}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  disabled
+                  className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-slate-200 text-[14px] font-black text-slate-400 cursor-not-allowed"
+                >
+                  <Ban className="h-5 w-5" />
+                  Không thể hủy sân
+                </button>
+              </section>
+            );
+          }
           const isEligible24h = val.isEligibleRefund;
           return isEligible24h ? (
             <section className="mb-4 rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-100">
@@ -1665,7 +1952,7 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
                 <div>
                   <h3 className="text-[14px] font-black text-red-950">Hủy dưới 24h: Không được hoàn tiền</h3>
                   <p className="mt-1 text-[12px] font-medium leading-relaxed text-red-700">
-                    Theo quy định của sân, lịch đặt hủy trong vòng dưới 24 giờ sẽ <strong>không được hoàn tiền (0đ)</strong>. Thao tác này chỉ giải phóng sân cho khách khác đặt.
+                    Theo quy định của sân, lịch đặt hủy trong vòng dưới 24 giờ sẽ <strong>không được hoàn tiền (0 VND)</strong>. Thao tác này chỉ giải phóng sân cho khách khác đặt.
                   </p>
                 </div>
               </div>
@@ -1729,7 +2016,144 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
         {bookingsState.loading&&<p className="p-3 text-xs text-slate-600">Đang tải lịch sân từ máy chủ...</p>}
         {bookingsState.error&&<p role="alert" className="bg-red-50 p-3 text-xs text-red-700">{bookingsState.error}<button onClick={()=>void refreshSharedBookings()} className="ml-2 underline">Thử lại</button></p>}
         {/* 1. TOP TOOLBAR & DATE CONTROLS */}
-        <div className="bg-white border-b border-slate-200 p-2.5 space-y-2 shrink-0 shadow-xs z-30">
+        <div className="bg-white border-b border-slate-200 p-2.5 space-y-2 shrink-0 shadow-xs relative z-[60]">
+          
+          {/* Ô TRA CỨU ĐẶT SÂN CHECK-IN (SĐT / MÃ ĐẶT SÂN) */}
+          <div className="relative">
+            <div className="relative flex items-center">
+              <Search className="absolute left-3 w-4 h-4 text-emerald-600 pointer-events-none" />
+              <input
+                type="text"
+                value={searchQuery}
+                onFocus={() => setIsSearchFocused(true)}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setIsSearchFocused(true);
+                }}
+                placeholder="Tra cứu SĐT hoặc Mã đặt sân để check-in..."
+                className="w-full h-9 pl-9 pr-8 text-xs font-semibold text-slate-900 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 outline-none transition placeholder:text-slate-400 placeholder:font-medium shadow-2xs"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchQuery('');
+                    setIsSearchFocused(false);
+                  }}
+                  className="absolute right-2.5 p-1 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-200 transition cursor-pointer"
+                  title="Xóa tìm kiếm"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+
+            {/* Dropdown kết quả tra cứu */}
+            {isSearchFocused && searchQuery.trim().length > 0 && (
+              <>
+                <div
+                  className="fixed inset-0 z-40"
+                  onClick={() => setIsSearchFocused(false)}
+                />
+                <div className="absolute left-0 right-0 top-10.5 z-50 rounded-2xl bg-white p-2.5 shadow-2xl border border-slate-200 max-h-[360px] overflow-y-auto space-y-2 animate-in fade-in slide-in-from-top-2 duration-150">
+                <div className="flex items-center justify-between px-1 pb-1 border-b border-slate-100 text-[11px] font-bold text-slate-500">
+                  <span>Kết quả tra cứu ({filteredSearchResults.length})</span>
+                  <button
+                    type="button"
+                    onClick={() => setIsSearchFocused(false)}
+                    className="text-slate-400 hover:text-slate-600 text-xs font-semibold cursor-pointer"
+                  >
+                    Đóng ✕
+                  </button>
+                </div>
+
+                {filteredSearchResults.length === 0 ? (
+                  <div className="py-5 text-center text-xs text-slate-500">
+                    <Search className="w-5 h-5 mx-auto mb-1 text-slate-300" />
+                    Không tìm thấy lịch đặt nào với từ khóa <strong className="text-slate-800 font-bold">"{searchQuery}"</strong>
+                  </div>
+                ) : (
+                  <div className="space-y-1.5">
+                    {filteredSearchResults.slice(0, 8).map((b) => {
+                      const isTargetDate = b.bookingDate === calendarBookingDate(selectedDate);
+                      const checkinVal = getCheckinValidation(b);
+                      const isDone = b.status === 'Đã kết thúc' || b.status === 'Hoàn tất';
+                      const isCancelled = b.status === 'Đã hủy' || b.status === 'DA_HUY';
+
+                      return (
+                        <div
+                          key={b.code}
+                          className="flex items-center justify-between gap-2.5 p-2 rounded-xl bg-slate-50 hover:bg-emerald-50/70 border border-slate-200/80 hover:border-emerald-300 transition group cursor-pointer"
+                          onClick={() => handleSelectSearchResult(b, 'view')}
+                        >
+                          <div className="min-w-0 flex-1 space-y-0.5">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="font-mono text-[11px] font-extrabold text-slate-900 bg-white px-1.5 py-0.5 rounded border border-slate-200">
+                                {b.code}
+                              </span>
+                              <span className="text-xs font-black text-slate-900 truncate">
+                                {b.customerName}
+                              </span>
+                              <span className="text-[11px] font-semibold text-slate-500 flex items-center gap-0.5">
+                                <Phone className="w-3 h-3 text-slate-400" />
+                                {b.phone}
+                              </span>
+                            </div>
+
+                            <div className="flex items-center gap-2 text-[11px] font-medium text-slate-600">
+                              <span className="font-bold text-emerald-800">{b.court}</span>
+                              <span>•</span>
+                              <span className="font-bold text-slate-800">{b.time}</span>
+                              <span>•</span>
+                              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${isTargetDate ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-700'}`}>
+                                {b.bookingDate || 'Hôm nay'}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+                            {b.status === 'Đã đặt' && (
+                              <button
+                                type="button"
+                                disabled={!checkinVal.canCheckin}
+                                onClick={() => handleSelectSearchResult(b, 'checkin')}
+                                className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-black shadow-xs transition active:scale-95 cursor-pointer ${
+                                  checkinVal.canCheckin
+                                    ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/30'
+                                    : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                                }`}
+                                title={checkinVal.message || 'Check-in sân ngay'}
+                              >
+                                <CheckCircle2 className="w-3.5 h-3.5" />
+                                <span>Check-in</span>
+                              </button>
+                            )}
+                            {b.status === 'Đang sử dụng' && (
+                              <span className="text-[10px] font-bold px-2 py-1 rounded-lg bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                Đang dùng
+                              </span>
+                            )}
+                            {isDone && (
+                              <span className="text-[10px] font-semibold px-2 py-1 rounded-lg bg-slate-100 text-slate-500">
+                                Hoàn tất
+                              </span>
+                            )}
+                            {isCancelled && (
+                              <span className="text-[10px] font-semibold px-2 py-1 rounded-lg bg-red-100 text-red-700">
+                                Đã hủy
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+              </>
+            )}
+          </div>
+
           {/* Date Picker Bar */}
           <div className="flex items-center justify-between bg-slate-50 rounded-xl p-1.5 border border-slate-200 relative">
             <button 
@@ -2168,6 +2592,13 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
                             const left = ((bStartMin - startTimelineMin) / intervalMode) * slotWidth;
                             const width = Math.max(46, ((bEndMin - bStartMin) / intervalMode) * slotWidth - 3);
 
+                            const hasSearch = Boolean(searchQuery.trim());
+                            const isSearchMatch = hasSearch && (
+                              (b.code || '').toLowerCase().includes(searchQuery.trim().toLowerCase()) ||
+                              (b.customerName || '').toLowerCase().includes(searchQuery.trim().toLowerCase()) ||
+                              (searchQuery.trim().replace(/\D/g, '') && (b.phone || '').replace(/\D/g, '').includes(searchQuery.trim().replace(/\D/g, '')))
+                            );
+
                             if (b.status === 'Đang sử dụng') {
                               return (
                                 <button
@@ -2181,7 +2612,13 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
                                     top: '4px',
                                     bottom: '4px',
                                   }}
-                                  className="absolute z-10 rounded-xl bg-emerald-600 text-white px-2 py-1 flex flex-col justify-center text-left shadow-sm active:scale-[0.99] transition-transform overflow-hidden border border-emerald-500 cursor-pointer"
+                                  className={`absolute z-10 rounded-xl bg-emerald-600 text-white px-2 py-1 flex flex-col justify-center text-left shadow-sm active:scale-[0.99] transition-all overflow-hidden border border-emerald-500 cursor-pointer ${
+                                    isSearchMatch
+                                      ? 'ring-3 ring-amber-400 ring-offset-2 z-30 shadow-xl scale-[1.02]'
+                                      : hasSearch
+                                      ? 'opacity-35 hover:opacity-100'
+                                      : ''
+                                  }`}
                                 >
                                   <div className="flex items-center gap-1 min-w-0">
                                     <span className="h-1.5 w-1.5 rounded-full bg-emerald-100 shrink-0 animate-ping" />
@@ -2207,7 +2644,13 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
                                   top: '4px',
                                   bottom: '4px',
                                 }}
-                                className={`absolute z-10 rounded-xl border px-2 py-1 flex flex-col justify-center text-left shadow-sm active:scale-[0.99] transition-transform overflow-hidden cursor-pointer ${completed?'bg-slate-100 border-slate-300 hover:bg-slate-200':'bg-blue-50 border-blue-300 hover:bg-blue-100/90'}`}
+                                className={`absolute z-10 rounded-xl border px-2 py-1 flex flex-col justify-center text-left shadow-sm active:scale-[0.99] transition-all overflow-hidden cursor-pointer ${completed?'bg-slate-100 border-slate-300 hover:bg-slate-200':'bg-blue-50 border-blue-300 hover:bg-blue-100/90'} ${
+                                    isSearchMatch
+                                      ? 'ring-3 ring-amber-400 ring-offset-2 z-30 shadow-xl scale-[1.02]'
+                                      : hasSearch
+                                      ? 'opacity-35 hover:opacity-100'
+                                      : ''
+                                  }`}
                               >
                                 <span className="text-[10px] font-black text-blue-950 truncate leading-tight">{b.customerName}</span>
                                 <span className="text-[9px] font-bold text-blue-700 truncate leading-tight mt-0.5">
@@ -2231,74 +2674,96 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
 
 
 
-      {/* Modal hiển thị danh sách đơn đã hủy trong ngày */}
+      {/* Modal hiển thị danh sách đơn đã hủy trong ngày - Bounded strictly inside phone screen */}
       {showCancelledListModal && (
-        <div className="fixed inset-0 z-[150] flex items-center justify-center bg-slate-950/50 backdrop-blur-xs p-4 animate-fade-in">
-          <div className="w-full max-w-lg rounded-3xl bg-white p-5 shadow-2xl ring-1 ring-slate-100 max-h-[85vh] flex flex-col">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <div>
-                <h3 className="text-sm font-black text-slate-900 flex items-center gap-1.5">
-                  <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-red-100 text-red-700">
+        <div
+          className="absolute inset-0 z-[150] flex items-center justify-center bg-slate-950/50 backdrop-blur-xs p-3 animate-fade-in"
+          onClick={() => setShowCancelledListModal(false)}
+        >
+          <div
+            className="w-[calc(100%-1.5rem)] max-w-sm rounded-2xl sm:rounded-3xl bg-white p-3.5 sm:p-4 shadow-2xl ring-1 ring-slate-100 max-h-[85vh] flex flex-col overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 gap-2">
+              <div className="min-w-0 flex-1">
+                <h3 className="text-sm font-black text-slate-900 flex items-center gap-1.5 truncate">
+                  <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-red-100 text-red-700">
                     <XCircle className="h-4 w-4" />
                   </span>
-                  Danh sách đơn đã hủy ({cancelledBookings.length})
+                  <span>Danh sách đơn đã hủy ({cancelledBookings.length})</span>
                 </h3>
-                <p className="text-[11px] font-bold text-slate-500 mt-0.5">
-                  Ngày {calendarBookingDate(selectedDate)} • Sân đã được giải phóng để nhận khách mới
+                <p className="text-[11px] font-semibold text-slate-500 mt-0.5 truncate">
+                  Ngày {calendarBookingDate(selectedDate)} • Sân đã giải phóng để nhận khách mới
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => setShowCancelledListModal(false)}
-                className="rounded-xl p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 cursor-pointer"
+                className="shrink-0 rounded-xl p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 cursor-pointer transition"
+                aria-label="Đóng danh sách"
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto divide-y divide-slate-100 my-2 pr-1">
-              {cancelledBookings.map((b) => (
-                <div key={b.code} className="py-3 flex items-center justify-between gap-3 hover:bg-slate-50/60 rounded-xl px-2 transition">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono text-xs font-black text-slate-900">{b.code}</span>
-                      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-700">{b.court}</span>
-                      <span className="rounded-full bg-red-100 text-red-700 px-2 py-0.5 text-[10px] font-black uppercase">ĐÃ HỦY</span>
-                    </div>
-                    <p className="text-xs font-bold text-slate-800 mt-1">
-                      {b.customerName} • <span className="text-slate-500 font-normal">{b.phone}</span>
-                    </p>
-                    <p className="text-[11px] font-semibold text-slate-500">
-                      Khung giờ: <strong className="text-slate-700">{b.time}</strong> • Tổng: <strong>{b.total}</strong>
-                    </p>
-                  </div>
-
-                  <div className="shrink-0 text-right">
-                    <span className={`inline-block px-2.5 py-1 rounded-lg text-[10px] font-black ${
-                      b.paymentStatus === 'Đã hoàn tiền' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-amber-50 text-amber-700 border border-amber-200'
-                    }`}>
-                      {b.paymentStatus || 'Đã hủy'}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowCancelledListModal(false);
-                        setSelectedBooking(b);
-                      }}
-                      className="block text-[11px] font-bold text-emerald-700 hover:underline mt-1.5 cursor-pointer ml-auto"
-                    >
-                      Xem chi tiết →
-                    </button>
-                  </div>
+            <div className="flex-1 overflow-y-auto space-y-2.5 my-2.5 pr-1 custom-scrollbar">
+              {cancelledBookings.length === 0 ? (
+                <div className="py-8 text-center text-slate-400 text-xs font-semibold">
+                  Không có đơn đặt sân nào bị hủy trong ngày này.
                 </div>
-              ))}
+              ) : (
+                cancelledBookings.map((b) => (
+                  <div
+                    key={b.code}
+                    className="p-3 rounded-2xl bg-slate-50/70 border border-slate-100/90 hover:bg-slate-100/70 transition space-y-2"
+                  >
+                    {/* Dòng 1: Mã đơn, Sân, Tag ĐÃ HỦY và Trạng thái thanh toán */}
+                    <div className="flex items-center justify-between gap-1.5 flex-wrap">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="font-mono text-xs font-black text-slate-900">{b.code}</span>
+                        <span className="rounded-md bg-white border border-slate-200 px-1.5 py-0.5 text-[10px] font-bold text-slate-700">{b.court}</span>
+                        <span className="rounded-md bg-red-100 text-red-700 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wide">ĐÃ HỦY</span>
+                      </div>
+                      <span className={`inline-block px-2 py-0.5 rounded-md text-[10px] font-bold whitespace-nowrap ${
+                        b.paymentStatus === 'Đã hoàn tiền' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-amber-50 text-amber-700 border border-amber-200'
+                      }`}>
+                        {b.paymentStatus || 'Đã hủy'}
+                      </span>
+                    </div>
+
+                    {/* Dòng 2: Thông tin khách hàng & Nút xem chi tiết */}
+                    <div className="flex items-end justify-between gap-2 pt-1 border-t border-slate-200/50">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-bold text-slate-800 truncate">
+                          {b.customerName} • <span className="text-slate-500 font-normal">{b.phone}</span>
+                        </p>
+                        <p className="text-[11px] font-semibold text-slate-500 mt-0.5 truncate">
+                          Khung giờ: <strong className="text-slate-700">{b.time}</strong> • Tổng: <strong className="text-emerald-700">{b.total}</strong>
+                        </p>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowCancelledListModal(false);
+                          setSelectedBooking(b);
+                        }}
+                        className="shrink-0 text-xs font-bold text-emerald-700 hover:text-emerald-800 hover:underline cursor-pointer flex items-center gap-0.5 py-1 px-1.5 rounded-lg active:bg-emerald-50 transition"
+                      >
+                        <span>Xem chi tiết</span>
+                        <span className="text-sm">→</span>
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
 
             <div className="pt-3 border-t border-slate-100 flex justify-end">
               <button
                 type="button"
                 onClick={() => setShowCancelledListModal(false)}
-                className="rounded-xl bg-slate-100 px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-200 cursor-pointer"
+                className="w-full rounded-xl bg-slate-100 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-200 active:scale-95 transition text-center cursor-pointer"
               >
                 Đóng
               </button>
@@ -2370,6 +2835,16 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
                     <p className="text-[10px] font-medium text-slate-600">{selectedBooking.sport}</p>
                   </div>
                   <div>
+                    <p className="text-[10px] font-semibold text-slate-600">Ngày thi đấu</p>
+                    <p className="mt-1 text-[13px] font-black leading-snug text-emerald-800">
+                      {(() => {
+                        const bDate = selectedBooking.bookingDate || calendarBookingDate(selectedDate);
+                        const info = getBookingDateDetails(bDate);
+                        return `${info.dayOfWeek} (${info.fullDate || bDate})`;
+                      })()}
+                    </p>
+                  </div>
+                  <div>
                     <p className="text-[10px] font-semibold text-slate-600">Khung thời gian</p>
                     <p className="mt-1 text-[13px] font-bold leading-snug text-slate-900">{selectedBooking.time}</p>
                   </div>
@@ -2403,83 +2878,123 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
               {/* Action buttons */}
               <div className="space-y-2">
                 {selectedBooking.status === 'Đã đặt' && (
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => openCheckinDetail(selectedBooking)}
-                      className="flex h-10 items-center justify-center gap-1.5 rounded-xl bg-emerald-700 px-2 text-[11px] font-bold text-white shadow-sm transition hover:bg-emerald-800 active:scale-[0.99]"
-                    >
-                      <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
-                      <span className="truncate">Check-in sân</span>
-                    </button>
-                    <div className="grid grid-cols-2 gap-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setTransferBooking(selectedBooking);
-                          setSelectedTargetCourt(null);
-                        }}
-                        className="flex h-10 items-center justify-center gap-1.5 rounded-xl border border-amber-300 bg-amber-50 px-2 text-[11px] font-black text-amber-800 shadow-sm transition active:scale-[0.99] cursor-pointer hover:bg-amber-100"
-                      >
-                        <ArrowRightLeft className="h-3.5 w-3.5 shrink-0 text-amber-700" />
-                        <span className="truncate">Đổi sân</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setCancelBooking(selectedBooking);
-                          setSelectedBooking(null);
-                          onCheckoutModeChange?.(true);
-                        }}
-                        className="flex h-10 items-center justify-center gap-1.5 rounded-xl border border-red-200 bg-red-50 px-2 text-[11px] font-black text-red-700 shadow-sm transition active:scale-[0.99] cursor-pointer hover:bg-red-100"
-                      >
-                        <Ban className="h-3.5 w-3.5 shrink-0" />
-                        <span className="truncate">Hủy đặt sân</span>
-                      </button>
-                    </div>
-                  </div>
+                  (() => {
+                    const cancelVal = getCancelValidation(selectedBooking);
+                    const transferVal = getTransferValidation(selectedBooking);
+                    const checkinVal = getCheckinValidation(selectedBooking);
+
+                    return (
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          disabled={!checkinVal.canCheckin}
+                          onClick={() => openCheckinDetail(selectedBooking)}
+                          className={`flex h-10 items-center justify-center gap-1.5 rounded-xl px-2 text-[11px] font-bold shadow-sm transition active:scale-[0.99] ${
+                            checkinVal.canCheckin
+                              ? 'bg-emerald-700 text-white hover:bg-emerald-800 cursor-pointer'
+                              : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                          }`}
+                        >
+                          <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
+                          <span className="truncate">Check-in sân</span>
+                        </button>
+                        <div className="grid grid-cols-2 gap-2">
+                          {transferVal.canTransfer ? (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setTransferBooking(selectedBooking);
+                                setSelectedTargetCourt(null);
+                              }}
+                              className="flex h-10 items-center justify-center gap-1.5 rounded-xl border border-amber-300 bg-amber-50 px-2 text-[11px] font-black text-amber-800 shadow-sm transition active:scale-[0.99] cursor-pointer hover:bg-amber-100"
+                            >
+                              <ArrowRightLeft className="h-3.5 w-3.5 shrink-0 text-amber-700" />
+                              <span className="truncate">Đổi sân</span>
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              disabled
+                              title={transferVal.message || 'Lịch đặt trong quá khứ không thể đổi sân'}
+                              className="flex h-10 items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-slate-100 px-2 text-[11px] font-bold text-slate-400 shadow-sm cursor-not-allowed"
+                            >
+                              <ArrowRightLeft className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+                              <span className="truncate">Đổi sân</span>
+                            </button>
+                          )}
+                          {cancelVal.canCancel ? (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setCancelBooking(selectedBooking);
+                                setSelectedBooking(null);
+                                onCheckoutModeChange?.(true);
+                              }}
+                              className="flex h-10 items-center justify-center gap-1.5 rounded-xl border border-red-200 bg-red-50 px-2 text-[11px] font-black text-red-700 shadow-sm transition active:scale-[0.99] cursor-pointer hover:bg-red-100"
+                            >
+                              <Ban className="h-3.5 w-3.5 shrink-0" />
+                              <span className="truncate">Hủy đặt sân</span>
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              disabled
+                              title={cancelVal.message || 'Lịch đặt trong quá khứ không thể hủy'}
+                              className="flex h-10 items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-slate-100 px-2 text-[11px] font-bold text-slate-400 shadow-sm cursor-not-allowed"
+                            >
+                              <Ban className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+                              <span className="truncate">Hủy đặt sân</span>
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })()
                 )}
 
                 {selectedBooking.status === 'Đang sử dụng' && (
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setCheckoutBooking(selectedBooking);
-                        setSelectedBooking(null);
-                        onCheckoutModeChange?.(true);
-                      }}
-                      className="flex h-10 items-center justify-center gap-1.5 rounded-xl bg-emerald-700 px-2 text-[11px] font-bold text-white shadow-sm transition hover:bg-emerald-800 active:scale-[0.99]"
-                    >
-                      <Undo2 className="h-3.5 w-3.5 shrink-0" />
-                      <span className="truncate">Kết thúc / Trả sân</span>
-                    </button>
-                    <div className="grid grid-cols-2 gap-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setTransferBooking(selectedBooking);
-                          setSelectedTargetCourt(null);
-                        }}
-                        className="flex h-10 items-center justify-center gap-1.5 rounded-xl border border-amber-300 bg-amber-50 px-2 text-[11px] font-black text-amber-800 shadow-sm transition active:scale-[0.99] cursor-pointer hover:bg-amber-100"
-                      >
-                        <ArrowRightLeft className="h-3.5 w-3.5 shrink-0 text-amber-700" />
-                        <span className="truncate">Đổi sân</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setCancelBooking(selectedBooking);
-                          setSelectedBooking(null);
-                          onCheckoutModeChange?.(true);
-                        }}
-                        className="flex h-10 items-center justify-center gap-1.5 rounded-xl border border-red-200 bg-red-50 px-2 text-[11px] font-black text-red-700 shadow-sm transition active:scale-[0.99] cursor-pointer hover:bg-red-100"
-                      >
-                        <Ban className="h-3.5 w-3.5 shrink-0" />
-                        <span className="truncate">Hủy đặt sân</span>
-                      </button>
-                    </div>
-                  </div>
+                  (() => {
+                    const transferVal = getTransferValidation(selectedBooking);
+                    return (
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCheckoutBooking(selectedBooking);
+                            setSelectedBooking(null);
+                            onCheckoutModeChange?.(true);
+                          }}
+                          className="flex h-10 items-center justify-center gap-1.5 rounded-xl bg-emerald-700 px-2 text-[11px] font-bold text-white shadow-sm transition hover:bg-emerald-800 active:scale-[0.99] cursor-pointer"
+                        >
+                          <Undo2 className="h-3.5 w-3.5 shrink-0" />
+                          <span className="truncate">Kết thúc / Trả sân</span>
+                        </button>
+                        {transferVal.canTransfer ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setTransferBooking(selectedBooking);
+                              setSelectedTargetCourt(null);
+                            }}
+                            className="flex h-10 items-center justify-center gap-1.5 rounded-xl border border-amber-300 bg-amber-50 px-2 text-[11px] font-black text-amber-800 shadow-sm transition active:scale-[0.99] cursor-pointer hover:bg-amber-100"
+                          >
+                            <ArrowRightLeft className="h-3.5 w-3.5 shrink-0 text-amber-700" />
+                            <span className="truncate">Đổi sân</span>
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            disabled
+                            title={transferVal.message || 'Ca thi đấu đã kết thúc, không thể đổi sân'}
+                            className="flex h-10 items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-slate-100 px-2 text-[11px] font-bold text-slate-400 shadow-sm cursor-not-allowed"
+                          >
+                            <ArrowRightLeft className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+                            <span className="truncate">Đổi sân</span>
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })()
                 )}
 
                 {selectedBooking.status === 'Đã hủy' && (
@@ -2534,53 +3049,181 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
         />
       )}
 
-      {/* 🟡 MODAL THANH TOÁN (PAYMENT BOTTOM SHEET) - GIỐNG HỆT THIẾT KẾ MẪU */}
+      {/* 🟡 MODAL THANH TOÁN (PAYMENT BOTTOM SHEET) - CHUẨN THEO TOBE_CHAY.bpmn */}
       {showPaymentModal && pendingBookingData && (
         <div className="fixed inset-0 z-[160] flex items-end sm:items-center justify-center bg-slate-900/60 p-0 sm:p-4 backdrop-blur-sm animate-in fade-in duration-300">
           <div className="w-full max-w-md rounded-t-3xl sm:rounded-3xl bg-white p-6 shadow-2xl animate-in slide-in-from-bottom-8 duration-300 flex flex-col items-center max-h-[94vh] overflow-y-auto">
             <div className="w-12 h-1.5 bg-slate-200 rounded-full mb-4 sm:hidden"></div>
             
-            <h3 className="text-lg font-black text-slate-900 uppercase tracking-wide">THANH TOÁN ĐƠN HÀNG</h3>
-            <p className="text-xs text-slate-500 mt-1 mb-4 text-center">Quét mã VietQR bằng ứng dụng ngân hàng</p>
-
-            <div className="w-full rounded-2xl border-2 border-emerald-500 bg-emerald-50/50 p-5 relative overflow-hidden text-center">
-              <div className="flex justify-between items-center mb-3">
-                <p className="font-extrabold text-slate-900 text-sm">MB BANK</p>
-                <span className="rounded bg-emerald-100 px-2 py-1 text-[10px] font-black text-emerald-700">VIETQR</span>
-              </div>
-              
-              <QrCodeArtwork className="mx-auto h-40 w-40" />
-
-              <div className="mt-4 space-y-1 text-xs">
-                <p className="text-slate-500">Số tiền thanh toán:</p>
-                <p className="text-2xl font-black text-emerald-600">{pendingBookingData.total.replace(' ', '')}</p>
-                <p className="text-slate-500 mt-2">Nội dung chuyển khoản:</p>
-                <p className="font-mono font-bold text-slate-900 bg-white py-1 rounded border border-slate-200 uppercase">
-                  CX {pendingBookingData.court.replace(/ /g, '').toUpperCase()} {pendingBookingData.phone.replace(/[\s.-]/g, '')}
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-6 flex flex-col items-center gap-3 w-full">
-              <div className="relative flex h-10 w-10 items-center justify-center">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex h-6 w-6 rounded-full bg-emerald-500 items-center justify-center">
-                  <span className="h-2 w-2 bg-white rounded-full"></span>
+            {/* Trạng thái Tạm giữ sân (Activity_056bcoz) */}
+            <div className="w-full mb-3 flex items-center justify-between bg-emerald-50 border border-emerald-300 rounded-xl px-3 py-1.5 text-[11px] text-emerald-900 font-bold">
+              <span className="flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                Đang tạm giữ {pendingBookingData.court}
+              </span>
+              <span className="text-[10px] font-semibold flex items-center gap-1">
+                <span className="text-emerald-800">Tạm giữ sân:</span>
+                <span className={`font-mono font-bold px-1.5 py-0.5 rounded transition ${
+                  adminPaymentCountdown <= 20
+                    ? 'bg-amber-100 text-amber-800 animate-pulse ring-1 ring-amber-300'
+                    : 'bg-emerald-100/90 text-emerald-900'
+                }`}>
+                  {Math.floor(adminPaymentCountdown / 60)}:{(adminPaymentCountdown % 60).toString().padStart(2, '0')}
                 </span>
-              </div>
-              <p className="text-sm font-semibold text-emerald-700 text-center">
-                Đang chờ ghi nhận thanh toán qua VietQR…
-              </p>
+              </span>
             </div>
 
-            {bookingSaveError && <p role="alert" className="mt-4 rounded-xl bg-red-50 p-3 text-xs text-red-700">{bookingSaveError}</p>}
-            <div className="w-full mt-6">
+            {/* Thông báo nhắc nhở sau 20s (Event_1510897 -> Activity_0xxhd0u) */}
+            {adminPaymentNotification && (
+              <div className="w-full mb-3 rounded-xl bg-amber-500 text-white p-2.5 text-xs font-bold flex items-center justify-between shadow-md animate-in slide-in-from-top-2">
+                <div className="flex items-center gap-2">
+                  <Bell className="h-4 w-4 shrink-0" />
+                  <span className="text-[11px] leading-tight">{adminPaymentNotification}</span>
+                </div>
+                <button type="button" onClick={() => setAdminPaymentNotification(null)} className="text-white/80 hover:text-white ml-2 text-xs">✕</button>
+              </div>
+            )}
+
+            <h3 className="text-lg font-black text-slate-900 uppercase tracking-wide">THANH TOÁN ĐƠN HÀNG</h3>
+            <p className="text-xs text-slate-500 mt-0.5 mb-3 text-center">Quét mã VietQR bằng ứng dụng ngân hàng</p>
+
+            {/* Trường hợp lỗi kỹ thuật thanh toán (Boundary Error Event Event_02s9rdl -> Activity_1mjvkbj) */}
+            {adminPaymentTechnicalError ? (
+              <div className="w-full space-y-4 my-2 animate-in fade-in">
+                <div className="rounded-2xl border-2 border-red-300 bg-red-50 p-4 text-center space-y-2">
+                  <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-red-100 text-red-600">
+                    <AlertTriangle className="h-6 w-6" />
+                  </div>
+                  <h4 className="text-xs font-black text-red-950 uppercase tracking-wide">Thông báo lỗi kỹ thuật thanh toán</h4>
+                  <p className="text-[11px] text-red-700 leading-relaxed font-medium">
+                    {adminPaymentTechnicalError}
+                  </p>
+                </div>
+
+                {/* Exclusive Gateway Gateway_1ukmj3e: Thanh toán lại ? */}
+                <div className="rounded-xl bg-slate-50 p-2.5 text-center border border-slate-200">
+                  <p className="text-[11px] font-bold text-slate-700">Khách có muốn thanh toán lại không?</p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={handleRetryAdminPayment}
+                    className="flex items-center justify-center gap-1.5 rounded-xl bg-emerald-600 py-2.5 text-xs font-bold text-white shadow-md hover:bg-emerald-700 active:scale-95 transition cursor-pointer"
+                  >
+                    <RefreshCw className="h-3.5 w-3.5" />
+                    Thanh toán lại
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleCancelAfterAdminPaymentError}
+                    className="rounded-xl border border-slate-200 bg-white py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-100 active:scale-95 transition cursor-pointer"
+                  >
+                    Hủy bỏ
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="w-full rounded-2xl border-2 border-emerald-500 bg-emerald-50/50 p-4 relative overflow-hidden text-center">
+                  <div className="flex justify-between items-center mb-2">
+                    <p className="font-extrabold text-slate-900 text-sm">MB BANK</p>
+                    <span className="rounded bg-emerald-100 px-2 py-0.5 text-[10px] font-black text-emerald-700">VIETQR</span>
+                  </div>
+                  
+                  <QrCodeArtwork className="mx-auto h-36 w-36" value={adminMobilePaymentUrl} />
+                  <div className="mt-2 text-center">
+                    <p className="text-[11px] font-bold text-slate-700">📱 Lấy điện thoại quét mã QR để chuyển tiền</p>
+                    <a
+                      href={adminMobilePaymentUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-block mt-0.5 text-[10px] font-bold text-blue-600 hover:text-blue-800 underline"
+                    >
+                      (Hoặc bấm vào đây để mở trang giả lập điện thoại)
+                    </a>
+                  </div>
+
+                  <div className="mt-3 space-y-1 text-xs">
+                    <p className="text-slate-500">Số tiền thanh toán:</p>
+                    <p className="text-2xl font-black text-emerald-600">{pendingBookingData.total.replace(' ', '')}</p>
+                    <p className="text-slate-500 mt-1.5">Nội dung chuyển khoản:</p>
+                    <p className="font-mono font-bold text-slate-900 bg-white py-1 rounded border border-slate-200 uppercase text-xs">
+                      CX {pendingBookingData.court.replace(/ /g, '').toUpperCase()} {pendingBookingData.phone.replace(/[\s.-]/g, '')}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-4 flex flex-col items-center gap-2.5 w-full">
+                  <div className="relative flex h-8 w-8 items-center justify-center">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
+                    <span className="relative inline-flex h-5 w-5 rounded-full bg-emerald-500 items-center justify-center">
+                      <span className="h-1.5 w-1.5 bg-white rounded-full"></span>
+                    </span>
+                  </div>
+                  <p className="text-xs font-semibold text-emerald-700 text-center">
+                    Đang chờ ghi nhận thanh toán qua VietQR…
+                  </p>
+                </div>
+
+                {bookingSaveError && <p role="alert" className="mt-3 rounded-xl bg-red-50 p-2.5 text-xs text-red-700">{bookingSaveError}</p>}
+                
+                <div className="w-full mt-3">
+                  <button
+                    type="button"
+                    onClick={handleCancelPayment}
+                    className="w-full rounded-xl border border-slate-200 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-50 cursor-pointer active:scale-95 transition"
+                  >
+                    Hủy giao dịch
+                  </button>
+                </div>
+
+
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* 🔴 EVENT SUB-PROCESS: KHÁCH XÁC NHẬN THOÁT KHỎI QUÁ TRÌNH THANH TOÁN ĐẶT SÂN (Activity_1clhmdn) */}
+      {showAdminCancelSubprocessModal && pendingBookingData && (
+        <div className="fixed inset-0 z-[170] flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="w-full max-w-sm rounded-3xl border border-amber-300 bg-white p-5 shadow-2xl space-y-4 animate-in zoom-in-95 duration-150">
+            <div className="flex items-center gap-3 border-b border-slate-100 pb-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-amber-100 text-amber-700">
+                <AlertTriangle className="h-5 w-5" />
+              </div>
+              <div>
+                <h4 className="text-sm font-black text-slate-900">Xác nhận hủy thanh toán</h4>
+                <p className="text-[10px] font-bold text-amber-700 uppercase tracking-wide">Quy trình phụ (Event Sub-process)</p>
+              </div>
+            </div>
+
+            <div className="rounded-xl bg-amber-50/70 p-3 text-xs text-amber-900 border border-amber-200/70 space-y-2 leading-relaxed">
+              <p className="font-semibold">
+                Xác nhận hủy giao dịch và thoát? Hệ thống sẽ kích hoạt quy trình phụ để xử lý:
+              </p>
+              <ul className="list-disc pl-4 space-y-1 text-[11px] text-amber-800">
+                <li>Hủy yêu cầu đặt sân hiện tại</li>
+                <li>Giải phóng khung giờ <strong className="font-bold">{pendingBookingData.time} ({pendingBookingData.court})</strong> trên lịch sân</li>
+                <li>Ghi nhận phiên đặt sân bị hủy vào hệ thống</li>
+              </ul>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 pt-1">
               <button
                 type="button"
-                onClick={handleCancelPayment}
-                className="w-full rounded-xl border border-slate-200 py-3 text-xs font-bold text-slate-600 hover:bg-slate-50 cursor-pointer active:scale-95"
+                onClick={() => setShowAdminCancelSubprocessModal(false)}
+                className="rounded-xl bg-slate-100 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-200 active:scale-95 transition cursor-pointer"
               >
-                Hủy giao dịch
+                Tiếp tục thanh toán
+              </button>
+              <button
+                type="button"
+                onClick={handleExecuteAdminCancelSubprocess}
+                className="rounded-xl bg-red-600 py-2.5 text-xs font-bold text-white shadow-md hover:bg-red-700 active:scale-95 transition cursor-pointer"
+              >
+                Xác nhận hủy yêu cầu
               </button>
             </div>
           </div>
@@ -2673,14 +3316,25 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
                   <p className="text-[11px] text-slate-500">CourtX Arena · Hóa đơn điện tử</p>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() => setShowReceipt(false)}
-                className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700 cursor-pointer transition"
-                aria-label="Đóng biên nhận"
-              >
-                <X className="h-5 w-5" />
-              </button>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={handleDownloadAdminReceipt}
+                  className="rounded-lg p-1 text-slate-400 hover:bg-emerald-100 hover:text-emerald-700 cursor-pointer transition"
+                  aria-label="Tải xuống biên nhận"
+                  title="Tải ảnh biên nhận (.png)"
+                >
+                  <Download className="h-5 w-5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowReceipt(false)}
+                  className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700 cursor-pointer transition"
+                  aria-label="Đóng biên nhận"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
             </div>
 
             {/* Chi tiết biên nhận */}
@@ -2733,7 +3387,7 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
             <div className="grid grid-cols-2 gap-2 pt-1">
               <button
                 type="button"
-                onClick={() => window.print()}
+                onClick={handlePrintAdminReceipt}
                 className="flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 active:scale-95 transition cursor-pointer"
               >
                 <Printer className="h-3.5 w-3.5" />
@@ -2789,6 +3443,16 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
               <div className="flex justify-between items-center">
                 <span className="text-slate-500">Sân hiện tại:</span>
                 <span className="font-black text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full">{transferBooking.court} ({transferBooking.sport})</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-slate-500">Ngày thi đấu:</span>
+                <span className="font-black text-emerald-800 bg-emerald-50 px-2.5 py-0.5 rounded-md border border-emerald-200">
+                  {(() => {
+                    const bDate = transferBooking.bookingDate || calendarBookingDate(selectedDate);
+                    const info = getBookingDateDetails(bDate);
+                    return `${info.dayOfWeek} (${info.fullDate || bDate})`;
+                  })()}
+                </span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-slate-500">Khung giờ gốc:</span>
@@ -2876,7 +3540,7 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
                 </span>
               </div>
 
-              <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto pr-1">
+              <div className="grid grid-cols-2 gap-2.5 max-h-52 overflow-y-auto p-1">
                 {candidateCourtsForTransfer.map((court) => {
                   const isSelected = selectedTargetCourt?.id === court.id;
                   return (
@@ -2885,12 +3549,12 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
                       type="button"
                       disabled={court.isOccupied}
                       onClick={() => setSelectedTargetCourt(court)}
-                      className={`flex flex-col p-3 rounded-2xl border text-left transition ${
+                      className={`relative flex flex-col p-3 rounded-2xl border-2 text-left transition-all outline-none ${
                         court.isOccupied
-                          ? 'border-slate-200 bg-slate-100 opacity-60 cursor-not-allowed'
+                          ? 'border-slate-200 bg-slate-100 opacity-60 cursor-not-allowed z-0'
                           : isSelected
-                          ? 'border-amber-500 bg-amber-50 ring-2 ring-amber-400'
-                          : 'border-slate-200 bg-white hover:border-amber-300 active:scale-95 cursor-pointer'
+                          ? 'border-amber-500 bg-amber-50/90 shadow-sm z-10'
+                          : 'border-slate-200 bg-white hover:border-amber-400 hover:bg-amber-50/20 active:scale-[0.98] cursor-pointer z-0'
                       }`}
                     >
                       <div className="flex items-center justify-between">
@@ -2933,7 +3597,7 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
               </button>
               <button
                 type="button"
-                disabled={!selectedTargetCourt || candidateCourtsForTransfer.find(c => c.id === selectedTargetCourt.id)?.isOccupied || isTransferring}
+                disabled={!selectedTargetCourt || candidateCourtsForTransfer.find(c => c.id === selectedTargetCourt.id)?.isOccupied || isTransferring || !getTransferValidation(transferBooking).canTransfer}
                 onClick={() => selectedTargetCourt && handleConfirmTransfer(selectedTargetCourt)}
                 className={`flex-1 py-2.5 rounded-xl font-bold text-xs text-white transition shadow-sm flex items-center justify-center gap-1.5 ${
                   !selectedTargetCourt || candidateCourtsForTransfer.find(c => c.id === selectedTargetCourt.id)?.isOccupied || isTransferring

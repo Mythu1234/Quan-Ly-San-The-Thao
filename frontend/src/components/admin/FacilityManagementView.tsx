@@ -194,7 +194,7 @@ export default function FacilityManagementView({
   if (subView === 'incidents') {
     return (
       <div className="min-w-0 flex-1 space-y-4 bg-white p-4 pb-8">
-        <button type="button" onClick={()=>setSubView('main')} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50"><ArrowLeft className="h-4 w-4"/>Cơ sở vật chất</button>
+        <button type="button" onClick={()=>setSubView('main')} className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-white px-3 py-2 text-xs font-medium text-emerald-800 transition hover:border-emerald-300 hover:bg-emerald-50 focus-visible:outline-2 focus-visible:outline-emerald-600"><ArrowLeft className="h-4 w-4"/>Cơ sở vật chất</button>
         {toastMessage&&<p role="status" className="rounded-lg bg-emerald-50 p-3 text-xs text-emerald-800">{toastMessage}</p>}
         <IncidentReportsList incidents={incidents} onView={handleOpenIncidentDetail} onDelete={onDeleteIncident} onCreate={()=>{setIncidentReturnView('incidents');setSubView('report_incident');}}/>
       </div>
@@ -215,8 +215,8 @@ export default function FacilityManagementView({
         </div>
       )}
 
-      <div className="flex items-start justify-between gap-3">
-        <h1 className="text-2xl font-black tracking-tight text-slate-900 leading-tight">
+      <div className="flex items-center justify-between gap-3">
+        <h1 className="text-base font-bold tracking-tight text-slate-900 leading-snug sm:text-lg">
           QUẢN LÝ CƠ SỞ VẬT CHẤT
         </h1>
         <button type="button" onClick={()=>setSubView('incidents')} aria-label={`Báo cáo sự cố, ${unresolvedCount} chưa xử lý`} title="Báo cáo sự cố" className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-emerald-800 shadow-sm transition hover:bg-emerald-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700">
@@ -260,7 +260,7 @@ export default function FacilityManagementView({
           })}
         </div>
 
-        <div className="space-y-2">
+        <div key={courtSportFilter} role="region" aria-label="Danh sách trạng thái sân" tabIndex={0} className="court-status-scroll max-h-88 space-y-2 overflow-y-auto overscroll-contain pr-1 focus-visible:outline-2 focus-visible:outline-emerald-600">
           {courts.length===0&&<div role="status" className="rounded-lg bg-amber-50 p-3 text-xs text-amber-800">Chưa tải được danh sách sân. <button type="button" onClick={()=>void refreshCourtAvailability()} className="font-bold underline">Tải lại danh sách sân</button></div>}
           {courts
             .filter((c) => {
@@ -270,13 +270,13 @@ export default function FacilityManagementView({
             .map((court) => (
             <div
               key={court.id}
-              className={`flex items-center justify-between gap-3 p-3 rounded-xl border bg-white transition ${
+              className={`flex h-16 items-center justify-between gap-3 p-3 rounded-xl border bg-white transition ${
                 court.isLocked
                   ? 'border-red-200'
                   : 'border-black/10 hover:border-emerald-300'
               }`}
             >
-              <div className="flex items-center gap-3">
+              <div className="flex min-w-0 items-center gap-3">
                 <div
                   aria-hidden="true"
                   className={`h-9 w-9 shrink-0 rounded-xl ${
@@ -285,9 +285,9 @@ export default function FacilityManagementView({
                       : 'bg-emerald-200'
                   }`}
                 />
-                <div>
-                  <div className="text-xs font-black text-slate-900">{court.name}</div>
-                  <div className={`text-[11px] font-semibold mt-0.5 ${
+                <div className="min-w-0">
+                  <div className="truncate text-xs font-black text-slate-900" title={court.name}>{court.name}</div>
+                  <div title={court.isLocked ? court.lockReason : undefined} className={`truncate text-[11px] font-semibold mt-0.5 ${
                     court.isLocked ? 'text-red-700' : 'text-emerald-800'
                   }`}>
                     {court.isLocked
@@ -301,7 +301,7 @@ export default function FacilityManagementView({
               <button
                 type="button"
                 onClick={() => handleCourtSwitchClick(court)}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none cursor-pointer ${
+                className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors focus:outline-none cursor-pointer ${
                   court.isLocked ? 'bg-red-500' : 'bg-emerald-700'
                 }`}
                 title={court.isLocked ? 'Bấm để mở lại sân' : 'Bấm để khóa bảo trì'}

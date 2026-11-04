@@ -62,7 +62,7 @@ type PaymentCheckoutProps = {
   onComplete: (result: PaymentResult) => void;
 };
 
-const formatCurrency = (amount: number) => `${amount.toLocaleString('vi-VN')}đ`;
+const formatCurrency = (amount: number) => `${amount.toLocaleString('vi-VN')} VND`;
 
 const getEffectiveRegistrationMonths = (months: number) => {
   const wholeMonths = Number.isFinite(months) ? Math.trunc(months) : 1;

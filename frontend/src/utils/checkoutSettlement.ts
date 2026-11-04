@@ -28,7 +28,7 @@ export interface CheckoutReceipt {
   incidentIds: string[];
 }
 export interface CheckoutResult { receipt: CheckoutReceipt; incidents: FacilityIncident[]; equipments: FacilityEquipment[] }
-export interface DamageDraft { id: string; existingId?: string; itemId: string; equipmentCode?:string; liability: IncidentLiability; description: string; images: string[] }
+export interface DamageDraft { id: string; existingId?: string; itemId: string; equipmentCode?:string; liability: IncidentLiability | ''; description: string; images: string[] }
 export const checkoutCourtCode=(value:string)=>value.toUpperCase().replace(/Đ/g,'D').match(/(?:CL|BC|BD)[-_]\d{2}/)?.[0].replace('_','-') || value;
 
 export function calculateCheckoutDamage(drafts: DamageDraft[], catalog: PriceRow[], existing: FacilityIncident[] = []) {
@@ -38,6 +38,7 @@ export function calculateCheckoutDamage(drafts: DamageDraft[], catalog: PriceRow
 export function buildCheckoutReports(drafts: DamageDraft[], catalog: PriceRow[], existing: FacilityIncident[], booking: Omit<CheckoutRequest, 'reports' | 'paymentConfirmed'>, reporter: IncidentReporter): FacilityIncident[] {
   const selected = new Set<string>();
   return drafts.map(draft => {
+    if (draft.liability !== 'DO_KHACH_LAM_HONG' && draft.liability !== 'BAO_HANH_SAN_VAN_DONG') throw Error('Vui lòng chọn trách nhiệm cho từng sự cố.');
     const item = catalog.find(row => row.id === draft.itemId);
     if (!item || !draft.description.trim()) throw Error('Chọn thiết bị và nhập mô tả cho từng sự cố.');
     const equipmentCode=draft.equipmentCode||(!item.equipment?.isCatalogItem?item.equipment?.code:undefined);

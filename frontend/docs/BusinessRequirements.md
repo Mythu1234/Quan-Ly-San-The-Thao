@@ -91,16 +91,29 @@ Các thông tin này là cơ sở cốt lõi để lập trình logic xử lý, 
 4. **Vé đặt sân:**
    * Không sử dụng bảng Vé điện tử riêng. Mã đặt sân (`ma_dat_san`) kiêm luôn vai trò của Mã vé điện tử để khách quét QR đối soát và làm thủ tục Check-in/Check-out.
 
-5. **Quy trình Thanh toán VietQR & Xuất biên nhận (Đồng bộ Khách hàng & Nhân viên/Chủ sân):**
-   * **Giao diện thanh toán VietQR tinh gọn:**
-     - Khi xác nhận đặt sân, hệ thống hiển thị mã QR VietQR với số tiền tương ứng và nội dung chuyển khoản chuẩn hóa (`CX <MÃ SÂN> <SỐ ĐIỆN THOẠI>`).
-     - Giao diện hiển thị trạng thái duy nhất: `"Đang chờ ghi nhận thanh toán qua VietQR…"` kèm biểu tượng radar nhấp nháy.
-     - Tuyệt đối **không hiển thị thanh tiến trình (progress bar) và không hiển thị số giây đếm ngược** trên giao diện nhằm giữ trải nghiệm tinh gọn, chuyên nghiệp.
-     - Cung cấp nút `"Hủy giao dịch"` cho phép hủy thao tác nếu có thay đổi.
-   * **Cơ chế ghi nhận tự động sau 5 giây:**
-     - Hệ thống chạy ngầm bộ đếm 5 giây (`5s`) mô phỏng phản hồi ghi nhận tiền vào tài khoản từ hệ thống ngân hàng.
-     - Sau 5 giây, hệ thống tự động lưu trữ dữ liệu vào CSDL Supabase: đơn đặt sân (`dat_san`), giao dịch thanh toán (`thanh_toan`), và biên nhận điện tử (`bien_nhan`) với mã định dạng tuần tự chuẩn (`DS...`, `TT...`, `BN...`).
+5. **Quy trình Thanh toán VietQR & Quản lý Tạm giữ sân (Chuẩn hóa theo TOBE_CHAY.bpmn):**
+   * **Cơ chế Tạm giữ sân & Đồng hồ đếm ngược (Court Hold & 1-Minute Countdown):**
+     - Khi xác nhận thông tin đặt sân, hệ thống lập tức chuyển sang trạng thái **"Tạm giữ sân"** (`Activity_056bcoz`) để khóa khung giờ, ngăn chặn các lượt đặt trùng lặp (double-booking).
+     - Giao diện thanh toán hiển thị thanh trạng thái: `● Đang tạm giữ <Mã sân>` kèm đồng hồ đếm ngược trực tiếp **`Tạm giữ sân: 1:00`** $\rightarrow$ `0:59`...
+     - **Tổng thời gian giữ sân:** **1 phút (60 giây)**.
+   * **Boundary Timer Event - Nhắc nhở thanh toán sau 40 giây:**
+     - Khi phiên thanh toán đã trôi qua **40 giây** (đồng hồ đếm ngược còn **20 giây**):
+     - Hệ thống tự động kích hoạt Boundary Timer Event nhắc thanh toán (`Activity_0xxhd0u` theo sơ đồ `TOBE_CHAY.bpmn`).
+     - Đồng hồ đếm ngược chuyển sang màu hổ phách cảnh báo nhấp nháy và hiển thị thanh thông báo: *"🔔 Nhắc nhở thanh toán (sau 40s): Sân đang tạm giữ sắp hết hạn trong 20 giây, vui lòng hoàn tất chuyển khoản VietQR!"*.
+   * **Boundary Timer Event - Hết hạn giữ sân sau 1 phút:**
+     - Nếu sau **1 phút (60 giây)** mà hệ thống chưa nhận được xác nhận thanh toán:
+     - Boundary Timer Event hết hạn giữ sân (`Activity_1a9aema` $\rightarrow$ `Event_18vovxa`) tự động kích hoạt.
+     - Hệ thống tự động đóng phiên thanh toán và giải phóng khung giờ tạm giữ để khách hàng khác có thể đặt.
+   * **Cơ chế Quét mã VietQR di động & Xác thực giao dịch (Mobile Payment & Realtime Confirmation):**
+     - Hệ thống hiển thị mã QR VietQR động (chứa liên kết phiên thanh toán `sessionId`) với số tiền tương ứng và nội dung chuyển khoản chuẩn hóa (`CX <MÃ SÂN> <SỐ ĐIỆN THOẠI>`).
+     - Giao diện hiển thị trạng thái: `"Đang chờ ghi nhận thanh toán qua VietQR…"` kèm biểu tượng radar xung nhịp và nút `"Hủy giao dịch"`. Tuyệt đối không hiển thị nút xác nhận thanh toán thủ công dư thừa trên web.
+     - **Thao tác thanh toán:** Khách hàng dùng điện thoại quét mã QR (hoặc bấm liên kết giả lập trên điện thoại): Màn hình di động mở giao diện ngân hàng MB Bank với đầy đủ thông tin giao dịch.
+     - **Xác nhận chuyển tiền:** Khi khách bấm *"Xác nhận chuyển tiền"* trên điện thoại, ứng dụng di động phát tín hiệu Realtime qua Supabase Broadcast Channel (`payment_session_<sessionId>`).
+     - Giao diện web lập tức bắt tín hiệu thành công tự động, lưu trữ dữ liệu vào CSDL Supabase: đơn đặt sân (`dat_san`), giao dịch thanh toán (`thanh_toan`), và biên nhận điện tử (`bien_nhan`) với mã tuần tự chuẩn (`DS...`, `TT...`, `BN...`).
      - Tự động chuyển thẳng sang màn hình **"ĐẶT SÂN THÀNH CÔNG!"**.
+   * **Hủy thanh toán chủ động (Event Sub-process - Activity_1clhmdn):**
+     - Người dùng bấm nút `"Hủy giao dịch"` trên giao diện thanh toán để kích hoạt Event Sub-process (`Activity_1clhmdn`).
+     - Hộp thoại xác nhận hiển thị: Khi người dùng đồng ý hủy, hệ thống đóng phiên thanh toán và giải phóng khung giờ ngay lập tức (`Event_0rjnoap`).
    * **Màn hình Đặt sân thành công & Biên nhận:**
      - Màn hình "ĐẶT SÂN THÀNH CÔNG!" hiển thị mã đơn đặt sân, thông tin chi tiết môn, sân, thời gian, số tiền đã thanh toán 100% qua VietQR.
      - Đồng bộ ở cả 2 luồng: cung cấp nút **"📋 BIÊN NHẬN"** mở modal biên nhận chi tiết (hỗ trợ in biên nhận kiểm tra vé tại quầy) và nút **"HOÀN TẤT"**.
@@ -135,6 +148,8 @@ Các thông tin này là cơ sở cốt lõi để lập trình logic xử lý, 
   * Nếu không phát sinh sự cố hư hại thiết bị, nhân viên thực hiện thao tác Check-out hoàn tất lượt đặt ngay lập tức với số tiền cần thu là **0 VNĐ**:
     $$\text{Tổng tiền thu lúc Checkout} = \text{Phí bồi thường sự cố CSVC do khách làm hỏng (nếu có, mặc định = 0 VNĐ)}$$
     $$\text{Tổng thanh toán lượt đặt} = \text{Tiền thuê sân (đã thanh toán 100% lúc đặt)} + \text{Phí bồi thường CSVC (nếu có)}$$
+
+* **Thanh toán bồi thường tại Check-out:** Sau khi nhập đủ thông tin sự cố và chọn trách nhiệm, nhân viên tick `Thanh toán qua VietQR` để mở mã QR dùng chung với phần đặt sân. Hệ thống mô phỏng ghi nhận thành công sau **7 giây**, tự tạo mã tham chiếu giao dịch và mở nút `Xác nhận Check-out`. Nhân viên phải nhấn xác nhận để lưu quyết toán, thanh toán và báo cáo sự cố; bộ đếm không tự hoàn tất trả sân. Thay đổi thông tin sự cố hoặc số tiền sẽ hủy trạng thái xác nhận thanh toán cũ. Bỏ tick sẽ hủy chờ thanh toán. Sân chịu chi phí hoặc không có hư hỏng thì không cần bước thanh toán bồi thường. Đây là luồng mô phỏng, chưa phải xác minh giao dịch ngân hàng thực tế.
 
 ---
 

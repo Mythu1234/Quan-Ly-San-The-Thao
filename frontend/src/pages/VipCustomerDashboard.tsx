@@ -318,7 +318,7 @@ export default function VipCustomerDashboard({ onLogout }: VipCustomerDashboardP
     setShowPayDueModal(false);
     showAlert(
       'Thanh toán thành công! 🎉',
-      `Bạn đã thanh toán thành công Đợt 3 (${financialSummary.totalPendingToPay.toLocaleString('vi-VN')}đ) qua VietQR.\n\nSổ công nợ của bạn hiện tại: 0đ (Đã hoàn thành 100% nghĩa vụ tài chính kỳ này).`
+      `Bạn đã thanh toán thành công Đợt 3 (${financialSummary.totalPendingToPay.toLocaleString('vi-VN')} VND) qua VietQR.\n\nSổ công nợ của bạn hiện tại: 0 VND (Đã hoàn thành 100% nghĩa vụ tài chính kỳ này).`
     );
   };
 
@@ -588,17 +588,17 @@ export default function VipCustomerDashboard({ onLogout }: VipCustomerDashboardP
                 <div className="rounded-2xl bg-white/5 border border-slate-800 p-3">
                   <span className="text-[10px] text-slate-400 block">Tổng Hợp Đồng (Đã -10%):</span>
                   <span className="text-base font-black text-white mt-0.5 block">
-                    {financialSummary.totalContractPrice.toLocaleString('vi-VN')}đ
+                    {financialSummary.totalContractPrice.toLocaleString('vi-VN')} VND
                   </span>
                   <span className="text-[9px] text-emerald-400">
-                    Tiết kiệm được: {financialSummary.vipDiscountAmount.toLocaleString('vi-VN')}đ
+                    Tiết kiệm được: {financialSummary.vipDiscountAmount.toLocaleString('vi-VN')} VND
                   </span>
                 </div>
 
                 <div className="rounded-2xl bg-white/5 border border-slate-800 p-3">
                   <span className="text-[10px] text-slate-400 block">Đã thanh toán (Cọc + Đợt):</span>
                   <span className="text-base font-black text-emerald-400 mt-0.5 block">
-                    {financialSummary.totalPaid.toLocaleString('vi-VN')}đ
+                    {financialSummary.totalPaid.toLocaleString('vi-VN')} VND
                   </span>
                   <span className="text-[9px] text-slate-400">
                     Tỷ lệ: {Math.round((financialSummary.totalPaid / financialSummary.totalContractPrice) * 100)}%
@@ -620,10 +620,10 @@ export default function VipCustomerDashboard({ onLogout }: VipCustomerDashboardP
                   <div className="flex items-baseline justify-between pt-1">
                     <div>
                       <span className="text-xl font-black text-amber-400">
-                        {financialSummary.totalPendingToPay.toLocaleString('vi-VN')}đ
+                        {financialSummary.totalPendingToPay.toLocaleString('vi-VN')} VND
                       </span>
                       <p className="text-[10px] text-slate-300 mt-0.5">
-                        Gồm <strong>{financialSummary.remainingDue.toLocaleString('vi-VN')}đ</strong> tiền sân + <strong>{financialSummary.incidentalFee.toLocaleString('vi-VN')}đ</strong> phụ phí nước
+                        Gồm <strong>{financialSummary.remainingDue.toLocaleString('vi-VN')} VND</strong> tiền sân + <strong>{financialSummary.incidentalFee.toLocaleString('vi-VN')} VND</strong> phụ phí nước
                       </p>
                     </div>
 
@@ -678,7 +678,7 @@ export default function VipCustomerDashboard({ onLogout }: VipCustomerDashboardP
 
                     <div className="flex items-baseline justify-between">
                       <span className="text-base font-black text-slate-900">
-                        {inst.amount.toLocaleString('vi-VN')}đ
+                        {inst.amount.toLocaleString('vi-VN')} VND
                       </span>
                       <span className="text-[11px] text-slate-500">Hạn đóng: {inst.dueDate}</span>
                     </div>
@@ -731,7 +731,7 @@ export default function VipCustomerDashboard({ onLogout }: VipCustomerDashboardP
                       <p className="text-[10px] text-slate-500 mt-0.5">{inc.date}</p>
                     </div>
                     <div className="text-right">
-                      <span className="font-black text-slate-900 block">{inc.amount.toLocaleString('vi-VN')}đ</span>
+                      <span className="font-black text-slate-900 block">{inc.amount.toLocaleString('vi-VN')} VND</span>
                       <span className={`text-[9px] font-bold ${inc.status === 'PAID' ? 'text-emerald-600' : 'text-amber-700'}`}>
                         {inc.statusLabel}
                       </span>
@@ -783,7 +783,7 @@ export default function VipCustomerDashboard({ onLogout }: VipCustomerDashboardP
                       <div>
                         <span className="text-[10px] text-slate-400 block">Số tiền hoàn:</span>
                         <span className="text-sm font-black text-emerald-600">
-                          +{ref.refundAmount.toLocaleString('vi-VN')}đ
+                          +{ref.refundAmount.toLocaleString('vi-VN')} VND
                         </span>
                       </div>
                       <div className="text-right">
@@ -984,7 +984,7 @@ export default function VipCustomerDashboard({ onLogout }: VipCustomerDashboardP
               <div className="flex justify-between items-center border-t border-emerald-200 pt-1.5">
                 <span className="text-slate-600 font-bold">Số tiền thanh toán:</span>
                 <span className="text-lg font-black text-emerald-600">
-                  {financialSummary.totalPendingToPay.toLocaleString('vi-VN')}đ
+                  {financialSummary.totalPendingToPay.toLocaleString('vi-VN')} VND
                 </span>
               </div>
               <div className="flex justify-between items-center">

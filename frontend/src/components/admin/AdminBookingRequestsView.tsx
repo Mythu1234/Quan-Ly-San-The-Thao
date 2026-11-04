@@ -164,14 +164,14 @@ export default function AdminBookingRequestsView() {
           remainingDue: newRemaining,
           paymentMethod: 'vietqr' as const,
           paymentStatus: newRemaining === 0 ? ('paid_in_full' as const) : ('partial' as const),
-          paymentStatusLabel: newRemaining === 0 ? 'Đã thanh toán đủ' : `Đã nộp ${newPaid.toLocaleString('vi-VN')}đ`,
+          paymentStatusLabel: newRemaining === 0 ? 'Đã thanh toán đủ' : `Đã nộp ${newPaid.toLocaleString('vi-VN')} VND`,
           status: newRemaining === 0 && r.status === 'pending' ? ('confirmed' as const) : r.status,
           statusLabel: newRemaining === 0 && r.status === 'pending' ? 'Đã chốt đặt sân' : r.statusLabel,
           contactLogs: [
             {
               date: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' }),
               staffName: 'Nhân viên/Quản lý tại quầy',
-              note: `Thu thêm ${payAmountInput.toLocaleString('vi-VN')}đ qua VietQR. Còn nợ: ${newRemaining.toLocaleString('vi-VN')}đ.`
+              note: `Thu thêm ${payAmountInput.toLocaleString('vi-VN')} VND qua VietQR. Còn nợ: ${newRemaining.toLocaleString('vi-VN')} VND.`
             },
             ...(r.contactLogs || [])
           ]
@@ -203,14 +203,14 @@ export default function AdminBookingRequestsView() {
         remainingDue,
         paymentMethod: 'vietqr',
         paymentStatus: remainingDue === 0 ? ('paid_in_full' as const) : ('partial' as const),
-        paymentStatusLabel: remainingDue === 0 ? 'Đã thanh toán đủ' : `Đã thanh toán ${totalPaid.toLocaleString('vi-VN')}đ`,
+        paymentStatusLabel: remainingDue === 0 ? 'Đã thanh toán đủ' : `Đã thanh toán ${totalPaid.toLocaleString('vi-VN')} VND`,
         status: 'confirmed' as const,
         statusLabel: 'Đã chốt đặt sân',
         contactLogs: [
           {
             date: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' }),
             staffName: 'Quản lý (Admin)',
-            note: `Đã đối soát thủ công và ghi nhận ${result.paidAmount.toLocaleString('vi-VN')}đ qua VietQR; hệ thống không xác minh giao dịch ngân hàng tự động.`
+            note: `Đã đối soát thủ công và ghi nhận ${result.paidAmount.toLocaleString('vi-VN')} VND qua VietQR; hệ thống không xác minh giao dịch ngân hàng tự động.`
           },
           ...(request.contactLogs || [])
         ]
@@ -237,7 +237,7 @@ export default function AdminBookingRequestsView() {
         {
           date: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' }),
           staffName: 'Nhân viên/Quản lý tại quầy',
-          note: `Đã đối soát thủ công và ghi nhận đủ ${result.paidAmount.toLocaleString('vi-VN')}đ qua VietQR; hệ thống không xác minh giao dịch ngân hàng tự động.`
+          note: `Đã đối soát thủ công và ghi nhận đủ ${result.paidAmount.toLocaleString('vi-VN')} VND qua VietQR; hệ thống không xác minh giao dịch ngân hàng tự động.`
         }
       ]
     };
@@ -460,12 +460,12 @@ export default function AdminBookingRequestsView() {
                 <div className="flex items-center justify-between text-[11px] pt-1.5 border-t border-slate-100">
                   <div className="flex items-center gap-2">
                     <span className="text-slate-500">
-                      Tổng: <strong className="text-slate-800 font-bold">{req.finalPrice.toLocaleString('vi-VN')}đ</strong>
+                      Tổng: <strong className="text-slate-800 font-bold">{req.finalPrice.toLocaleString('vi-VN')} VND</strong>
                     </span>
                     <span className="text-slate-300">|</span>
                     <span className="text-slate-500">
                       Nợ: <strong className={req.remainingDue > 0 ? "text-amber-700 font-bold" : "text-emerald-700 font-bold"}>
-                        {req.remainingDue > 0 ? `${req.remainingDue.toLocaleString('vi-VN')}đ` : '0đ'}
+                        {req.remainingDue > 0 ? `${req.remainingDue.toLocaleString('vi-VN')} VND` : '0 VND'}
                       </strong>
                     </span>
                   </div>
@@ -538,7 +538,7 @@ export default function AdminBookingRequestsView() {
                 <DollarSign className="w-4 h-4 text-amber-600 mb-0.5" />
                 <span className="text-[11px]">Thu tiền</span>
                 <span className="text-[9px] text-amber-600 font-semibold">
-                  {currentDetailReq.remainingDue > 0 ? `Nợ ${currentDetailReq.remainingDue.toLocaleString('vi-VN')}đ` : 'Đã đủ 100%'}
+                  {currentDetailReq.remainingDue > 0 ? `Nợ ${currentDetailReq.remainingDue.toLocaleString('vi-VN')} VND` : 'Đã đủ 100%'}
                 </span>
               </button>
               )}
@@ -590,19 +590,19 @@ export default function AdminBookingRequestsView() {
                 <div className="bg-white p-2 rounded-lg border border-slate-100">
                   <div className="text-[10px] text-slate-400">Tổng tiền</div>
                   <div className="font-black text-slate-900 text-xs mt-0.5">
-                    {currentDetailReq.finalPrice.toLocaleString('vi-VN')}đ
+                    {currentDetailReq.finalPrice.toLocaleString('vi-VN')} VND
                   </div>
                 </div>
                 <div className="bg-white p-2 rounded-lg border border-slate-100">
                   <div className="text-[10px] text-slate-400">Đã nộp</div>
                   <div className="font-black text-emerald-700 text-xs mt-0.5">
-                    {currentDetailReq.paidAmount.toLocaleString('vi-VN')}đ
+                    {currentDetailReq.paidAmount.toLocaleString('vi-VN')} VND
                   </div>
                 </div>
                 <div className="bg-white p-2 rounded-lg border border-slate-100">
                   <div className="text-[10px] text-slate-400">Còn nợ</div>
                   <div className={`font-black text-xs mt-0.5 ${currentDetailReq.remainingDue > 0 ? 'text-amber-700' : 'text-emerald-700'}`}>
-                    {currentDetailReq.remainingDue > 0 ? `${currentDetailReq.remainingDue.toLocaleString('vi-VN')}đ` : '0đ (Đủ)'}
+                    {currentDetailReq.remainingDue > 0 ? `${currentDetailReq.remainingDue.toLocaleString('vi-VN')} VND` : '0 VND (Đủ)'}
                   </div>
                 </div>
               </div>
@@ -611,7 +611,7 @@ export default function AdminBookingRequestsView() {
                 <div className="text-[10px] text-emerald-900 bg-white p-2 rounded-lg border border-slate-200/80 flex items-center justify-between">
                   <span>Kế hoạch: <strong>Chia {currentDetailReq.installmentCount || 3} kỳ</strong></span>
                   <span className="text-slate-500 font-medium">
-                    (Ước tính ~{Math.round(currentDetailReq.finalPrice / (currentDetailReq.installmentCount || 3)).toLocaleString('vi-VN')}đ/kỳ)
+                    (Ước tính ~{Math.round(currentDetailReq.finalPrice / (currentDetailReq.installmentCount || 3)).toLocaleString('vi-VN')} VND/kỳ)
                   </span>
                 </div>
               )}
@@ -858,7 +858,7 @@ export default function AdminBookingRequestsView() {
                 <div className="flex items-center justify-between border-b border-slate-200/80 pb-1.5">
                   <span className="font-bold text-slate-800 uppercase text-[10px]">Thanh toán tại quầy</span>
                   <span className="font-bold text-emerald-700 text-xs">
-                    Tổng dự toán: {newBasePrice.toLocaleString('vi-VN')}đ
+                    Tổng dự toán: {newBasePrice.toLocaleString('vi-VN')} VND
                   </span>
                 </div>
 
@@ -876,7 +876,7 @@ export default function AdminBookingRequestsView() {
                 </div>
 
                 <div className="pt-1 border-t border-slate-200/60 text-xs font-bold text-emerald-800">
-                  Thu đủ 100%: {newBasePrice.toLocaleString('vi-VN')}đ
+                  Thu đủ 100%: {newBasePrice.toLocaleString('vi-VN')} VND
                 </div>
               </div>
 
@@ -943,22 +943,22 @@ export default function AdminBookingRequestsView() {
             <div className="rounded-xl bg-slate-50 p-3 border border-slate-200 space-y-1.5">
               <div className="flex justify-between items-center">
                 <span className="text-slate-500">Tổng tiền phải trả:</span>
-                <span className="font-bold text-slate-900">{selectedReq.finalPrice.toLocaleString('vi-VN')}đ</span>
+                <span className="font-bold text-slate-900">{selectedReq.finalPrice.toLocaleString('vi-VN')} VND</span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-slate-500">Đã thanh toán trước:</span>
-                <span className="font-bold text-emerald-700">{selectedReq.paidAmount.toLocaleString('vi-VN')}đ</span>
+                <span className="font-bold text-emerald-700">{selectedReq.paidAmount.toLocaleString('vi-VN')} VND</span>
               </div>
               <div className="flex justify-between items-center border-t border-slate-200/60 pt-1.5 font-bold">
                 <span className="text-slate-700">Số tiền còn thiếu:</span>
-                <span className="text-amber-800 text-sm">{selectedReq.remainingDue.toLocaleString('vi-VN')}đ</span>
+                <span className="text-amber-800 text-sm">{selectedReq.remainingDue.toLocaleString('vi-VN')} VND</span>
               </div>
             </div>
 
             <form onSubmit={handleSavePayment} className="space-y-3">
               <div>
                 <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                  Số tiền thu lần này (VNĐ) <span className="text-red-500">*</span>
+                  Số tiền thu lần này (VND) <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="number"
@@ -986,7 +986,7 @@ export default function AdminBookingRequestsView() {
               <div className="rounded-xl border border-emerald-300 bg-emerald-50/50 p-3 text-center space-y-2">
                 <QrCodeArtwork className="mx-auto h-32 w-32 rounded-lg p-2" />
                 <p className="font-bold text-emerald-800 text-[11px]">
-                  Mã QR minh họa • {payAmountInput.toLocaleString('vi-VN')}đ
+                  Mã QR minh họa • {payAmountInput.toLocaleString('vi-VN')} VND
                 </p>
                 <p className="text-[10px] text-slate-500 font-mono">
                   Nội dung: {selectedReq.code} {selectedReq.phone}

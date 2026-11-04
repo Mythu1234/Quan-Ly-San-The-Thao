@@ -174,11 +174,11 @@ export function mapSupabaseToLookupTicket(row: SupabaseBookingRow) {
     court: row.san?.ten_san || 'Sân Thể Thao',
     date: formatDateVN(row.ngay_dat),
     time: `${startFormatted} - ${endFormatted} (${durHours} giờ)`,
-    total: `${totalNum.toLocaleString('vi-VN')}đ`,
+    total: `${totalNum.toLocaleString('vi-VN')} VND`,
     rawTotal: totalNum,
     status: statusText,
     paymentStatus: paymentText,
-    refundAmount: refunded > 0 ? `${refunded.toLocaleString('vi-VN')}đ` : undefined,
+    refundAmount: refunded > 0 ? `${refunded.toLocaleString('vi-VN')} VND` : undefined,
     refundStatus: refunded > 0 ? 'Đã hoàn tiền' : undefined,
     hoursUntilStart: Math.round(hoursUntilStart * 10) / 10,
     sportId: getSportSlug(row.san?.ma_bo_mon),
@@ -257,6 +257,39 @@ class BookingApiService {
     refundAmount?: number;
   }): Promise<{ success: boolean; message: string }> {
     try {
+      // Kiểm tra trạng thái hiện tại trước khi hủy
+      const { data: currentBooking } = await supabase
+        .from('dat_san')
+        .select('trang_thai, ngay_dat, gio_bat_dau')
+        .eq('ma_dat_san', params.code)
+        .maybeSingle();
+
+      if (currentBooking) {
+        const st = (currentBooking.trang_thai || '').toUpperCase();
+        if (['DANG_SU_DUNG', 'DA_KET_THUC', 'HOAN_TAT', 'DA_HUY'].includes(st)) {
+          return {
+            success: false,
+            message: 'Lịch đặt sân đã/đang sử dụng hoặc đã kết thúc, không thể hủy!'
+          };
+        }
+
+        try {
+          const [y, m, d] = (currentBooking.ngay_dat || '').split('-').map(Number);
+          const [h, min] = (currentBooking.gio_bat_dau || '').split(':').map(Number);
+          if (y && m && d) {
+            const startMs = new Date(y, m - 1, d, h || 0, min || 0, 0).getTime();
+            if (startMs <= Date.now()) {
+              return {
+                success: false,
+                message: 'Lượt đặt sân đã bắt đầu hoặc đã qua giờ thi đấu trong quá khứ, không thể hủy!'
+              };
+            }
+          }
+        } catch {
+          // ignore date parse error
+        }
+      }
+
       // 1. Cập nhật trạng thái đơn trong Supabase
       const { error: updateErr } = await supabase
         .from('dat_san')

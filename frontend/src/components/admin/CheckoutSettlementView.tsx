@@ -6,7 +6,8 @@ import type { IncidentReporter } from '../../utils/incidentStorage';
 import { facilityApiService } from '../../services/facilityService';
 import { DATA, useCompensationCatalog } from '../../utils/compensationCatalog';
 import IncidentSelect from './IncidentSelect';
-import { buildCheckoutReports, calculateCheckoutDamage, checkoutCourtCode, type CheckoutRequest, type CheckoutResult, type DamageDraft } from '../../utils/checkoutSettlement';
+import QrCodeArtwork from '../QrCodeArtwork';
+import { buildCheckoutReports, calculateCheckoutDamage, type CheckoutRequest, type CheckoutResult, type DamageDraft } from '../../utils/checkoutSettlement';
 
 const inputClass='w-full rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs text-slate-900 outline-none focus:border-emerald-600';
 const money=(value:number)=>`${value.toLocaleString('vi-VN')} VND`;
@@ -26,10 +27,11 @@ export default function CheckoutSettlementView({booking,date,equipments,incident
     && (!report.bookingDate || report.bookingDate === bookingDate) && report.compensationPaymentStatus !== 'paid' && report.compensationPaymentStatus !== 'not_required');
   const toDraft=(report:FacilityIncident):DamageDraft=>({id:report.id,existingId:report.id,
     itemId:report.compensationItemId || catalog.find(item=>item.equipment?.code === report.equipmentCode)?.id || '',
-    equipmentCode:report.equipmentCode,liability:report.liability || 'BAO_HANH_SAN_VAN_DONG',description:report.description,images:report.images || []});
+    equipmentCode:report.equipmentCode,liability:report.liability || '',description:report.description,images:report.images || []});
   const [expanded,setExpanded]=useState(linked.length>0);
   const [drafts,setDrafts]=useState<DamageDraft[]>(()=>linked.map(toDraft));
   const [paymentConfirmed,setPaymentConfirmed]=useState(false);
+  const [paymentStarted,setPaymentStarted]=useState(false);
   const [bankTransactionCode,setBankTransactionCode]=useState('');
   const [saving,setSaving]=useState(false);
   const [reading,setReading]=useState(false);
@@ -41,7 +43,7 @@ export default function CheckoutSettlementView({booking,date,equipments,incident
       .catch(error=>{if(mounted)setError(error instanceof Error?error.message:'Chưa đọc được quyết toán.');})
       .finally(()=>{if(mounted)setCheckingReceipt(false);});
     return()=>{mounted=false;};},[reference]);
-  useEffect(()=>{if(linked.length){setExpanded(true);setDrafts(current=>[...current,...linked.filter(report=>!current.some(item=>item.existingId===report.id)).map(toDraft)]);}},[incidents]);
+  useEffect(()=>{if(linked.length){setExpanded(true);setDrafts(current=>{const additions=linked.filter(report=>!current.some(item=>item.existingId===report.id)).map(toDraft);return additions.length?[...current,...additions]:current;});}},[incidents]);
   const activeDrafts=expanded?drafts:[];
   const damage=calculateCheckoutDamage(activeDrafts,catalog,incidents);
   const balance=Number(booking.remaining.replace(/\D/g,''))||0;
@@ -55,23 +57,38 @@ export default function CheckoutSettlementView({booking,date,equipments,incident
   const checkInLabel=checkInDate&&!Number.isNaN(checkInDate.getTime())
     ?new Intl.DateTimeFormat('vi-VN',{timeZone:'Asia/Ho_Chi_Minh',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23',day:'2-digit',month:'2-digit',year:'numeric'}).format(checkInDate)
     :'Chưa ghi nhận';
-  useEffect(()=>{setPaymentConfirmed(false);},[amountDue]);
-  const candidates=incidents.filter(report=>!report.deletedAt && checkoutCourtCode(report.courtName)===checkoutCourtCode(booking.court) && (!report.bookingCode || report.bookingCode===booking.code)
-    && (!report.bookingDate || report.bookingDate===bookingDate) && report.compensationPaymentStatus!=='paid' && report.compensationPaymentStatus!=='not_required'
-    && !drafts.some(draft=>draft.existingId===report.id));
-  const update=(id:string,patch:Partial<DamageDraft>)=>{setDrafts(current=>current.map(item=>item.id===id?{...item,...patch}:item));setPaymentConfirmed(false);setError('');};
-  const add=()=>setDrafts(current=>[...current,{id:`SC-${crypto.randomUUID()}`,itemId:'',liability:'DO_KHACH_LAM_HONG',description:'',images:[]}]);
+  const resetPayment=()=>{setPaymentStarted(false);setPaymentConfirmed(false);setBankTransactionCode('');};
+  useEffect(()=>{resetPayment();},[amountDue,drafts,expanded]);
+  useEffect(()=>{
+    if(!paymentStarted||paymentConfirmed||amountDue<=0)return;
+    const timer=setTimeout(()=>{
+      setBankTransactionCode(`VQR${Date.now().toString().slice(-8)}`);
+      setPaymentConfirmed(true);
+    },7000);
+    return()=>clearTimeout(timer);
+  },[paymentStarted,paymentConfirmed,amountDue,drafts,expanded]);
+  const update=(id:string,patch:Partial<DamageDraft>)=>{setDrafts(current=>current.map(item=>item.id===id?{...item,...patch}:item));resetPayment();setError('');};
+  const add=()=>setDrafts(current=>[...current,{id:`SC-${crypto.randomUUID()}`,itemId:'',liability:'',description:'',images:[]}]);
   const upload=(id:string,file?:File)=>{
     if(!file)return;
     if(!['image/jpeg','image/png','image/webp'].includes(file.type)||file.size>5*1024*1024){setError('Chọn ảnh JPG, PNG hoặc WebP tối đa 5 MB.');return;}
     setReading(true);const reader=new FileReader();reader.onload=()=>{update(id,{images:[String(reader.result)]});setReading(false);};reader.onerror=()=>{setError('Không đọc được ảnh.');setReading(false);};reader.readAsDataURL(file);
+  };
+  const startPayment=(checked:boolean)=>{
+    resetPayment();setError('');
+    if(!checked)return;
+    try{
+      buildCheckoutReports(activeDrafts,catalog,incidents,{reference,bookingCode:booking.code,bookingDate,courtName:booking.court,customerName:booking.customerName,customerPhone:booking.phone,remainingBalance:balance,expectedAmount:amountDue},currentUser);
+      setPaymentStarted(true);
+    }catch(failure){setError(failure instanceof Error?failure.message:'Vui lòng hoàn tất thông tin sự cố trước khi thanh toán.');}
   };
   const confirm=async()=>{
     if(saving||reading||checkingReceipt)return;
     setError('');
     try {
       if(balance>0)throw Error('Tiền sân phải thanh toán đủ trước khi sử dụng. Checkout chỉ thu bồi thường.');
-      if(expanded&&!drafts.length)throw Error('Thêm thiết bị hoặc chọn báo cáo đã có.');
+      if(expanded&&!drafts.length)throw Error('Thêm thiết bị hư hỏng để lập báo cáo sự cố.');
+      if(activeDrafts.some(draft=>!draft.liability))throw Error('Vui lòng chọn trách nhiệm cho từng sự cố.');
       if(amountDue>0&&!paymentConfirmed)throw Error('Xác nhận đã nhận thanh toán VietQR.');
       if(amountDue>0&&!bankTransactionCode.trim())throw Error('Nhập mã giao dịch ngân hàng để đối soát bồi thường.');
       const base={reference,bookingCode:booking.code,bookingDate,courtName:booking.court,customerName:booking.customerName,customerPhone:booking.phone,remainingBalance:balance,expectedAmount:amountDue};
@@ -82,7 +99,7 @@ export default function CheckoutSettlementView({booking,date,equipments,incident
     }catch(failure){setError(failure instanceof Error?failure.message:'Chưa hoàn tất được trả sân.');}finally{setSaving(false);}
   };
   if(previous)return <div className="space-y-3 bg-white p-3"><h2 className="text-lg font-bold text-emerald-800">Đã hoàn tất trả sân</h2><p className="text-xs text-slate-700">{booking.code} · Đã thu thêm {money(previous.receipt.amountPaid)}</p><button type="button" onClick={onFinished} className="rounded-lg bg-emerald-700 px-3 py-2 text-xs text-white">Quay lại lịch sân</button></div>;
-  return <div className="flex-1 min-h-0 overflow-y-auto space-y-3 bg-white p-3 pb-6">
+  return <div className="no-scrollbar flex-1 min-h-0 overflow-y-auto space-y-3 bg-white p-3 pb-6">
     <button type="button" disabled={saving} onClick={onBack} className="flex items-center gap-1 text-xs text-slate-600"><ArrowLeft className="h-4 w-4"/>Quay lại lịch sân</button>
     <div className="flex flex-wrap items-center justify-between gap-2">
       <h2 className="text-lg font-bold text-slate-900">Quyết toán Check-out</h2>
@@ -123,15 +140,15 @@ export default function CheckoutSettlementView({booking,date,equipments,incident
           return <div key={draft.id} className="space-y-2 rounded-lg border border-slate-200 p-2.5">
             <div className="flex items-center justify-between gap-2"><span className="text-[11px] font-semibold text-slate-700">{original?`Báo cáo ${original.id}`:'Sự cố mới'}</span>{!linked.some(report=>report.id===draft.existingId)&&<button type="button" title="Bỏ sự cố" onClick={()=>{setDrafts(current=>current.filter(item=>item.id!==draft.id));setPaymentConfirmed(false);}} className="text-red-700"><Trash2 className="h-3.5 w-3.5"/></button>}</div>
             <div><label htmlFor={`checkout-equipment-${draft.id}`} className="mb-1 block text-[11px] text-slate-600">Thiết bị <span className="text-red-600">*</span></label><IncidentSelect compact id={`checkout-equipment-${draft.id}`} disabled={saving||!!original?.compensationItemId} value={draft.itemId} onChange={value=>update(draft.id,{itemId:value,equipmentCode:undefined})} placeholder="Chọn thiết bị bồi thường" searchPlaceholder="Tìm tên thiết bị..." options={Object.entries(DATA).flatMap(([sport,info])=>(original?catalog:liveCatalog).filter(item=>item.sport===sport).map(item=>({value:item.id,label:item.name,group:info.label,detail:money(original?.compensationPrice ?? item.price)})))}/></div>
-            <div><label htmlFor={`checkout-liability-${draft.id}`} className="mb-1 block text-[11px] text-slate-600">Trách nhiệm</label><IncidentSelect compact id={`checkout-liability-${draft.id}`} disabled={saving||!!original} value={draft.liability} onChange={value=>update(draft.id,{liability:value as DamageDraft['liability']})} searchable={false} placeholder="Chọn trách nhiệm" searchPlaceholder="Trách nhiệm" options={[{value:'DO_KHACH_LAM_HONG',label:'Khách chịu',detail:'Làm hỏng / làm mất · Thu bồi thường khi checkout'},{value:'BAO_HANH_SAN_VAN_DONG',label:'Sân chịu',detail:'Hao mòn / bảo hành · Không thu khách'}]}/></div>
+            <div><label htmlFor={`checkout-liability-${draft.id}`} className="mb-1 block text-[11px] text-slate-600">Trách nhiệm <span className="text-red-600">*</span></label><IncidentSelect compact id={`checkout-liability-${draft.id}`} disabled={saving||!!original?.liability} value={draft.liability} onChange={value=>update(draft.id,{liability:value as DamageDraft['liability']})} searchable={false} placeholder="Chọn trách nhiệm" searchPlaceholder="Trách nhiệm" options={[{value:'DO_KHACH_LAM_HONG',label:'Khách chịu',detail:'Làm hỏng / làm mất · Thu bồi thường khi checkout'},{value:'BAO_HANH_SAN_VAN_DONG',label:'Sân chịu',detail:'Hao mòn / bảo hành · Không thu khách'}]}/></div>
             <textarea rows={2} readOnly={!!original} value={draft.description} onChange={event=>update(draft.id,{description:event.target.value})} placeholder="Mô tả hư hỏng (bắt buộc)" className={`${inputClass} resize-none`}/>
             {!original&&<label className="inline-flex cursor-pointer items-center gap-1 text-[11px] font-semibold text-emerald-800"><Camera className="h-3.5 w-3.5"/>Thêm ảnh (có thể bổ sung sau)<input type="file" accept="image/jpeg,image/png,image/webp" onChange={event=>upload(draft.id,event.target.files?.[0])} className="sr-only"/></label>}
             {draft.images[0]&&<img src={draft.images[0]} alt="Ảnh sự cố" className="max-h-24 rounded-lg object-contain"/>}
-            <p className={`text-right text-xs font-bold ${draft.liability==='DO_KHACH_LAM_HONG'?'text-red-700':'text-emerald-800'}`}>Khách trả: {money(draft.liability==='DO_KHACH_LAM_HONG'?price:0)}</p>
+            {draft.liability&&<p className={`text-right text-xs font-bold ${draft.liability==='DO_KHACH_LAM_HONG'?'text-red-700':'text-emerald-800'}`}>Khách trả: {money(draft.liability==='DO_KHACH_LAM_HONG'?price:0)}</p>}
           </div>;
         })}
         <div className="flex flex-wrap gap-2"><button type="button" onClick={add} className="flex items-center gap-1 rounded-lg border border-emerald-200 px-2 py-1.5 text-[11px] font-semibold text-emerald-800"><Plus className="h-3 w-3"/>Thêm thiết bị</button>
-        {candidates.length>0&&<div className="min-w-0 flex-1"><IncidentSelect compact id="checkout-existing-incident" disabled={saving} value="" placeholder="Gắn báo cáo đã lập" searchPlaceholder="Tìm báo cáo sự cố..." options={candidates.map(report=>({value:report.id,label:report.title,detail:report.id}))} onChange={value=>{const report=candidates.find(item=>item.id===value);if(report){setDrafts(current=>[...current,toDraft(report)]);setPaymentConfirmed(false);}}}/></div>}</div>
+        </div>
       </fieldset>}
     </section>
     <section className="space-y-2 rounded-xl border border-black/15 p-3 text-xs">
@@ -141,7 +158,20 @@ export default function CheckoutSettlementView({booking,date,equipments,incident
       {damage>0&&<div className="flex justify-between text-red-700"><span>Bồi thường thiết bị</span><strong>{money(damage)}</strong></div>}
       <div className="flex items-center justify-between gap-2 border-t border-slate-100 pt-2"><span className="font-bold text-emerald-800">Cần thu lúc Check-out</span><strong className={`text-lg ${amountDue>0?'text-red-700':'text-emerald-800'}`}>{money(amountDue)}</strong></div>
     </section>
-    {amountDue>0&&<section className="space-y-2 rounded-xl border border-black/15 p-3"><h3 className="text-xs font-bold text-emerald-800">Thanh toán qua VietQR</h3><img src="/images/QR.png" alt="VietQR chuyển khoản" className="mx-auto w-36 rounded-xl"/><p className="text-center text-xs font-semibold text-slate-800">Số tiền: {money(amountDue)}</p><p className="text-center text-[11px] text-slate-600">Nội dung: CK {booking.code}</p><label className="block text-[11px] text-slate-700">Mã giao dịch ngân hàng<input value={bankTransactionCode} onChange={event=>setBankTransactionCode(event.target.value)} disabled={saving} placeholder="Mã giao dịch trên ứng dụng ngân hàng" className={`${inputClass} mt-1`}/></label><label className="flex items-center gap-2 text-xs text-emerald-800"><input type="checkbox" checked={paymentConfirmed} onChange={event=>setPaymentConfirmed(event.target.checked)} disabled={saving} className="accent-emerald-700"/>Đã kiểm tra nhận đủ {money(amountDue)} qua VietQR</label></section>}
+    {amountDue>0&&<section className="space-y-3 rounded-xl border border-black/15 p-3">
+      <label className="flex cursor-pointer items-center gap-2 text-xs font-bold text-emerald-800"><input type="checkbox" checked={paymentStarted} onChange={event=>startPayment(event.target.checked)} disabled={saving||reading||checkingReceipt||balance>0} className="h-4 w-4 accent-emerald-700"/>Thanh toán qua VietQR</label>
+      {paymentStarted&&<>
+        <div className="space-y-2 rounded-xl border border-emerald-100 bg-emerald-50/50 p-3">
+          <div className="flex items-center justify-between text-[10px] font-bold"><span className="text-slate-800">MB BANK</span><span className="rounded bg-emerald-100 px-2 py-1 text-emerald-700">VIETQR</span></div>
+          <QrCodeArtwork className="mx-auto h-36 w-36"/>
+          <p className="text-center text-xs font-semibold text-slate-800">Số tiền: {money(amountDue)}</p>
+          <p className="text-center text-[11px] text-slate-600">Nội dung: CK {booking.code}</p>
+        </div>
+        <div role="status" aria-live="polite" className="flex items-center justify-center gap-2 rounded-lg bg-emerald-50 p-3 text-xs font-semibold text-emerald-800">
+          {paymentConfirmed?<><CheckCircle2 className="h-4 w-4 shrink-0"/>Thanh toán thành công</>:<><span className="relative flex h-3 w-3 shrink-0"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60"/><span className="relative h-3 w-3 rounded-full bg-emerald-500"/></span>Đang chờ ghi nhận thanh toán qua VietQR…</>}
+        </div>
+      </>}
+    </section>}
     <button type="button" onClick={confirm} disabled={checkingReceipt||saving||reading||balance>0||(amountDue>0&&(!paymentConfirmed||!bankTransactionCode.trim()))} className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-700 py-3 text-xs font-bold text-white hover:bg-emerald-800 disabled:opacity-60"><CheckCircle2 className="h-4 w-4"/>{saving?'Đang lưu...':checkingReceipt?'Đang kiểm tra lượt trả sân...':'Xác nhận Check-out'}</button>
   </div>;
 }
