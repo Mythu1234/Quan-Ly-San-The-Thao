@@ -13,7 +13,7 @@ import { addBookingRequest } from '../types/bookingRequest';
 import type { IncidentReporter } from '../utils/incidentStorage';
 import { isCourtLocked } from '../hooks/useCourtAvailability';
 import { useState, useRef, useEffect, useMemo } from 'react';
-import { Search, MapPin, Phone, Clock, Play, Home, Calendar as CalendarIcon, X, Zap, User, Lock, Eye, EyeOff, ArrowLeft, ArrowRight, ChevronLeft, ChevronRight, ChevronDown, Trophy, CheckCircle2, RefreshCw, MessageSquare, Copy, Check, AlertTriangle } from 'lucide-react';
+import { Download, Search, MapPin, Phone, Clock, Play, Home, Calendar as CalendarIcon, X, Zap, User, Lock, Eye, EyeOff, ArrowLeft, ArrowRight, ChevronLeft, ChevronRight, ChevronDown, Trophy, CheckCircle2, RefreshCw, MessageSquare, Copy, Check, AlertTriangle } from 'lucide-react';
 
 const parseTimeToMinutes = (t: string): number => {
   if (!t) return 0;
@@ -317,6 +317,37 @@ export default function TrangChu() {
   const [orderCode,setOrderCode] = useState<string>('');
   const [paymentCode,setPaymentCode]=useState('');
   const [showReceipt,setShowReceipt]=useState(false);
+  const handleDownloadReceipt = () => {
+    const receiptContent = `=====================================================
+          COURTX ARENA - BIÊN NHẬN ĐẶT SÂN
+              Hóa đơn điện tử đặt sân
+=====================================================
+Mã biên nhận (Vé):     ${orderCode || '—'}
+Mã thanh toán:         ${paymentCode || '—'}
+Khách hàng:            ${customerName || '—'}
+Số điện thoại:         ${customerPhone || '—'}
+Bộ môn & Sân:          ${currentSport?.name || ''} · ${selectedCourt || '—'}
+Thời gian:             ${selectedDate || '—'} · ${selectedSlot || '—'}
+Phương thức:           VietQR (100%)
+Tổng tiền thanh toán:  ${totalPrice.toLocaleString('vi-VN')}đ
+Trạng thái:            Đã thanh toán (Thành công)
+Thời gian xuất phiếu:  ${new Date().toLocaleString('vi-VN')}
+=====================================================
+* Quý khách vui lòng lưu lại hoặc xuất trình biên nhận này
+  khi đến nhận sân tại CourtX Arena.
+=====================================================`;
+
+    const blob = new Blob([receiptContent], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `Bien-Nhan-${orderCode || 'CourtX'}.txt`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
 
   // Lookup Search State
   const [lookupQuery, setLookupQuery] = useState<string>('');
@@ -3097,7 +3128,26 @@ export default function TrangChu() {
                   <p className="text-[10px] text-emerald-200">CourtX Arena · Hóa đơn điện tử</p>
                 </div>
               </div>
-              <button type="button" onClick={() => setShowReceipt(false)} className="text-white/70 hover:text-white text-lg font-bold">✕</button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleDownloadReceipt}
+                  title="Tải xuống thông tin biên nhận"
+                  aria-label="Tải xuống thông tin biên nhận"
+                  className="p-1 rounded-lg text-emerald-200 hover:text-white hover:bg-emerald-600/60 transition cursor-pointer flex items-center justify-center"
+                >
+                  <Download className="w-5 h-5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowReceipt(false)}
+                  className="text-white/70 hover:text-white text-lg font-bold p-1 leading-none cursor-pointer"
+                  title="Đóng"
+                  aria-label="Đóng"
+                >
+                  ✕
+                </button>
+              </div>
             </div>
 
             {/* Body */}
