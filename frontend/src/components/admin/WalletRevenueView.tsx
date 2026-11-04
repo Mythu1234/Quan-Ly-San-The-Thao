@@ -588,7 +588,7 @@ export default function WalletRevenueView({ transactions, onProcessRefund, isLoa
                 </button>
               ))}
             </div>
-            <div className="w-36 shrink-0">
+            <div className="w-40 shrink-0">
               <label htmlFor="transaction-sport-filter" className="sr-only">Lọc theo bộ môn</label>
               <IncidentSelect
                 id="transaction-sport-filter"
@@ -617,10 +617,16 @@ export default function WalletRevenueView({ transactions, onProcessRefund, isLoa
             </p>
           </div>
         ) : (
-          <div className="no-scrollbar w-full min-w-0 overflow-x-auto">
+          <div
+            key={`${selectedDate}-${reportPeriod}-${statusFilter}-${sportFilter}`}
+            role="region"
+            aria-label="Danh sách giao dịch trong kỳ, cuộn để xem thêm"
+            tabIndex={0}
+            className="transaction-table-scroll max-h-[min(420px,60dvh)] w-full min-w-0 overflow-auto overscroll-contain focus-visible:outline-2 focus-visible:outline-emerald-600"
+          >
             <table className="w-full min-w-[560px] table-fixed border-collapse border border-slate-200 text-left @4xl:min-w-0">
-              <thead>
-                <tr className="bg-slate-50/80 text-[11px] font-extrabold uppercase tracking-wide text-slate-500">
+              <thead className="sticky top-0 z-10 bg-slate-100 shadow-[0_1px_0_0_#e2e8f0]">
+                <tr className="bg-slate-100 text-[11px] font-extrabold uppercase tracking-wide text-slate-700">
                   <th scope="col" className="w-[23%] border border-slate-200 px-2 py-2 text-[10px] leading-4 @4xl:hidden">Giao dịch</th>
                   <th scope="col" className="w-[23%] border border-slate-200 px-2 py-2 text-[10px] leading-4 @4xl:hidden">Khách</th>
                   <th scope="col" className="w-[17%] border border-slate-200 px-2 py-2 text-[10px] leading-4 @4xl:hidden">Sân</th>
