@@ -1,3 +1,4 @@
+import { downloadBookingReceipt, printBookingReceipt, type BookingReceiptData } from '../utils/bookingReceipt';
 import {staffAuthService} from '../services/staffAuthService';
 import AdminDashboard from './AdminDashboard';
 import CustomerSchedule from '../components/CustomerSchedule';
@@ -320,37 +321,19 @@ export default function TrangChu() {
   const [orderCode,setOrderCode] = useState<string>('');
   const [paymentCode,setPaymentCode]=useState('');
   const [showReceipt,setShowReceipt]=useState(false);
-  const handleDownloadReceipt = () => {
-    const receiptContent = `=====================================================
-          COURTX ARENA - BIÊN NHẬN ĐẶT SÂN
-              Hóa đơn điện tử đặt sân
-=====================================================
-Mã biên nhận (Vé):     ${orderCode || '—'}
-Mã thanh toán:         ${paymentCode || '—'}
-Khách hàng:            ${customerName || '—'}
-Số điện thoại:         ${customerPhone || '—'}
-Bộ môn & Sân:          ${currentSport?.name || ''} · ${selectedCourt || '—'}
-Thời gian:             ${selectedDate || '—'} · ${selectedSlot || '—'}
-Phương thức:           VietQR (100%)
-Tổng tiền thanh toán:  ${totalPrice.toLocaleString('vi-VN')} VND
-Trạng thái:            Đã thanh toán (Thành công)
-Thời gian xuất phiếu:  ${new Date().toLocaleString('vi-VN')}
-=====================================================
-* Quý khách vui lòng lưu lại hoặc xuất trình biên nhận này
-  khi đến nhận sân tại CourtX Arena.
-=====================================================`;
-
-    const blob = new Blob([receiptContent], { type: 'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `Bien-Nhan-${orderCode || 'CourtX'}.txt`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-  };
-
+  const getReceiptData = (): BookingReceiptData => ({
+    bookingCode: orderCode,
+    paymentCode,
+    customerName,
+    customerPhone,
+    sport: currentSport?.name || '',
+    court: selectedCourt,
+    date: selectedDate,
+    time: selectedSlot,
+    total: totalPrice.toLocaleString('vi-VN') + ' VND',
+  });
+  const handleDownloadReceipt = () => downloadBookingReceipt(getReceiptData());
+  const handlePrintReceipt = () => printBookingReceipt(getReceiptData());
 
   // Lookup Search State
   const [lookupQuery, setLookupQuery] = useState<string>('');
@@ -3169,8 +3152,8 @@ Thời gian xuất phiếu:  ${new Date().toLocaleString('vi-VN')}
                 <button
                   type="button"
                   onClick={handleDownloadReceipt}
-                  title="Tải xuống thông tin biên nhận"
-                  aria-label="Tải xuống thông tin biên nhận"
+                  title="Tải ảnh biên nhận (.png)"
+                  aria-label="Tải ảnh biên nhận (.png)"
                   className="p-1 rounded-lg text-emerald-200 hover:text-white hover:bg-emerald-600/60 transition cursor-pointer flex items-center justify-center"
                 >
                   <Download className="w-5 h-5" />
@@ -3236,7 +3219,7 @@ Thời gian xuất phiếu:  ${new Date().toLocaleString('vi-VN')}
             <div className="px-5 pb-5 flex gap-2">
               <button
                 type="button"
-                onClick={() => window.print()}
+                onClick={handlePrintReceipt}
                 className="flex-1 flex items-center justify-center gap-1.5 rounded-xl border border-slate-300 py-3 text-xs font-bold text-slate-700 hover:bg-slate-50 cursor-pointer active:scale-95"
               >
                 🖨 In biên nhận

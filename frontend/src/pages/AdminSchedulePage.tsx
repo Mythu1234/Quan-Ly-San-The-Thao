@@ -1,3 +1,4 @@
+import { downloadBookingReceipt, printBookingReceipt, type BookingReceiptData } from '../utils/bookingReceipt';
 import { useMemo, useRef, useState, useEffect } from 'react';
 import {
   AlertTriangle, ArrowLeft, ArrowRightLeft, Ban, Calendar, CalendarClock,
@@ -198,36 +199,24 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
   const [paymentSuccessBooking, setPaymentSuccessBooking] = useState<BookingDetail | null>(null);
   const [showReceipt, setShowReceipt] = useState<boolean>(false);
 
+  const getAdminReceiptData = (): BookingReceiptData | null => paymentSuccessBooking ? ({
+    bookingCode: paymentSuccessBooking.code,
+    paymentCode: paymentSuccessBooking.paymentCode || '',
+    customerName: paymentSuccessBooking.customerName,
+    customerPhone: paymentSuccessBooking.phone,
+    sport: paymentSuccessBooking.sport,
+    court: paymentSuccessBooking.court,
+    date: formatBookingDateVi(selectedDate),
+    time: paymentSuccessBooking.time,
+    total: paymentSuccessBooking.total,
+  }) : null;
   const handleDownloadAdminReceipt = () => {
-    if (!paymentSuccessBooking) return;
-    const lines = [
-      '=====================================================',
-      '         COURTX ARENA - BIÊN NHẬN ĐẶT SÂN',
-      '               Hóa đơn điện tử',
-      '=====================================================',
-      `Mã biên nhận (Vé): ${paymentSuccessBooking.code}`,
-      `Mã thanh toán:     ${paymentSuccessBooking.paymentCode || paymentSuccessBooking.code.replace('DS', 'TT')}`,
-      `Khách hàng:        ${paymentSuccessBooking.customerName}`,
-      `Số điện thoại:     ${paymentSuccessBooking.phone}`,
-      `Bộ môn & Sân:      ${paymentSuccessBooking.sport} · ${paymentSuccessBooking.court}`,
-      `Thời gian:         ${formatBookingDateVi(selectedDate)} · ${paymentSuccessBooking.time}`,
-      `Phương thức:       VietQR (100%)`,
-      '-----------------------------------------------------',
-      `Tổng tiền:         ${paymentSuccessBooking.total}`,
-      `Trạng thái:        Đã thanh toán`,
-      '=====================================================',
-      'Vui lòng xuất trình biên nhận khi nhận sân.',
-      '=====================================================',
-    ];
-    const blob = new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `BienNhan-${paymentSuccessBooking.code}-${Date.now()}.txt`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    const receipt = getAdminReceiptData();
+    if (receipt) downloadBookingReceipt(receipt);
+  };
+  const handlePrintAdminReceipt = () => {
+    const receipt = getAdminReceiptData();
+    if (receipt) printBookingReceipt(receipt);
   };
 
   const START_TIME_OPTIONS = useMemo(() => {
@@ -2864,7 +2853,7 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
                   onClick={handleDownloadAdminReceipt}
                   className="rounded-lg p-1 text-slate-400 hover:bg-emerald-100 hover:text-emerald-700 cursor-pointer transition"
                   aria-label="Tải xuống biên nhận"
-                  title="Tải xuống biên nhận (.txt)"
+                  title="Tải ảnh biên nhận (.png)"
                 >
                   <Download className="h-5 w-5" />
                 </button>
@@ -2929,7 +2918,7 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
             <div className="grid grid-cols-2 gap-2 pt-1">
               <button
                 type="button"
-                onClick={() => window.print()}
+                onClick={handlePrintAdminReceipt}
                 className="flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 active:scale-95 transition cursor-pointer"
               >
                 <Printer className="h-3.5 w-3.5" />
