@@ -48,7 +48,7 @@ const DEFAULT_NOTIFICATIONS: SystemNotification[] = [
     type: 'system',
     typeLabel: 'Hệ thống CourtX',
     title: 'Cập nhật bảng giá niêm yết sân',
-    message: 'Bảng giá tiêu chuẩn: Cầu lông 120.000đ, Bóng chuyền 150.000đ, Bóng đá mini 200.000đ/giờ/sân.',
+    message: 'Bảng giá tiêu chuẩn: Cầu lông 120.000 VND, Bóng chuyền 150.000 VND, Bóng đá mini 200.000 VND/giờ/sân.',
     createdAt: new Date(Date.now() - 86_400_000).toISOString(),
     isRead: true,
     priority: 'normal',

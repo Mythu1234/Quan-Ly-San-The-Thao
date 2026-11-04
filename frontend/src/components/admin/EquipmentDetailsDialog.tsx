@@ -18,7 +18,7 @@ const sportLabels: Record<string, string> = {
   CauLong: 'Cầu lông', BongChuyen: 'Bóng chuyền', BongDa: 'Bóng đá', DungChung: 'Thiết bị chung',
 };
 const displayText = (value?: string) => value?.trim() || 'Chưa cập nhật';
-const displayMoney = (value?: number | null) => value != null ? `${value.toLocaleString('vi-VN')} VNĐ` : 'Chưa cập nhật';
+const displayMoney = (value?: number | null) => value != null ? `${value.toLocaleString('vi-VN')} VND` : 'Chưa cập nhật';
 
 function DetailField({ label, value }: { label: string; value?: string }) {
   return <div className="min-w-0 space-y-1">

@@ -39,7 +39,7 @@ interface DailyBookingTotal {
   amount: number;
 }
 
-const formatCurrency = (amount: number) => `${new Intl.NumberFormat('vi-VN').format(amount)} đ`;
+const formatCurrency = (amount: number) => `${new Intl.NumberFormat('vi-VN').format(amount)} VND`;
 
 const formatDateInput = (date: Date) => {
   const year = date.getFullYear();

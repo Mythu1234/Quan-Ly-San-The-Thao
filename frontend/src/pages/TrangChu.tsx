@@ -16,6 +16,8 @@ import { isCourtLocked } from '../hooks/useCourtAvailability';
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { Search, MapPin, Phone, Clock, Play, Home, Calendar as CalendarIcon, X, Zap, User, Lock, Eye, EyeOff, ArrowLeft, ArrowRight, ChevronLeft, ChevronRight, ChevronDown, Trophy, CheckCircle2, RefreshCw, MessageSquare, Copy, Check, AlertTriangle } from 'lucide-react';
 
+const venueDirectionsUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent('Đường số 6, An Hải, Đà Nẵng, Việt Nam')}`;
+
 const parseTimeToMinutes = (t: string): number => {
   if (!t) return 0;
   const [h, m] = t.split(':').map(Number);
@@ -452,7 +454,7 @@ export default function TrangChu() {
       description: 'Mặt thảm BWF tiêu chuẩn 4.5mm chống trượt, hệ thống đèn chiếu sáng chống chói Lux LED 1000+, trần cao 11m.',
       specs: ['MẶT THẢM BWF', 'CHỐNG CHÓI', 'CHUẨN 4.5MM'],
       pricePerHour: 120000,
-      priceLabel: '120.000đ / GIỜ',
+      priceLabel: '120.000 VND / GIỜ',
       image: '/images/badminton.jpg',
       icon: ShuttlecockIcon,
       courts: ['Sân CL-01', 'Sân CL-02', 'Sân CL-03', 'Sân CL-04', 'Sân CL-05'],
@@ -466,7 +468,7 @@ export default function TrangChu() {
       description: 'Sân bóng đá cỏ nhân tạo đạt chuẩn thi đấu mini 5 - 7 người, hệ thống đèn LED chuyên nghiệp, bóng thi đấu đạt chuẩn.',
       specs: ['SÂN 5 - 7 NGƯỜI', 'ĐÈN LUX 1000', 'CỎ NHÂN TẠO'],
       pricePerHour: 200000,
-      priceLabel: '200.000đ / GIỜ',
+      priceLabel: '200.000 VND / GIỜ',
       image: '/images/hero_arena.jpg',
       icon: FootballIcon,
       courts: ['Sân BD-01', 'Sân BD-02', 'Sân BD-03', 'Sân BD-04'],
@@ -480,7 +482,7 @@ export default function TrangChu() {
       description: 'Sân bóng chuyền trong nhà mái che cao 12m, thảm thi đấu Taraflex xịn, trụ và lưới căng chuẩn FIVB thi đấu.',
       specs: ['THẢM TARAFLEX', 'MÁI CHE 12M', 'ĐÈN LUX 1000'],
       pricePerHour: 150000,
-      priceLabel: '150.000đ / GIỜ',
+      priceLabel: '150.000 VND / GIỜ',
       image: '/images/volleyball.jpg',
       icon: VolleyballIcon,
       courts: ['Sân BC-01', 'Sân BC-02', 'Sân BC-03', 'Sân BC-04', 'Sân BC-05'],
@@ -883,7 +885,7 @@ export default function TrangChu() {
   // Price Calculation
   const durationHours = selectedDuration / 60;
   const totalPrice = currentSport ? Math.round(currentSport.pricePerHour * durationHours) : 0;
-  const formattedPrice = totalPrice.toLocaleString('vi-VN') + 'đ';
+  const formattedPrice = totalPrice.toLocaleString('vi-VN') + ' VND';
   const selectedSlot = selectedStartTime ? `${selectedStartTime} - ${selectedEndTime}` : 'Chưa chọn giờ';
 
   const handleBookingSubmit = (e: React.FormEvent) => {
@@ -1111,7 +1113,7 @@ export default function TrangChu() {
                 ...t,
                 status: 'ĐÃ HỦY',
                 canCancel: false,
-                refundAmount: refundEligible ? `${rawRefund.toLocaleString('vi-VN')}đ` : '0đ',
+                refundAmount: refundEligible ? `${rawRefund.toLocaleString('vi-VN')} VND` : '0 VND',
                 refundStatus: refundEligible ? 'Đã hoàn tiền' : 'Không hoàn tiền',
               }
             : t
@@ -1123,7 +1125,7 @@ export default function TrangChu() {
         title: 'Hủy đặt sân thành công!',
         message: `Lịch đặt mã ${ticket.code} (${ticket.court}) đã được hủy và giải phóng thành công.`,
         policyMessage: refundEligible
-          ? `Hủy trước ≥ 24h: Hệ thống đã tạo lệnh tự động hoàn tiền 100% (${rawRefund.toLocaleString('vi-VN')} VNĐ) qua VietQR cho quý khách.`
+          ? `Hủy trước ≥ 24h: Hệ thống đã tạo lệnh tự động hoàn tiền 100% (${rawRefund.toLocaleString('vi-VN')} VND) qua VietQR cho quý khách.`
           : 'Hủy trước dưới 24h: Theo quy định, lượt đặt này không được hoàn tiền. Khung giờ đã được giải phóng cho khách khác.',
       });
     } catch (err: any) {
@@ -1151,18 +1153,18 @@ export default function TrangChu() {
     <div className="flex min-h-screen flex-col bg-slate-50 text-slate-900 antialiased selection:bg-emerald-500 selection:text-white">
 
       {/* 🟢 TOP HEADER BAR (WHITE & GREEN) */}
-      <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 px-4 py-3 backdrop-blur-md shadow-xs">
+      <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 px-4 py-2.5 backdrop-blur-md shadow-xs">
         <div className="flex items-center justify-between">
-          <div onClick={() => handleTabChange('booking')} className="flex items-center gap-3 cursor-pointer select-none">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500 text-white shadow-md shadow-emerald-500/20">
-              <span className="text-xl font-black">C</span>
+          <div onClick={() => handleTabChange('booking')} className="flex items-center gap-2 cursor-pointer select-none">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-500 text-white shadow-sm shadow-emerald-500/20">
+              <span className="text-lg font-black">C</span>
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-xl font-black tracking-tight text-slate-900">COURT<span className="text-emerald-600">X</span></span>
-                <span className="flex h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span className="text-lg font-black tracking-tight text-slate-900">COURT<span className="text-emerald-600">X</span></span>
+                <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
               </div>
-              <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">
+              <p className="text-[8px] font-bold uppercase tracking-[0.12em] text-slate-500">
                 Nhà thi đấu đa năng
               </p>
             </div>
@@ -1174,7 +1176,7 @@ export default function TrangChu() {
               onClick={() => handleTabChange('lookup')}
               className={`flex h-9 px-3 items-center gap-1.5 rounded-full border text-xs font-bold transition active:scale-95 ${activeTab === 'lookup'
                   ? 'border-emerald-500 bg-emerald-50 text-emerald-700 shadow-xs'
-                  : 'border-slate-200 bg-slate-100 text-slate-700 hover:border-emerald-500 hover:text-emerald-600'
+                  : 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:border-emerald-400 hover:bg-emerald-100'
                 }`}
             >
               <Search className='w-3.5 h-3.5' />
@@ -1189,45 +1191,45 @@ export default function TrangChu() {
 
       {/* ⚪ TAB ĐẶT SÂN */}
       {activeTab === 'booking' && (
-        <main className="flex-1 space-y-6 p-4 pb-28">
+        <main className="flex-1 space-y-5 p-4 pt-3 pb-24">
 
           {/* ======================================================== */}
           {/* 1. GIỚI THIỆU TỔ HỢP / HERO SECTION (WHITE & GREEN)      */}
           {/* ======================================================== */}
-          <section ref={introRef} className="scroll-mt-16 space-y-4">
+          <section ref={introRef} className="scroll-mt-16 space-y-3">
 
             {/* Top Tagline Badge */}
-            <div className="inline-flex items-center gap-2 rounded-full border border-emerald-300 bg-emerald-50 px-3.5 py-1 text-[11px] font-extrabold uppercase tracking-widest text-emerald-700 shadow-xs">
+            <div className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[9px] font-bold uppercase tracking-wider text-emerald-700">
               <span className="inline-block h-2 w-2 rounded-full bg-emerald-500 animate-ping"></span>
               THẾ HỆ SÂN ĐẤU MỚI
             </div>
 
             {/* Hero Headlines */}
             <div>
-              <h1 className="text-3xl font-black leading-tight tracking-tight text-slate-900">
+              <h1 className="text-[24px] font-extrabold leading-[1.2] tracking-tight text-slate-900 min-[380px]:text-[26px]">
                 BỨT PHÁ GIỚI HẠN <br />
                 <span className="bg-gradient-to-r from-emerald-600 to-teal-500 bg-clip-text text-transparent">
                   THƯỢNG TRỊ MỌI MẶT SÂN
                 </span>
               </h1>
-              <p className="mt-2.5 text-xs leading-5 text-slate-600">
+              <p className="mt-2 text-[11px] leading-[1.7] text-slate-600">
                 Hệ thống sân đấu đạt tiêu chuẩn thi đấu quốc tế, chiếu sáng chuyên nghiệp Lux LED 1000+, mặt thảm tiêu chuẩn BWF & FIVB mang lại trải nghiệm đỉnh cao.
               </p>
             </div>
 
             {/* Hero Action Buttons */}
-            <div className="grid grid-cols-2 gap-3 pt-1">
+            <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
                 onClick={() => scrollToBooking()}
-                className="flex items-center justify-center gap-2 rounded-xl bg-emerald-500 px-4 py-3.5 text-xs font-black uppercase tracking-wider text-white shadow-lg shadow-emerald-500/25 transition active:scale-95 hover:bg-emerald-600 cursor-pointer"
+                className="flex h-10 items-center justify-center gap-1.5 rounded-xl bg-emerald-700 px-2 text-[11px] font-bold uppercase text-white shadow-sm shadow-emerald-500/20 transition active:scale-95 hover:bg-emerald-800 cursor-pointer"
               >
                 <Zap className='w-4 h-4' /> ĐẶT SÂN NGAY
               </button>
               <button
                 type="button"
                 onClick={scrollToFacility}
-                className="flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-3.5 text-xs font-black uppercase tracking-wider text-slate-800 shadow-xs transition active:scale-95 hover:bg-slate-50 cursor-pointer"
+                className="flex h-10 items-center justify-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50 px-2 text-[11px] font-bold uppercase text-emerald-700 shadow-xs transition active:scale-95 hover:bg-emerald-100 cursor-pointer"
               >
                 <Play className='w-4 h-4 fill-current' /> XEM VIDEO
               </button>
@@ -1238,27 +1240,27 @@ export default function TrangChu() {
               <img
                 src="/images/hero_arena.jpg"
                 alt="COURTX Arena Overview"
-                className="h-48 w-full object-cover transition duration-500 hover:scale-105"
+                className="h-36 w-full object-cover transition duration-500 hover:scale-105 min-[380px]:h-40"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-slate-950/70 via-transparent to-transparent"></div>
-              <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between">
-                <span className="rounded-md bg-emerald-500/90 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-white backdrop-blur-md shadow">
+              <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between gap-2">
+                <span className="rounded-md bg-emerald-500/90 px-2 py-1 text-[8px] font-bold uppercase tracking-wide text-white backdrop-blur-md shadow">
                   CHUẨN THI ĐẤU BWF & FIVB
                 </span>
-                <span className="text-[10px] font-bold text-white shadow">1000 Lux LED</span>
+                <span className="shrink-0 text-[8px] font-bold text-white shadow">1000 Lux LED</span>
               </div>
             </div>
 
             {/* 3 Stats Counters Grid */}
-            <div className="grid grid-cols-3 gap-2.5">
+            <div className="grid grid-cols-3 gap-2">
               {[
                 ['03', 'MÔN ĐỈNH CAO'],
                 ['100%', 'SÂN THI ĐẤU'],
                 ['1000', 'LUX LED'],
               ].map(([val, lbl]) => (
-                <div key={lbl} className="rounded-2xl border border-slate-200 bg-white p-3 text-center shadow-xs">
-                  <p className="text-xl font-black text-emerald-600">{val}</p>
-                  <p className="mt-0.5 text-[9px] font-extrabold uppercase tracking-wider text-slate-500">{lbl}</p>
+                <div key={lbl} className="rounded-xl border border-slate-200 bg-white px-1.5 py-2 text-center shadow-xs">
+                  <p className="text-lg font-extrabold leading-tight text-emerald-600">{val}</p>
+                  <p className="mt-1 text-[8px] font-bold uppercase tracking-wide text-slate-500">{lbl}</p>
                 </div>
               ))}
             </div>
@@ -1330,7 +1332,7 @@ export default function TrangChu() {
                       <button
                         type="button"
                         onClick={() => scrollToBooking(sport.id as any)}
-                        className="rounded-xl bg-emerald-500 px-3.5 py-2 text-xs font-black uppercase tracking-wider text-white shadow-sm transition hover:bg-emerald-600 active:scale-95 cursor-pointer"
+                        className="rounded-xl bg-emerald-700 px-3.5 py-2 text-xs font-black uppercase tracking-wider text-white shadow-sm transition hover:bg-emerald-800 active:scale-95 cursor-pointer"
                       >
                         Đặt ngay →
                       </button>
@@ -1345,35 +1347,35 @@ export default function TrangChu() {
           {/* ======================================================== */}
           {/* 3. HỆ THỐNG ĐẶT SÂN TỰ ĐỘNG (LIGHT THEME)               */}
           {/* ======================================================== */}
-          <section ref={bookingRef} className="scroll-mt-16 space-y-5 pt-4 border-t border-slate-200">
+          <section ref={bookingRef} className="scroll-mt-16 space-y-3 pt-3 border-t border-slate-200">
             <div>
               <p className="text-[10px] font-extrabold uppercase tracking-widest text-emerald-600">
                 ● ĐẶT SÂN & LỊCH TRỐNG REAL-TIME
               </p>
-              <h2 className="mt-0.5 text-xl font-black text-slate-900">
+              <h2 className="mt-1 text-base font-bold leading-snug text-slate-900">
                 HỆ THỐNG ĐẶT SÂN NHANH, THANH TOÁN TỰ ĐỘNG
               </h2>
-              <p className="mt-1 text-xs text-slate-600">
+              <p className="mt-1 text-[11px] leading-relaxed text-slate-600">
                 Chọn môn thể thao, ngày thi đấu và thời gian để giữ lịch thi đấu ngay.
               </p>
             </div>
 
             {/* ⚡ BƯỚC 1: CHỌN MÔN ĐẶT SÂN */}
             {/* ⚡ BƯỚC 1: CHỌN MÔN THỂ THAO & NIÊM YẾT GIÁ */}
-            <div id="step-1-sport-section" className="rounded-2xl border border-slate-200 bg-white p-4 space-y-3 shadow-xs scroll-mt-20">
+            <div id="step-1-sport-section" className="rounded-2xl border border-slate-200 bg-white p-3 space-y-2.5 shadow-xs scroll-mt-20">
               {/* Header: 1 CHỌN MÔN ĐẶT SÂN & NIÊM YẾT CHÍNH THỨC */}
-              <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-                <div className="flex items-center gap-2">
-                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500 text-xs font-black text-white shrink-0">1</span>
-                  <h3 className="text-sm font-black uppercase tracking-wider text-slate-900">
+              <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-100">
+                <div className="flex items-center gap-1.5">
+                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-700 text-[10px] font-bold text-white shrink-0">1</span>
+                  <h3 className="text-[11px] font-bold uppercase text-slate-900">
                     CHỌN MÔN ĐẶT SÂN
                   </h3>
                 </div>
-                <div className="flex items-center gap-1.5 shrink-0">
-                  <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-emerald-800 border border-emerald-200">
+                <div className="flex items-center gap-1 shrink-0">
+                  <span className="rounded-full bg-emerald-50 px-1.5 py-0.5 text-[8px] font-bold uppercase text-emerald-800 border border-emerald-200">
                     NIÊM YẾT CHÍNH THỨC
                   </span>
-                  <span className="rounded-lg bg-slate-100 px-2.5 py-0.5 text-[10px] font-bold text-slate-600 border border-slate-200">
+                  <span className="rounded-md bg-slate-50 px-1.5 py-0.5 text-[8px] font-semibold text-slate-500 border border-slate-200">
                     05:00 – 23:00
                   </span>
                 </div>
@@ -1394,22 +1396,22 @@ export default function TrangChu() {
                     setSelectedSportId('badminton');
                     setSportError(null);
                   }}
-                  className={`p-3 transition-all cursor-pointer flex items-center justify-between gap-3 ${selectedSportId === 'badminton'
-                      ? 'bg-emerald-50/90 border-l-4 border-l-emerald-600 shadow-2xs'
+                  className={`min-h-14 px-2 py-2 transition-all cursor-pointer flex items-center justify-between gap-2 ${selectedSportId === 'badminton'
+                      ? 'bg-emerald-50/90 border-l-2 border-l-emerald-700 shadow-2xs'
                       : 'hover:bg-slate-100/60'
                     }`}
                 >
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <div className={`flex h-10 w-10 items-center justify-center rounded-xl shrink-0 transition ${selectedSportId === 'badminton' ? 'bg-emerald-600 text-white shadow-xs' : 'bg-emerald-100 text-emerald-800'
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className={`flex h-8 w-8 items-center justify-center rounded-lg shrink-0 transition [&>svg]:h-5 [&>svg]:w-5 ${selectedSportId === 'badminton' ? 'bg-emerald-700 text-white shadow-xs' : 'bg-emerald-100 text-emerald-800'
                       }`}>
                       <ShuttlecockIcon />
                     </div>
                     <div>
                       <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="text-xs font-black text-slate-900">Cầu Lông</span>
-                        <span className="text-[10px] font-bold text-slate-500 bg-white px-1.5 py-0.5 rounded border border-slate-200">5 sân</span>
+                        <span className="text-[11px] font-bold text-slate-900">Cầu Lông</span>
+                        <span className="text-[8px] font-medium text-slate-500 bg-white px-1 py-0.5 rounded border border-slate-200">5 sân</span>
                         {selectedSportId === 'badminton' && (
-                          <span className="rounded-full bg-emerald-600 px-2 py-0.5 text-[9px] font-black text-white flex items-center gap-0.5">
+                          <span className="rounded-full bg-emerald-700 px-1.5 py-0.5 text-[8px] font-bold text-white flex items-center gap-0.5">
                             <Check className="w-2.5 h-2.5" /> ĐÃ CHỌN
                           </span>
                         )}
@@ -1417,8 +1419,8 @@ export default function TrangChu() {
                     </div>
                   </div>
                   <div className="text-right shrink-0">
-                    <div className="text-sm font-black text-emerald-600">120.000đ</div>
-                    <div className="text-[10px] font-semibold text-slate-400">/ giờ / sân</div>
+                    <div className="text-xs font-bold text-emerald-700">120.000 VND</div>
+                    <div className="text-[9px] font-medium text-slate-400">/ giờ / sân</div>
                   </div>
                 </div>
 
@@ -1428,22 +1430,22 @@ export default function TrangChu() {
                     setSelectedSportId('volleyball');
                     setSportError(null);
                   }}
-                  className={`p-3 transition-all cursor-pointer flex items-center justify-between gap-3 ${selectedSportId === 'volleyball'
-                      ? 'bg-emerald-50/90 border-l-4 border-l-emerald-600 shadow-2xs'
+                  className={`min-h-14 px-2 py-2 transition-all cursor-pointer flex items-center justify-between gap-2 ${selectedSportId === 'volleyball'
+                      ? 'bg-emerald-50/90 border-l-2 border-l-emerald-700 shadow-2xs'
                       : 'hover:bg-slate-100/60'
                     }`}
                 >
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <div className={`flex h-10 w-10 items-center justify-center rounded-xl shrink-0 transition ${selectedSportId === 'volleyball' ? 'bg-emerald-600 text-white shadow-xs' : 'bg-emerald-100 text-emerald-800'
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className={`flex h-8 w-8 items-center justify-center rounded-lg shrink-0 transition [&>svg]:h-5 [&>svg]:w-5 ${selectedSportId === 'volleyball' ? 'bg-emerald-700 text-white shadow-xs' : 'bg-emerald-100 text-emerald-800'
                       }`}>
                       <VolleyballIcon />
                     </div>
                     <div>
                       <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="text-xs font-black text-slate-900">Bóng Chuyền</span>
-                        <span className="text-[10px] font-bold text-slate-500 bg-white px-1.5 py-0.5 rounded border border-slate-200">5 sân</span>
+                        <span className="text-[11px] font-bold text-slate-900">Bóng Chuyền</span>
+                        <span className="text-[8px] font-medium text-slate-500 bg-white px-1 py-0.5 rounded border border-slate-200">5 sân</span>
                         {selectedSportId === 'volleyball' && (
-                          <span className="rounded-full bg-emerald-600 px-2 py-0.5 text-[9px] font-black text-white flex items-center gap-0.5">
+                          <span className="rounded-full bg-emerald-700 px-1.5 py-0.5 text-[8px] font-bold text-white flex items-center gap-0.5">
                             <Check className="w-2.5 h-2.5" /> ĐÃ CHỌN
                           </span>
                         )}
@@ -1451,8 +1453,8 @@ export default function TrangChu() {
                     </div>
                   </div>
                   <div className="text-right shrink-0">
-                    <div className="text-sm font-black text-emerald-600">150.000đ</div>
-                    <div className="text-[10px] font-semibold text-slate-400">/ giờ / sân</div>
+                    <div className="text-xs font-bold text-emerald-700">150.000 VND</div>
+                    <div className="text-[9px] font-medium text-slate-400">/ giờ / sân</div>
                   </div>
                 </div>
 
@@ -1462,22 +1464,22 @@ export default function TrangChu() {
                     setSelectedSportId('football');
                     setSportError(null);
                   }}
-                  className={`p-3 transition-all cursor-pointer flex items-center justify-between gap-3 ${selectedSportId === 'football'
-                      ? 'bg-emerald-50/90 border-l-4 border-l-emerald-600 shadow-2xs'
+                  className={`min-h-14 px-2 py-2 transition-all cursor-pointer flex items-center justify-between gap-2 ${selectedSportId === 'football'
+                      ? 'bg-emerald-50/90 border-l-2 border-l-emerald-700 shadow-2xs'
                       : 'hover:bg-slate-100/60'
                     }`}
                 >
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <div className={`flex h-10 w-10 items-center justify-center rounded-xl shrink-0 transition ${selectedSportId === 'football' ? 'bg-emerald-600 text-white shadow-xs' : 'bg-emerald-100 text-emerald-800'
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className={`flex h-8 w-8 items-center justify-center rounded-lg shrink-0 transition [&>svg]:h-5 [&>svg]:w-5 ${selectedSportId === 'football' ? 'bg-emerald-700 text-white shadow-xs' : 'bg-emerald-100 text-emerald-800'
                       }`}>
                       <FootballIcon />
                     </div>
                     <div>
                       <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="text-xs font-black text-slate-900">Bóng Đá Mini</span>
-                        <span className="text-[10px] font-bold text-slate-500 bg-white px-1.5 py-0.5 rounded border border-slate-200">4 sân</span>
+                        <span className="text-[11px] font-bold text-slate-900">Bóng Đá Mini</span>
+                        <span className="text-[8px] font-medium text-slate-500 bg-white px-1 py-0.5 rounded border border-slate-200">4 sân</span>
                         {selectedSportId === 'football' && (
-                          <span className="rounded-full bg-emerald-600 px-2 py-0.5 text-[9px] font-black text-white flex items-center gap-0.5">
+                          <span className="rounded-full bg-emerald-700 px-1.5 py-0.5 text-[8px] font-bold text-white flex items-center gap-0.5">
                             <Check className="w-2.5 h-2.5" /> ĐÃ CHỌN
                           </span>
                         )}
@@ -1485,14 +1487,14 @@ export default function TrangChu() {
                     </div>
                   </div>
                   <div className="text-right shrink-0">
-                    <div className="text-sm font-black text-emerald-600">200.000đ</div>
-                    <div className="text-[10px] font-semibold text-slate-400">/ giờ / sân</div>
+                    <div className="text-xs font-bold text-emerald-700">200.000 VND</div>
+                    <div className="text-[9px] font-medium text-slate-400">/ giờ / sân</div>
                   </div>
                 </div>
               </div>
 
               {/* Note bar */}
-              <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1">
+              <div className="flex flex-wrap items-center justify-between gap-1 text-[9px] leading-relaxed text-slate-500">
                 <span>⚡ Đơn giá cố định, không phụ thu cuối tuần</span>
                 <span className="text-emerald-700 font-bold flex items-center gap-1">
                   <CheckCircle2 className="w-3.5 h-3.5" /> 100% VietQR
@@ -1503,14 +1505,14 @@ export default function TrangChu() {
             {/* ⚡ BƯỚC 2: CHỌN NGÀY THI ĐẤU */}
             <div
               id="step-2-date-section"
-              className={`rounded-2xl bg-white p-4 space-y-3.5 shadow-xs transition-all ${dateError ? 'border-2 border-rose-500 ring-4 ring-rose-100 shadow-md' : 'border border-slate-200'
+              className={`rounded-2xl bg-white p-3 space-y-2.5 shadow-xs transition-all ${dateError ? 'border-2 border-rose-500 ring-4 ring-rose-100 shadow-md' : 'border border-slate-200'
                 }`}
             >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-black text-white ${dateError ? 'bg-rose-500 animate-pulse' : 'bg-emerald-500'
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5">
+                  <span className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold text-white ${dateError ? 'bg-rose-500 animate-pulse' : 'bg-emerald-700'
                     }`}>2</span>
-                  <h3 className={`text-sm font-black uppercase tracking-wider ${dateError ? 'text-rose-600' : 'text-slate-900'
+                  <h3 className={`text-[11px] font-bold uppercase ${dateError ? 'text-rose-600' : 'text-slate-900'
                     }`}>CHỌN NGÀY THI ĐẤU</h3>
                 </div>
 
@@ -1518,9 +1520,9 @@ export default function TrangChu() {
                 <button
                   type="button"
                   onClick={() => setIsDatePickerOpen(!isDatePickerOpen)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border transition active:scale-95 shadow-2xs cursor-pointer ${isDatePickerOpen
-                      ? 'border-emerald-600 bg-emerald-600 text-white font-black'
-                      : 'border-emerald-300 bg-emerald-50 text-emerald-800 text-xs font-black hover:bg-emerald-100'
+                  className={`flex h-8 items-center gap-1 px-2 text-[10px] rounded-lg border transition active:scale-95 cursor-pointer ${isDatePickerOpen
+                      ? 'border-emerald-600 bg-emerald-700 text-white font-black'
+                      : 'border-emerald-200 bg-emerald-50 text-emerald-800 font-semibold hover:bg-emerald-100'
                     }`}
                   title="Bấm để xổ lịch chọn ngày"
                 >
@@ -1540,20 +1542,20 @@ export default function TrangChu() {
 
               {/* 📅 CALENDAR DROPDOWN: XỔ RA BẢNG LỊCH THÁNG TRỰC QUAN ĐỂ CHỌN */}
               {isDatePickerOpen && (
-                <div className="rounded-2xl border-2 border-emerald-400 bg-white p-3.5 shadow-lg animate-in fade-in slide-in-from-top-2 duration-200 space-y-3">
+                <div className="mx-auto w-full max-w-xs rounded-xl border border-emerald-100 bg-white p-2.5 shadow-sm animate-in fade-in slide-in-from-top-2 duration-200 space-y-2">
                   {/* Month & Year header */}
-                  <div className="flex items-center justify-between px-1">
+                  <div className="flex items-center justify-between rounded-lg bg-emerald-50/60 px-1 py-1">
                     <button
                       type="button"
                       onClick={handlePrevMonth}
-                      className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 text-slate-700 active:scale-95 transition cursor-pointer"
+                      className="flex h-7 w-7 items-center justify-center rounded-lg text-emerald-700 hover:bg-emerald-100 active:scale-95 transition cursor-pointer"
                       title="Tháng trước"
                     >
                       <ChevronLeft className="w-4 h-4" />
                     </button>
 
                     <div className="text-center">
-                      <span className="text-xs font-black uppercase text-slate-900 tracking-wider">
+                      <span className="text-[11px] font-bold text-slate-800">
                         Tháng {calendarMonth.getMonth() + 1}, {calendarMonth.getFullYear()}
                       </span>
                     </div>
@@ -1561,7 +1563,7 @@ export default function TrangChu() {
                     <button
                       type="button"
                       onClick={handleNextMonth}
-                      className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 text-slate-700 active:scale-95 transition cursor-pointer"
+                      className="flex h-7 w-7 items-center justify-center rounded-lg text-emerald-700 hover:bg-emerald-100 active:scale-95 transition cursor-pointer"
                       title="Tháng sau"
                     >
                       <ChevronRight className="w-4 h-4" />
@@ -1569,7 +1571,7 @@ export default function TrangChu() {
                   </div>
 
                   {/* Weekday headers */}
-                  <div className="grid grid-cols-7 gap-1 text-center text-[11px] font-bold text-slate-400">
+                  <div className="grid grid-cols-7 gap-0.5 text-center text-[9px] font-semibold text-slate-400">
                     <div>T2</div>
                     <div>T3</div>
                     <div>T4</div>
@@ -1580,7 +1582,7 @@ export default function TrangChu() {
                   </div>
 
                   {/* Days Grid */}
-                  <div className="grid grid-cols-7 gap-1 text-xs">
+                  <div className="grid grid-cols-7 gap-0.5 text-[11px]">
                     {calendarDays.map((item, idx) => {
                       const itemTime = new Date(item.dateObj.getFullYear(), item.dateObj.getMonth(), item.dateObj.getDate()).getTime();
                       const baseTime = today.getTime();
@@ -1595,7 +1597,7 @@ export default function TrangChu() {
                         return (
                           <div
                             key={idx}
-                            className="h-9 w-full rounded-xl flex flex-col items-center justify-center font-bold text-xs text-slate-300 opacity-20 select-none cursor-not-allowed bg-slate-50/50 pointer-events-none"
+                            className="h-8 w-full rounded-lg flex flex-col items-center justify-center font-medium text-[11px] text-slate-300 select-none cursor-not-allowed pointer-events-none"
                           >
                             <span>{item.dayNumber}</span>
                           </div>
@@ -1608,11 +1610,11 @@ export default function TrangChu() {
                           type="button"
                           onClick={() => handleSelectCalendarDay(item.dateObj)}
                           className={[
-                            'h-9 w-full rounded-xl flex flex-col items-center justify-center font-bold transition text-xs relative',
+                            'h-8 w-full rounded-lg flex flex-col items-center justify-center font-semibold transition text-[11px] relative',
                             !item.isCurrentMonth ? 'text-slate-300' : 'text-slate-800',
                             'cursor-pointer hover:bg-emerald-50 hover:text-emerald-800 active:scale-95',
-                            isSelected ? 'bg-emerald-600 text-white font-black hover:bg-emerald-700 shadow-sm shadow-emerald-600/30 ring-2 ring-emerald-300' : '',
-                            isToday && !isSelected ? 'border border-emerald-500 text-emerald-700 font-black' : ''
+                            isSelected ? 'bg-emerald-700 text-white font-bold hover:bg-emerald-800 hover:text-white shadow-sm' : '',
+                            isToday && !isSelected ? 'border border-emerald-200 bg-emerald-50 text-emerald-700 font-bold' : ''
                           ].filter(Boolean).join(' ')}
                         >
                           <span>{item.dayNumber}</span>
@@ -1625,7 +1627,7 @@ export default function TrangChu() {
                   </div>
 
                   {/* Quick footer */}
-                  <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-xs">
+                  <div className="flex items-center justify-between pt-1.5 border-t border-slate-100 text-[10px]">
                     <button
                       type="button"
                       onClick={() => {
@@ -1636,7 +1638,7 @@ export default function TrangChu() {
                         setDateError(null);
                         setIsDatePickerOpen(false);
                       }}
-                      className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 font-bold hover:bg-slate-200 transition cursor-pointer text-[11px]"
+                      className="px-2 py-1 rounded-md bg-emerald-50 text-emerald-700 font-semibold hover:bg-emerald-100 transition cursor-pointer text-[10px]"
                     >
                       Hôm nay
                     </button>
@@ -1644,7 +1646,7 @@ export default function TrangChu() {
                     <button
                       type="button"
                       onClick={() => setIsDatePickerOpen(false)}
-                      className="px-3 py-1 rounded-lg bg-emerald-50 text-emerald-700 font-bold hover:bg-emerald-100 transition cursor-pointer text-[11px]"
+                      className="px-2 py-1 rounded-md text-slate-500 font-semibold hover:bg-slate-50 transition cursor-pointer text-[10px]"
                     >
                       Đóng lịch ✕
                     </button>
@@ -1653,12 +1655,12 @@ export default function TrangChu() {
               )}
 
               {/* Quick Date Pills: 21 Days Horizon */}
-              <div className="flex gap-2 overflow-x-auto pb-1.5 pt-0.5 no-scrollbar">
+              <div className="flex gap-1.5 overflow-x-auto py-0.5 no-scrollbar">
                 {/* If user picked a custom date that's not in the 21 days */}
                 {selectedDate && !availableDates.some((item) => `${item.label} (${item.date})` === selectedDate) && (
                   <button
                     type="button"
-                    className="flex-shrink-0 flex flex-col items-center justify-center rounded-xl px-4 py-2.5 border-2 border-emerald-600 bg-emerald-500 text-white font-black shadow-md shadow-emerald-500/25 ring-2 ring-emerald-300/50"
+                    className="flex-shrink-0 flex h-12 flex-col items-center justify-center rounded-lg px-2.5 border border-emerald-600 bg-emerald-700 text-white font-bold shadow-sm"
                   >
                     <span className="text-[10px] font-bold uppercase tracking-wider opacity-90">⭐ Đã chọn</span>
                     <span className="text-xs font-black mt-0.5">{selectedDate}</span>
@@ -1678,9 +1680,9 @@ export default function TrangChu() {
                         setDateError(null);
                       }}
                       className={[
-                        'flex-shrink-0 flex flex-col items-center justify-center rounded-xl px-4 py-2.5 border transition active:scale-95 cursor-pointer',
+                        'flex-shrink-0 flex h-12 min-w-16 flex-col items-center justify-center rounded-lg px-2.5 border transition active:scale-95 cursor-pointer',
                         isSelected
-                          ? 'border-emerald-500 bg-emerald-500 text-white font-black shadow-md shadow-emerald-500/20'
+                          ? 'border-emerald-600 bg-emerald-700 text-white font-bold shadow-sm'
                           : 'border-slate-200 bg-slate-50 text-slate-700 hover:border-slate-300 hover:bg-slate-100',
                       ].join(' ')}
                     >
@@ -1695,11 +1697,11 @@ export default function TrangChu() {
             </div>
 
             {/* ⚡ BƯỚC 3: LỊCH SÂN TRỰC QUAN REAL-TIME */}
-            <div id="booking-schedule-section" className="rounded-2xl border border-slate-200 bg-white p-4 space-y-3.5 shadow-xs scroll-mt-20">
+            <div id="booking-schedule-section" className="rounded-2xl border border-slate-200 bg-white p-3 space-y-2.5 shadow-xs scroll-mt-20">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500 text-xs font-black text-white">3</span>
-                  <h3 className="text-sm font-black uppercase tracking-wider text-slate-900">LỊCH SÂN TRỰC QUAN REAL-TIME</h3>
+                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-700 text-[10px] font-bold text-white">3</span>
+                  <h3 className="text-[11px] font-bold uppercase text-slate-900">LỊCH SÂN TRỰC QUAN REAL-TIME</h3>
                 </div>
               </div>
 
@@ -1747,13 +1749,13 @@ export default function TrangChu() {
                       setCustomerNote('');
                       setShowBookingPopup(true);
                     }}
-                    className="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black px-3.5 py-2 active:scale-95 transition cursor-pointer shadow-xs shrink-0 flex items-center gap-1"
+                    className="rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-black px-3.5 py-2 active:scale-95 transition cursor-pointer shadow-xs shrink-0 flex items-center gap-1"
                   >
                     Mở màn hình đặt sân <ArrowRight className="w-3.5 h-3.5" />
                   </button>
                 </div>
               ) : (
-                <div className="rounded-xl border border-dashed border-amber-300 bg-amber-50/70 p-3 text-center text-xs text-amber-800 animate-pulse">
+                <div className="rounded-lg border border-dashed border-amber-200 bg-amber-50/60 px-2 py-2 text-center text-[10px] leading-relaxed text-amber-800">
                   <p className="font-bold">👆 Quý khách vui lòng chạm vào một ô giờ còn trống (màu vàng) trên bảng lịch ở trên để bắt đầu đặt sân.</p>
                 </div>
               )}
@@ -1771,30 +1773,30 @@ export default function TrangChu() {
               </div>
               <div>
                 <h3 className="text-sm font-black text-slate-900">NHÀ THI ĐẤU ĐA NĂNG COURTX</h3>
-                <p className="text-[10px] text-slate-500">Hệ thống sân tiêu chuẩn thi đấu quốc tế</p>
               </div>
             </div>
 
             <div className="space-y-1.5 text-xs text-slate-700 border-t border-slate-100 pt-3">
-              <p><MapPin className='w-3.5 h-3.5 inline mr-1 text-emerald-600' /> <strong>Địa chỉ:</strong> Số 18 Đường Thi Đấu, Phường Thể Thao, Quận Đa Năng, TP.HCM</p>
-              <p><Phone className='w-3.5 h-3.5 inline mr-1 text-emerald-600' /> <strong>Hotline đặt sân:</strong> <span className="text-emerald-600 font-bold">0912 345 678</span></p>
+              <p><MapPin className='w-3.5 h-3.5 inline mr-1 text-emerald-600' /> <strong>Địa chỉ:</strong> Đường số 6, An Hải, Đà Nẵng</p>
+              <p><Phone className='w-3.5 h-3.5 inline mr-1 text-emerald-600' /> <strong>Hotline đặt sân:</strong> <a href="tel:0838598626" className="text-emerald-600 font-bold">0838 598 626</a></p>
               <p><Clock className='w-3.5 h-3.5 inline mr-1 text-emerald-600' /> <strong>Giờ mở cửa:</strong> 05:00 - 23:00 (Tất cả các ngày trong tuần)</p>
             </div>
 
             <div className="grid grid-cols-2 gap-2 pt-1">
               <a
-                href="tel:0912345678"
+                href="tel:0838598626"
                 className="flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 py-2.5 text-xs font-bold text-slate-800 hover:bg-slate-100 transition"
               >
                 <Phone className='w-3.5 h-3.5 inline mr-1 text-emerald-600' /> Gọi Hotline
               </a>
-              <button
-                type="button"
-                onClick={() => showAlert('Chỉ đường', 'Đang mở bản đồ Google Maps tới Nhà thi đấu COURTX...')}
+              <a
+                href={venueDirectionsUrl}
+                target="_blank"
+                rel="noopener noreferrer"
                 className="flex items-center justify-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50 py-2.5 text-xs font-bold text-emerald-700 hover:bg-emerald-100 transition"
               >
                 <MapPin className='w-3.5 h-3.5 inline mr-1' /> Chỉ đường Map
-              </button>
+              </a>
             </div>
           </section>
 
@@ -1803,24 +1805,24 @@ export default function TrangChu() {
 
       {/* 🔍 TAB TRA CỨU THÔNG TIN ĐẶT SÂN */}
       {activeTab === 'lookup' && (
-        <main className="flex-1 space-y-6 p-4 pb-28 animate-in fade-in duration-200">
-          <section ref={lookupRef} className="space-y-4">
-            <div className="flex items-center justify-between">
+        <main className="flex-1 space-y-3 p-4 pt-3 pb-24 animate-in fade-in duration-200">
+          <section ref={lookupRef} className="space-y-2.5">
+            <div className="flex items-start justify-between gap-2">
               <div>
-                <p className="text-[10px] font-extrabold uppercase tracking-widest text-emerald-600">
+                <p className="text-[9px] font-bold uppercase tracking-wide text-emerald-600">
                   ● KIỂM TRA LỊCH ĐÃ ĐẶT
                 </p>
-                <h2 className="mt-0.5 text-xl font-black text-slate-900">
+                <h2 className="mt-1 text-base font-bold leading-snug text-slate-900">
                   TRA CỨU THÔNG TIN ĐẶT SÂN
                 </h2>
-                <p className="mt-1 text-xs text-slate-600">
+                <p className="mt-1 text-[11px] leading-relaxed text-slate-600">
                   Tra cứu lịch đặt đã lưu bằng mã đặt sân hoặc số điện thoại của khách hàng.
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => scrollToBooking()}
-                className="text-xs font-bold text-emerald-700 hover:text-emerald-800 flex items-center gap-1 active:scale-95 transition shrink-0 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-200 cursor-pointer"
+                className="text-[10px] font-semibold text-emerald-700 hover:text-emerald-800 flex items-center gap-1 active:scale-95 transition shrink-0 bg-emerald-50 px-2 py-1.5 rounded-lg border border-emerald-200 cursor-pointer"
               >
                 <span>Đặt sân</span> →
               </button>
@@ -1833,11 +1835,11 @@ export default function TrangChu() {
                 onChange={(e) => setLookupQuery(e.target.value)}
                 placeholder="Mã đặt sân hoặc số điện thoại"
                 disabled={lookupLoading}
-                className="flex-1 rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-xs text-slate-900 placeholder-slate-400 outline-none focus:border-emerald-500 shadow-xs"
+                className="min-w-0 h-9 flex-1 rounded-lg border border-slate-200 bg-white px-2.5 text-[11px] text-slate-900 placeholder-slate-400 outline-none focus:border-emerald-500 shadow-xs"
               />
               <button
                 type="submit"
-                className="rounded-xl bg-emerald-500 px-4 py-3 text-xs font-black uppercase tracking-wider text-white hover:bg-emerald-600 transition shadow-sm active:scale-95 cursor-pointer"
+                className="h-9 shrink-0 rounded-lg bg-emerald-700 px-3 text-[11px] font-bold uppercase text-white hover:bg-emerald-800 transition shadow-sm active:scale-95 cursor-pointer"
               >
                 {lookupLoading?'ĐANG TRA CỨU...':'TRA CỨU'}
               </button>
@@ -1850,7 +1852,7 @@ export default function TrangChu() {
               lookupResults.length > 0 ? (
                 <div className="space-y-3">
                   {lookupResults.map((lookupResult) => (
-                    <div key={lookupResult.code} className="rounded-2xl border border-emerald-300 bg-white p-4 space-y-3 shadow-sm">
+                    <div key={lookupResult.code} className="rounded-xl border border-emerald-200 bg-white p-3 space-y-2 shadow-sm">
                       <div className="flex items-center justify-between border-b border-slate-100 pb-2">
                         <span className="font-mono text-sm font-extrabold text-slate-900">{lookupResult.code}</span>
                         <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-[10px] font-black text-emerald-700 border border-emerald-200">
@@ -1885,7 +1887,7 @@ export default function TrangChu() {
                           type="button"
                           onClick={() => handleCancelTicket(lookupResult)}
                           disabled={!lookupResult.canCancel || lookupResult.status === 'ĐÃ HỦY'}
-                          className={'w-full rounded-xl border py-2.5 text-xs font-bold active:scale-95 transition ' + (lookupResult.status === 'ĐÃ HỦY' ? 'border-slate-200 text-slate-400 bg-slate-50' : 'border-red-200 text-red-600 hover:bg-red-50')}
+                          className={'w-full rounded-xl border py-2 text-[11px] font-semibold active:scale-95 transition ' + (lookupResult.status === 'ĐÃ HỦY' ? 'border-slate-200 text-slate-400 bg-slate-50' : 'border-red-200 text-red-600 hover:bg-red-50')}
                         >
                           {lookupResult.status === 'ĐÃ HỦY' ? 'Đã hủy' : lookupResult.canCancel ? 'Hủy vé' : 'Không thể hủy (Đã quá giờ)'}
                         </button>
@@ -1894,22 +1896,22 @@ export default function TrangChu() {
                   ))}
                 </div>
               ) : (
-                <div className="rounded-2xl border border-slate-200 bg-white p-6 text-center text-xs text-slate-500 shadow-xs">
+                <div className="rounded-2xl border border-slate-200 bg-white p-3 text-center text-[11px] text-slate-500 shadow-xs">
                   <Search className="w-6 h-6 mx-auto mb-2 text-slate-400" />
                   Không tìm thấy thông tin đơn đặt sân phù hợp với từ khóa "<span className="text-slate-900 font-bold">{lookupQuery}</span>".
                 </div>
               )
             ) : (
-              <p className="rounded-2xl border border-slate-200 bg-white p-4 text-xs text-slate-600">Nhập số điện thoại đã dùng khi đặt sân hoặc mã đặt sân để xem thông tin.</p>
+              <p className="rounded-2xl border border-slate-200 bg-white p-2.5 text-[11px] leading-relaxed text-slate-600">Nhập số điện thoại đã dùng khi đặt sân hoặc mã đặt sân để xem thông tin.</p>
             )}
           </section>
 
           {/* Chính sách hủy vé & hoàn tiền */}
-          <section className="rounded-2xl border border-slate-200 bg-white p-4 space-y-2.5 text-xs shadow-xs">
-            <h3 className="font-black text-slate-900 uppercase text-[11px] tracking-wider flex items-center gap-1.5">
+          <section className="rounded-2xl border border-slate-200 bg-white p-3 space-y-2 text-[11px] shadow-xs">
+            <h3 className="font-bold text-slate-900 uppercase text-[10px] tracking-wide flex items-center gap-1.5">
               <Zap className="w-4 h-4 text-emerald-600" /> CHÍNH SÁCH HỦY VÉ & HOÀN TIỀN
             </h3>
-            <ul className="space-y-1.5 text-slate-600 text-[11px]">
+            <ul className="space-y-1.5 text-slate-600 text-[10px] leading-relaxed">
               <li className="flex items-start gap-2">
                 <span className="text-emerald-600 font-bold">✓</span>
                 <span><strong>Hủy trước ít nhất 24 giờ:</strong> Hoàn 100% số tiền đã thanh toán; khoản hoàn chờ xử lý.</span>
@@ -1920,71 +1922,46 @@ export default function TrangChu() {
               </li>
               <li className="flex items-start gap-2">
                 <span className="text-emerald-600 font-bold">✓</span>
-                <span><strong>Hỗ trợ kỹ thuật / thắc mắc:</strong> Liên hệ hotline 0912 345 678 để được giải quyết nhanh nhất.</span>
+                <span><strong>Hỗ trợ kỹ thuật / thắc mắc:</strong> Liên hệ hotline <a href="tel:0838598626" className="font-semibold text-emerald-700">0838 598 626</a> để được giải quyết nhanh nhất.</span>
               </li>
             </ul>
           </section>
 
           {/* Section Liên hệ */}
-          <section className="rounded-2xl border border-slate-200 bg-white p-4 space-y-3 shadow-xs">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700 text-xl font-black">
+          <section className="rounded-2xl border border-slate-200 bg-white p-3 space-y-2.5 shadow-xs">
+            <div className="flex items-center gap-2">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700 text-xl font-black">
                 <Home className='w-5 h-5' />
               </div>
               <div>
-                <h3 className="text-sm font-black text-slate-900">NHÀ THI ĐẤU ĐA NĂNG COURTX</h3>
-                <p className="text-[10px] text-slate-500">Hệ thống sân tiêu chuẩn thi đấu quốc tế</p>
+                <h3 className="text-xs font-bold text-slate-900">NHÀ THI ĐẤU ĐA NĂNG COURTX</h3>
               </div>
             </div>
 
-            <div className="space-y-1.5 text-xs text-slate-700 border-t border-slate-100 pt-3">
-              <p><MapPin className='w-3.5 h-3.5 inline mr-1 text-emerald-600' /> <strong>Địa chỉ:</strong> Số 18 Đường Thi Đấu, Phường Thể Thao, Quận Đa Năng, TP.HCM</p>
-              <p><Phone className='w-3.5 h-3.5 inline mr-1 text-emerald-600' /> <strong>Hotline đặt sân:</strong> <span className="text-emerald-600 font-bold">0912 345 678</span></p>
+            <div className="space-y-1.5 text-[11px] leading-relaxed text-slate-700 border-t border-slate-100 pt-2">
+              <p><MapPin className='w-3.5 h-3.5 inline mr-1 text-emerald-600' /> <strong>Địa chỉ:</strong> Đường số 6, An Hải, Đà Nẵng</p>
+              <p><Phone className='w-3.5 h-3.5 inline mr-1 text-emerald-600' /> <strong>Hotline đặt sân:</strong> <a href="tel:0838598626" className="text-emerald-600 font-bold">0838 598 626</a></p>
               <p><Clock className='w-3.5 h-3.5 inline mr-1 text-emerald-600' /> <strong>Giờ mở cửa:</strong> 05:00 - 23:00 (Tất cả các ngày trong tuần)</p>
             </div>
 
             <div className="grid grid-cols-2 gap-2 pt-1">
               <a
-                href="tel:0912345678"
-                className="flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 py-2.5 text-xs font-bold text-slate-800 hover:bg-slate-100 transition"
+                href="tel:0838598626"
+                className="flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 py-2 text-[11px] font-semibold text-slate-800 hover:bg-slate-100 transition"
               >
                 <Phone className='w-3.5 h-3.5 inline mr-1 text-emerald-600' /> Gọi Hotline
               </a>
-              <button
-                type="button"
-                onClick={() => showAlert('Chỉ đường', 'Đang mở bản đồ Google Maps tới Nhà thi đấu COURTX...')}
-                className="flex items-center justify-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50 py-2.5 text-xs font-bold text-emerald-700 hover:bg-emerald-100 transition"
+              <a
+                href={venueDirectionsUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50 py-2 text-[11px] font-semibold text-emerald-700 hover:bg-emerald-100 transition"
               >
                 <MapPin className='w-3.5 h-3.5 inline mr-1' /> Chỉ đường Map
-              </button>
+              </a>
             </div>
           </section>
         </main>
-      )}
-
-      {/* 🟢 FLOATING BUBBLE: XEM LỊCH SÂN NGAY TRÊN TRANG ĐẶT SÂN */}
-      {activeTab === 'booking' && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 w-full max-w-md pointer-events-none z-40 px-4 flex justify-end animate-in fade-in zoom-in-95 duration-300">
-          <button
-            type="button"
-            onClick={() => {
-              const el = document.getElementById('booking-schedule-section');
-              if (el) {
-                el.scrollIntoView({ behavior: 'smooth' });
-              } else {
-                setShowScheduleModal(true);
-              }
-            }}
-            className="pointer-events-auto flex items-center gap-2 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2.5 shadow-xl shadow-emerald-950/25 border-2 border-emerald-400 active:scale-95 transition-all group cursor-pointer"
-          >
-            <span className="relative flex h-2.5 w-2.5">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-300 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-white"></span>
-            </span>
-            <CalendarIcon className="w-4 h-4 text-emerald-100 group-hover:rotate-12 transition-transform" />
-            <span className="text-xs font-black tracking-wide">Xem lịch sân</span>
-          </button>
-        </div>
       )}
 
       {/* 📱 MODAL BOTTOM SHEET: XEM LỊCH SÂN TRỰC TIẾP TRÊN TRANG ĐẶT SÂN */}
@@ -2071,7 +2048,7 @@ export default function TrangChu() {
               <div className="flex justify-between items-center border-t border-amber-200/60 pt-1.5">
                 <span className="text-slate-500">Dự toán toàn đợt:</span>
                 <span className="font-black text-emerald-700 text-sm">
-                  {eventFinalPrice.toLocaleString('vi-VN')}đ
+                  {eventFinalPrice.toLocaleString('vi-VN')} VND
                 </span>
               </div>
               <p className="text-[10px] text-amber-700 font-medium">
@@ -2276,7 +2253,7 @@ export default function TrangChu() {
                 <div className="flex items-center justify-between pt-1 border-t border-slate-200">
                   <span>Hoàn tiền:</span>
                   <span className={`font-black ${((pendingCancelTicket.hoursUntilStart ?? 0) >= 24) ? 'text-emerald-600' : 'text-red-500'}`}>
-                    {((pendingCancelTicket.hoursUntilStart ?? 0) >= 24) ? `${pendingCancelTicket.total} (Hoàn 100%)` : '0đ (Hủy dưới 24h)'}
+                    {((pendingCancelTicket.hoursUntilStart ?? 0) >= 24) ? `${pendingCancelTicket.total} (Hoàn 100%)` : '0 VND (Hủy dưới 24h)'}
                   </span>
                 </div>
               </div>
@@ -2586,7 +2563,7 @@ export default function TrangChu() {
                     <button
                       type="button"
                       onClick={() => handleSendForgotOtp()}
-                      className="w-full flex items-center justify-center gap-2 rounded-2xl bg-emerald-500 py-3.5 text-xs font-black uppercase tracking-wider text-white shadow-md shadow-emerald-500/20 hover:bg-emerald-600 active:scale-95 transition cursor-pointer"
+                      className="w-full flex items-center justify-center gap-2 rounded-2xl bg-emerald-700 py-3.5 text-xs font-black uppercase tracking-wider text-white shadow-md shadow-emerald-500/20 hover:bg-emerald-800 active:scale-95 transition cursor-pointer"
                     >
                       Tiếp tục & Gửi mã OTP qua SMS <Zap className="w-4 h-4 fill-current" />
                     </button>
@@ -2674,7 +2651,7 @@ export default function TrangChu() {
                     <button
                       type="button"
                       onClick={handleVerifyForgotOtp}
-                      className="w-full flex items-center justify-center gap-2 rounded-2xl bg-emerald-500 py-3.5 text-xs font-black uppercase tracking-wider text-white shadow-md shadow-emerald-500/20 hover:bg-emerald-600 active:scale-95 transition cursor-pointer"
+                      className="w-full flex items-center justify-center gap-2 rounded-2xl bg-emerald-700 py-3.5 text-xs font-black uppercase tracking-wider text-white shadow-md shadow-emerald-500/20 hover:bg-emerald-800 active:scale-95 transition cursor-pointer"
                     >
                       Xác nhận mã OTP & Nhận mật khẩu mới <Zap className="w-4 h-4 fill-current" />
                     </button>
@@ -2762,7 +2739,7 @@ export default function TrangChu() {
                           <button
                             type="button"
                             onClick={handleSaveCustomPassword}
-                            className="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 text-xs font-black active:scale-95 transition cursor-pointer"
+                            className="rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white px-3 py-2 text-xs font-black active:scale-95 transition cursor-pointer"
                           >
                             Lưu
                           </button>
@@ -2782,7 +2759,7 @@ export default function TrangChu() {
                         setPasswordInput(generatedNewPassword || forgotNewPassword);
                         setForgotStep('account');
                       }}
-                      className="w-full flex items-center justify-center gap-2 rounded-2xl bg-emerald-500 py-3.5 text-xs font-black uppercase tracking-wider text-white shadow-md shadow-emerald-500/20 hover:bg-emerald-600 active:scale-95 transition cursor-pointer"
+                      className="w-full flex items-center justify-center gap-2 rounded-2xl bg-emerald-700 py-3.5 text-xs font-black uppercase tracking-wider text-white shadow-md shadow-emerald-500/20 hover:bg-emerald-800 active:scale-95 transition cursor-pointer"
                     >
                       Đăng nhập ngay với mật khẩu mới <Zap className="w-4 h-4 fill-current" />
                     </button>
@@ -2841,7 +2818,7 @@ export default function TrangChu() {
                     Hủy dưới 24h: Không được hoàn tiền
                   </p>
                   <p className="text-slate-600 text-xs">
-                    Số tiền hoàn lại: <strong className="text-red-600 font-extrabold">0đ</strong>
+                    Số tiền hoàn lại: <strong className="text-red-600 font-extrabold">0 VND</strong>
                   </p>
                 </div>
               )}
@@ -2862,7 +2839,7 @@ export default function TrangChu() {
                   type="button"
                   onClick={() => handleProceedCancelWithOTP(cancelConfirmation)}
                   className={`rounded-xl py-2.5 text-xs font-bold text-white active:scale-95 transition cursor-pointer shadow-sm ${isEligible
-                      ? 'bg-emerald-600 hover:bg-emerald-700'
+                      ? 'bg-emerald-700 hover:bg-emerald-800'
                       : 'bg-red-600 hover:bg-red-700'
                     }`}
                 >
@@ -2932,7 +2909,7 @@ export default function TrangChu() {
                         setTimeout(() => currentPopup.onConfirm(), 10);
                       }
                     }}
-                    className="rounded-xl bg-emerald-500 py-3.5 text-xs font-bold text-white hover:bg-emerald-600 active:scale-95 transition shadow-sm"
+                    className="rounded-xl bg-emerald-700 py-3.5 text-xs font-bold text-white hover:bg-emerald-800 active:scale-95 transition shadow-sm"
                   >
                     {popup.type === 'confirm' ? 'Có, xác nhận' : 'Đóng'}
                   </button>
@@ -3021,7 +2998,7 @@ export default function TrangChu() {
 
               <div className="shrink-0 space-y-2.5 border-t border-slate-100 bg-white px-4 pb-[max(0.875rem,env(safe-area-inset-bottom))] pt-3">
                 <div className="flex items-end justify-between gap-2">
-                  <div><p className="text-xs font-bold text-slate-700">Tổng thanh toán</p><p className="mt-0.5 text-[10px] text-slate-400">{currentSport?.pricePerHour.toLocaleString('vi-VN')}đ/giờ · {selectedDuration} phút</p></div>
+                  <div><p className="text-xs font-bold text-slate-700">Tổng thanh toán</p><p className="mt-0.5 text-[10px] text-slate-400">{currentSport?.pricePerHour.toLocaleString('vi-VN')} VND/giờ · {selectedDuration} phút</p></div>
                   <strong className={`text-2xl font-extrabold tracking-tight ${conflictBooking ? 'text-slate-400 line-through' : 'text-emerald-700'}`}>{formattedPrice}</strong>
                 </div>
                 <button type="submit" disabled={Boolean(conflictBooking)} className="flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-emerald-700 text-xs font-bold text-white shadow-sm transition hover:bg-emerald-800 active:scale-[0.99] disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400 disabled:shadow-none">
@@ -3052,7 +3029,7 @@ export default function TrangChu() {
 
               <div className="mt-4 space-y-1 text-xs">
                 <p className="text-slate-500">Số tiền thanh toán:</p>
-                <p className="text-2xl font-black text-emerald-600">{totalPrice.toLocaleString('vi-VN')}đ</p>
+                <p className="text-2xl font-black text-emerald-600">{totalPrice.toLocaleString('vi-VN')} VND</p>
                 <p className="text-slate-500 mt-2">Nội dung chuyển khoản:</p>
                 <p className="font-mono font-bold text-slate-900 bg-white py-1 rounded border border-slate-200 uppercase">CX {selectedCourt.replace(/ /g, '')} {customerPhone}</p>
               </div>
@@ -3111,7 +3088,7 @@ export default function TrangChu() {
                 <span className="text-slate-500">Ngày & giờ:</span>
                 <span className="text-right font-bold text-slate-900">{selectedDate} · {selectedSlot}</span>
               </div>
-              <div className="flex justify-between border-t border-slate-200 pt-2"><span className="text-slate-500">Đã thanh toán đủ 100% qua VietQR:</span> <span className="font-black text-emerald-600">{totalPrice.toLocaleString('vi-VN')}đ</span></div>
+              <div className="flex justify-between border-t border-slate-200 pt-2"><span className="text-slate-500">Đã thanh toán đủ 100% qua VietQR:</span> <span className="font-black text-emerald-600">{totalPrice.toLocaleString('vi-VN')} VND</span></div>
             </div>
 
             <p className="text-[11px] text-slate-500">
@@ -3133,7 +3110,7 @@ export default function TrangChu() {
               <button
                 type="button"
                 onClick={() => { setIsSubmitted(false); setShowReceipt(false); }}
-                className="flex-1 rounded-xl bg-emerald-500 py-3 text-xs font-black uppercase tracking-wider text-white hover:bg-emerald-600"
+                className="flex-1 rounded-xl bg-emerald-700 py-3 text-xs font-black uppercase tracking-wider text-white hover:bg-emerald-800"
               >
                 HOÀN TẤT
               </button>
@@ -3192,7 +3169,7 @@ export default function TrangChu() {
               </div>
               <div className="flex justify-between items-center border-t border-slate-200 pt-3">
                 <span className="font-bold text-slate-800">Tổng tiền thanh toán:</span>
-                <span className="font-black text-emerald-600 text-sm">{totalPrice.toLocaleString('vi-VN')}đ</span>
+                <span className="font-black text-emerald-600 text-sm">{totalPrice.toLocaleString('vi-VN')} VND</span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-slate-500">Trạng thái:</span>

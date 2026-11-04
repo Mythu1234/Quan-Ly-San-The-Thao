@@ -54,7 +54,7 @@ export default function IncidentReportsList({ incidents, onView, onDelete, onCre
       <p className="truncate text-[11px] text-slate-600" title={incident.description}>{incident.description}</p>
       <div className="flex items-center justify-between gap-2 text-[10px]">
         <span className={incident.status === 'da_khac_phuc' ? 'text-emerald-700' : 'text-amber-700'}>{incident.statusLabel}</span>
-        <span className="font-semibold text-emerald-800">Giá áp dụng: {(incident.compensationPrice || 0).toLocaleString('vi-VN')}đ{incident.liability === 'BAO_HANH_SAN_VAN_DONG' ? ' · Sân chịu' : ' · Khách chịu'}</span>
+        <span className="font-semibold text-emerald-800">Giá áp dụng: {(incident.compensationPrice || 0).toLocaleString('vi-VN')} VND{incident.liability === 'BAO_HANH_SAN_VAN_DONG' ? ' · Sân chịu' : ' · Khách chịu'}</span>
       </div>
     </article>)}
     </div>

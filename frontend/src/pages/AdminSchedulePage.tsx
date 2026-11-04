@@ -48,21 +48,21 @@ export interface AdminCourtItem {
 }
 
 export const STANDARD_ADMIN_COURTS: AdminCourtItem[] = [
-  // 5 Sân Cầu lông (CL-01 -> CL-05): 120.000 VNĐ / giờ
+  // 5 Sân Cầu lông (CL-01 -> CL-05): 120.000 VND / giờ
   { id: 'SAN_CL_01', code: 'CL-01', name: 'Sân CL-01', sportId: 'badminton', sportName: 'Cầu Lông', pricePerHour: 120000, priceLabel: '120k/h' },
   { id: 'SAN_CL_02', code: 'CL-02', name: 'Sân CL-02', sportId: 'badminton', sportName: 'Cầu Lông', pricePerHour: 120000, priceLabel: '120k/h' },
   { id: 'SAN_CL_03', code: 'CL-03', name: 'Sân CL-03', sportId: 'badminton', sportName: 'Cầu Lông', pricePerHour: 120000, priceLabel: '120k/h' },
   { id: 'SAN_CL_04', code: 'CL-04', name: 'Sân CL-04', sportId: 'badminton', sportName: 'Cầu Lông', pricePerHour: 120000, priceLabel: '120k/h' },
   { id: 'SAN_CL_05', code: 'CL-05', name: 'Sân CL-05', sportId: 'badminton', sportName: 'Cầu Lông', pricePerHour: 120000, priceLabel: '120k/h' },
 
-  // 5 Sân Bóng chuyền (BC-01 -> BC-05): 150.000 VNĐ / giờ
+  // 5 Sân Bóng chuyền (BC-01 -> BC-05): 150.000 VND / giờ
   { id: 'SAN_BC_01', code: 'BC-01', name: 'Sân BC-01', sportId: 'volleyball', sportName: 'Bóng Chuyền', pricePerHour: 150000, priceLabel: '150k/h' },
   { id: 'SAN_BC_02', code: 'BC-02', name: 'Sân BC-02', sportId: 'volleyball', sportName: 'Bóng Chuyền', pricePerHour: 150000, priceLabel: '150k/h' },
   { id: 'SAN_BC_03', code: 'BC-03', name: 'Sân BC-03', sportId: 'volleyball', sportName: 'Bóng Chuyền', pricePerHour: 150000, priceLabel: '150k/h' },
   { id: 'SAN_BC_04', code: 'BC-04', name: 'Sân BC-04', sportId: 'volleyball', sportName: 'Bóng Chuyền', pricePerHour: 150000, priceLabel: '150k/h' },
   { id: 'SAN_BC_05', code: 'BC-05', name: 'Sân BC-05', sportId: 'volleyball', sportName: 'Bóng Chuyền', pricePerHour: 150000, priceLabel: '150k/h' },
 
-  // 4 Sân Bóng đá mini (BD-01 -> BD-04): 200.000 VNĐ / giờ
+  // 4 Sân Bóng đá mini (BD-01 -> BD-04): 200.000 VND / giờ
   { id: 'SAN_BD_01', code: 'BD-01', name: 'Sân BD-01', sportId: 'football', sportName: 'Bóng Đá Mini', pricePerHour: 200000, priceLabel: '200k/h' },
   { id: 'SAN_BD_02', code: 'BD-02', name: 'Sân BD-02', sportId: 'football', sportName: 'Bóng Đá Mini', pricePerHour: 200000, priceLabel: '200k/h' },
   { id: 'SAN_BD_03', code: 'BD-03', name: 'Sân BD-03', sportId: 'football', sportName: 'Bóng Đá Mini', pricePerHour: 200000, priceLabel: '200k/h' },
@@ -1784,7 +1784,7 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
                 <div>
                   <h3 className="text-[14px] font-black text-red-950">Hủy dưới 24h: Không được hoàn tiền</h3>
                   <p className="mt-1 text-[12px] font-medium leading-relaxed text-red-700">
-                    Theo quy định của sân, lịch đặt hủy trong vòng dưới 24 giờ sẽ <strong>không được hoàn tiền (0đ)</strong>. Thao tác này chỉ giải phóng sân cho khách khác đặt.
+                    Theo quy định của sân, lịch đặt hủy trong vòng dưới 24 giờ sẽ <strong>không được hoàn tiền (0 VND)</strong>. Thao tác này chỉ giải phóng sân cho khách khác đặt.
                   </p>
                 </div>
               </div>
