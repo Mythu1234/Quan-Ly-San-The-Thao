@@ -332,7 +332,7 @@ Số điện thoại:         ${customerPhone || '—'}
 Bộ môn & Sân:          ${currentSport?.name || ''} · ${selectedCourt || '—'}
 Thời gian:             ${selectedDate || '—'} · ${selectedSlot || '—'}
 Phương thức:           VietQR (100%)
-Tổng tiền thanh toán:  ${totalPrice.toLocaleString('vi-VN')}đ
+Tổng tiền thanh toán:  ${totalPrice.toLocaleString('vi-VN')} VND
 Trạng thái:            Đã thanh toán (Thành công)
 Thời gian xuất phiếu:  ${new Date().toLocaleString('vi-VN')}
 =====================================================
