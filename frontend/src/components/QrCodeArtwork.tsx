@@ -1,5 +1,9 @@
+import { useState, useEffect } from 'react';
+import QRCode from 'qrcode';
+
 type QrCodeArtworkProps = {
   className?: string;
+  value?: string;
 };
 
 const moduleCount = 25;
@@ -42,28 +46,59 @@ const modules = Array.from({ length: moduleCount * moduleCount }, (_, index) => 
   return { x, y, dark: isDarkModule(x, y) };
 });
 
-export default function QrCodeArtwork({ className = 'h-40 w-40' }: QrCodeArtworkProps) {
+export default function QrCodeArtwork({ className = 'h-40 w-40', value }: QrCodeArtworkProps) {
+  const [qrDataUrl, setQrDataUrl] = useState<string>('');
+
+  useEffect(() => {
+    if (!value) {
+      setQrDataUrl('');
+      return;
+    }
+    QRCode.toDataURL(value, {
+      width: 320,
+      margin: 1,
+      errorCorrectionLevel: 'M',
+      color: {
+        dark: '#0f172a',
+        light: '#ffffff',
+      },
+    })
+      .then((url) => setQrDataUrl(url))
+      .catch((err) => {
+        console.warn('QR code generation failed:', err);
+        setQrDataUrl('');
+      });
+  }, [value]);
+
   return (
-    <div className={`rounded-2xl border border-slate-200 bg-white p-2.5 shadow-[0_8px_24px_rgba(15,23,42,0.10)] ${className}`}>
-      <svg
-        viewBox="0 0 29 29"
-        role="img"
-        aria-label="Mã QR minh họa VietQR"
-        className="block h-full w-full rounded-lg"
-        shapeRendering="crispEdges"
-      >
-        <rect width="29" height="29" fill="white" />
-        {modules.filter((module) => module.dark).map(({ x, y }) => (
-          <rect
-            key={`${x}-${y}`}
-            x={x + 2}
-            y={y + 2}
-            width="1"
-            height="1"
-            fill="#0f172a"
-          />
-        ))}
-      </svg>
+    <div className={`rounded-2xl border border-slate-200 bg-white p-2.5 shadow-[0_8px_24px_rgba(15,23,42,0.10)] flex items-center justify-center overflow-hidden ${className}`}>
+      {qrDataUrl ? (
+        <img
+          src={qrDataUrl}
+          alt="Mã QR thanh toán VietQR quét bằng điện thoại"
+          className="h-full w-full object-contain block select-none"
+        />
+      ) : (
+        <svg
+          viewBox="0 0 29 29"
+          role="img"
+          aria-label="Mã QR minh họa VietQR"
+          className="block h-full w-full rounded-lg"
+          shapeRendering="crispEdges"
+        >
+          <rect width="29" height="29" fill="white" />
+          {modules.filter((module) => module.dark).map(({ x, y }) => (
+            <rect
+              key={`${x}-${y}`}
+              x={x + 2}
+              y={y + 2}
+              width="1"
+              height="1"
+              fill="#0f172a"
+            />
+          ))}
+        </svg>
+      )}
     </div>
   );
 }

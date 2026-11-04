@@ -1,10 +1,11 @@
+import { supabase } from '../lib/supabaseClient';
 import { downloadBookingReceipt, printBookingReceipt, type BookingReceiptData } from '../utils/bookingReceipt';
 import { useMemo, useRef, useState, useEffect } from 'react';
 import {
   AlertTriangle, ArrowLeft, ArrowRightLeft, Ban, Calendar, CalendarClock,
   Check, CheckCircle2, RefreshCw, ChevronDown, ChevronLeft, ChevronRight, CircleX, XCircle,
   Clock3, Cloud, CreditCard, Info, LayoutGrid, MapPin, Phone,
-  Download, Printer, ReceiptText, Search, ShieldCheck, Undo2, UserRound, X, Zap
+  Bell, Download, Printer, ReceiptText, Search, ShieldCheck, Undo2, UserRound, X, Zap
 } from 'lucide-react';
 import QrCodeArtwork from '../components/QrCodeArtwork';
 import CheckoutSettlementView from '../components/admin/CheckoutSettlementView';
@@ -242,7 +243,8 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
   const [bookingSendZalo, setBookingSendZalo] = useState<boolean>(true);
   const [bookingErrors, setBookingErrors] = useState<{ name?: string; phone?: string }>({});
   const [showPaymentModal, setShowPaymentModal] = useState<boolean>(false);
-  const [adminPaymentCountdown, setAdminPaymentCountdown] = useState<number>(5);
+  const [adminPaymentCountdown, setAdminPaymentCountdown] = useState<number>(60);
+  const [adminPaymentSessionId, setAdminPaymentSessionId] = useState<string>('');
   const [bookingSaving, setBookingSaving] = useState(false);
   const [bookingSaveError, setBookingSaveError] = useState('');
   const [pendingBookingData, setPendingBookingData] = useState<BookingDetail | null>(null);
@@ -671,6 +673,7 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
 
     setBookingSaveError('');
     setPendingBookingData(pendingBooking);
+    setAdminPaymentSessionId('PAY_ADMIN_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6));
     setShowPaymentModal(true);
   };
 
@@ -719,23 +722,114 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
     }
   };
 
+  // URL xác nhận thanh toán mô phỏng cho điện thoại quét QR
+  const adminMobilePaymentUrl = useMemo(() => {
+    if (!showPaymentModal || !pendingBookingData || !adminPaymentSessionId) return '';
+    let host = typeof window !== 'undefined' ? window.location.hostname : '192.168.1.81';
+    if (host === 'localhost' || host === '127.0.0.1') {
+      host = '192.168.1.81';
+    }
+    const port = typeof window !== 'undefined' && window.location.port ? ':' + window.location.port : '';
+    const protocol = typeof window !== 'undefined' ? window.location.protocol : 'http:';
+    const q = new URLSearchParams({
+      view: 'phone-payment',
+      session: adminPaymentSessionId,
+      court: pendingBookingData.court,
+      amount: pendingBookingData.total.replace(/\D/g, ''),
+      phone: pendingBookingData.phone,
+      time: pendingBookingData.time,
+      name: pendingBookingData.customerName,
+    });
+    return protocol + '//' + host + port + '/?' + q.toString();
+  }, [showPaymentModal, pendingBookingData, adminPaymentSessionId]);
+
+  // Lắng nghe tín hiệu xác nhận từ điện thoại qua Supabase Realtime & LocalStorage
+  useEffect(() => {
+    if (!showPaymentModal || !adminPaymentSessionId) return;
+
+    const channel = supabase.channel('payment_session_' + adminPaymentSessionId);
+    channel
+      .on('broadcast', { event: 'PAYMENT_CONFIRMED' }, () => {
+        void handleConfirmPaymentSuccess();
+      })
+      .on('broadcast', { event: 'PAYMENT_CANCELLED' }, () => {
+        handleExecuteAdminCancelSubprocess();
+      })
+      .subscribe();
+
+    const interval = setInterval(() => {
+      try {
+        const item = localStorage.getItem('courtx_confirmed_' + adminPaymentSessionId);
+        if (item) {
+          localStorage.removeItem('courtx_confirmed_' + adminPaymentSessionId);
+          void handleConfirmPaymentSuccess();
+        }
+      } catch {
+        // ignore
+      }
+    }, 600);
+
+    return () => {
+      clearInterval(interval);
+      void channel.unsubscribe();
+    };
+  }, [showPaymentModal, adminPaymentSessionId]);
+
+  // TOBE_CHAY.bpmn: Quản lý logic Thanh toán theo sơ đồ BPMN TOBE
+  const [showAdminCancelSubprocessModal, setShowAdminCancelSubprocessModal] = useState<boolean>(false);
+  const [adminPaymentTechnicalError, setAdminPaymentTechnicalError] = useState<string | null>(null);
+  const [adminPaymentNotification, setAdminPaymentNotification] = useState<string | null>(null);
+
   const handleCancelPayment = () => {
-    setShowPaymentModal(false);
-    setAdminPaymentCountdown(5);
+    setShowAdminCancelSubprocessModal(true);
   };
 
+  const handleExecuteAdminCancelSubprocess = () => {
+    setShowAdminCancelSubprocessModal(false);
+    setShowPaymentModal(false);
+    setPendingBookingData(null);
+    setAdminPaymentCountdown(60);
+    setAdminPaymentTechnicalError(null);
+    setAdminPaymentNotification(null);
+  };
+
+  const handleRetryAdminPayment = () => {
+    setAdminPaymentTechnicalError(null);
+    setAdminPaymentCountdown(60);
+  };
+
+  const handleCancelAfterAdminPaymentError = () => {
+    setAdminPaymentTechnicalError(null);
+    setShowPaymentModal(false);
+    setPendingBookingData(null);
+    setAdminPaymentCountdown(60);
+  };
+
+  const handleTriggerAdmin10MinTimeout = () => {
+    setShowPaymentModal(false);
+    setPendingBookingData(null);
+    setAdminPaymentCountdown(60);
+    setAdminPaymentTechnicalError(null);
+    setAdminPaymentNotification(null);
+  };
+
+  // Tự động kiểm tra thời gian thanh toán theo TOBE_CHAY.bpmn (40s nhắc nhở, 1 phút hết hạn)
   useEffect(() => {
-    if (!showPaymentModal) {
-      setAdminPaymentCountdown(5);
+    if (!showPaymentModal || adminPaymentTechnicalError || showAdminCancelSubprocessModal) {
       return;
     }
-    if (adminPaymentCountdown <= 0 && !bookingSaveError) {
-      handleConfirmPaymentSuccess();
+    // Khi trôi qua 40s (còn 20s: adminPaymentCountdown === 20): tự động kích hoạt Boundary Timer nhắc nhở
+    if (adminPaymentCountdown === 20 && !adminPaymentNotification) {
+      setAdminPaymentNotification('🔔 Nhắc nhở thanh toán (sau 40s): Sân đang tạm giữ sắp hết hạn trong 20 giây, vui lòng hoàn tất chuyển khoản VietQR!');
+    }
+    // Khi hết 1 phút (60s): tự động kích hoạt Boundary Timer hết hạn giữ sân
+    if (adminPaymentCountdown <= 0) {
+      handleTriggerAdmin10MinTimeout();
       return;
     }
     const t = setTimeout(() => setAdminPaymentCountdown((c) => c - 1), 1000);
     return () => clearTimeout(t);
-  }, [showPaymentModal, adminPaymentCountdown, bookingSaveError]);
+  }, [showPaymentModal, adminPaymentCountdown, bookingSaveError, adminPaymentTechnicalError, showAdminCancelSubprocessModal, adminPaymentNotification]);
 
 
   const handleFinishBooking = () => {
@@ -2583,74 +2677,96 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
 
 
 
-      {/* Modal hiển thị danh sách đơn đã hủy trong ngày */}
+      {/* Modal hiển thị danh sách đơn đã hủy trong ngày - Bounded strictly inside phone screen */}
       {showCancelledListModal && (
-        <div className="fixed inset-0 z-[150] flex items-center justify-center bg-slate-950/50 backdrop-blur-xs p-4 animate-fade-in">
-          <div className="w-full max-w-lg rounded-3xl bg-white p-5 shadow-2xl ring-1 ring-slate-100 max-h-[85vh] flex flex-col">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <div>
-                <h3 className="text-sm font-black text-slate-900 flex items-center gap-1.5">
-                  <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-red-100 text-red-700">
+        <div
+          className="absolute inset-0 z-[150] flex items-center justify-center bg-slate-950/50 backdrop-blur-xs p-3 animate-fade-in"
+          onClick={() => setShowCancelledListModal(false)}
+        >
+          <div
+            className="w-[calc(100%-1.5rem)] max-w-sm rounded-2xl sm:rounded-3xl bg-white p-3.5 sm:p-4 shadow-2xl ring-1 ring-slate-100 max-h-[85vh] flex flex-col overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 gap-2">
+              <div className="min-w-0 flex-1">
+                <h3 className="text-sm font-black text-slate-900 flex items-center gap-1.5 truncate">
+                  <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-red-100 text-red-700">
                     <XCircle className="h-4 w-4" />
                   </span>
-                  Danh sách đơn đã hủy ({cancelledBookings.length})
+                  <span>Danh sách đơn đã hủy ({cancelledBookings.length})</span>
                 </h3>
-                <p className="text-[11px] font-bold text-slate-500 mt-0.5">
-                  Ngày {calendarBookingDate(selectedDate)} • Sân đã được giải phóng để nhận khách mới
+                <p className="text-[11px] font-semibold text-slate-500 mt-0.5 truncate">
+                  Ngày {calendarBookingDate(selectedDate)} • Sân đã giải phóng để nhận khách mới
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => setShowCancelledListModal(false)}
-                className="rounded-xl p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 cursor-pointer"
+                className="shrink-0 rounded-xl p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 cursor-pointer transition"
+                aria-label="Đóng danh sách"
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto divide-y divide-slate-100 my-2 pr-1">
-              {cancelledBookings.map((b) => (
-                <div key={b.code} className="py-3 flex items-center justify-between gap-3 hover:bg-slate-50/60 rounded-xl px-2 transition">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono text-xs font-black text-slate-900">{b.code}</span>
-                      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-700">{b.court}</span>
-                      <span className="rounded-full bg-red-100 text-red-700 px-2 py-0.5 text-[10px] font-black uppercase">ĐÃ HỦY</span>
-                    </div>
-                    <p className="text-xs font-bold text-slate-800 mt-1">
-                      {b.customerName} • <span className="text-slate-500 font-normal">{b.phone}</span>
-                    </p>
-                    <p className="text-[11px] font-semibold text-slate-500">
-                      Khung giờ: <strong className="text-slate-700">{b.time}</strong> • Tổng: <strong>{b.total}</strong>
-                    </p>
-                  </div>
-
-                  <div className="shrink-0 text-right">
-                    <span className={`inline-block px-2.5 py-1 rounded-lg text-[10px] font-black ${
-                      b.paymentStatus === 'Đã hoàn tiền' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-amber-50 text-amber-700 border border-amber-200'
-                    }`}>
-                      {b.paymentStatus || 'Đã hủy'}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowCancelledListModal(false);
-                        setSelectedBooking(b);
-                      }}
-                      className="block text-[11px] font-bold text-emerald-700 hover:underline mt-1.5 cursor-pointer ml-auto"
-                    >
-                      Xem chi tiết →
-                    </button>
-                  </div>
+            <div className="flex-1 overflow-y-auto space-y-2.5 my-2.5 pr-1 custom-scrollbar">
+              {cancelledBookings.length === 0 ? (
+                <div className="py-8 text-center text-slate-400 text-xs font-semibold">
+                  Không có đơn đặt sân nào bị hủy trong ngày này.
                 </div>
-              ))}
+              ) : (
+                cancelledBookings.map((b) => (
+                  <div
+                    key={b.code}
+                    className="p-3 rounded-2xl bg-slate-50/70 border border-slate-100/90 hover:bg-slate-100/70 transition space-y-2"
+                  >
+                    {/* Dòng 1: Mã đơn, Sân, Tag ĐÃ HỦY và Trạng thái thanh toán */}
+                    <div className="flex items-center justify-between gap-1.5 flex-wrap">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="font-mono text-xs font-black text-slate-900">{b.code}</span>
+                        <span className="rounded-md bg-white border border-slate-200 px-1.5 py-0.5 text-[10px] font-bold text-slate-700">{b.court}</span>
+                        <span className="rounded-md bg-red-100 text-red-700 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wide">ĐÃ HỦY</span>
+                      </div>
+                      <span className={`inline-block px-2 py-0.5 rounded-md text-[10px] font-bold whitespace-nowrap ${
+                        b.paymentStatus === 'Đã hoàn tiền' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-amber-50 text-amber-700 border border-amber-200'
+                      }`}>
+                        {b.paymentStatus || 'Đã hủy'}
+                      </span>
+                    </div>
+
+                    {/* Dòng 2: Thông tin khách hàng & Nút xem chi tiết */}
+                    <div className="flex items-end justify-between gap-2 pt-1 border-t border-slate-200/50">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-bold text-slate-800 truncate">
+                          {b.customerName} • <span className="text-slate-500 font-normal">{b.phone}</span>
+                        </p>
+                        <p className="text-[11px] font-semibold text-slate-500 mt-0.5 truncate">
+                          Khung giờ: <strong className="text-slate-700">{b.time}</strong> • Tổng: <strong className="text-emerald-700">{b.total}</strong>
+                        </p>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowCancelledListModal(false);
+                          setSelectedBooking(b);
+                        }}
+                        className="shrink-0 text-xs font-bold text-emerald-700 hover:text-emerald-800 hover:underline cursor-pointer flex items-center gap-0.5 py-1 px-1.5 rounded-lg active:bg-emerald-50 transition"
+                      >
+                        <span>Xem chi tiết</span>
+                        <span className="text-sm">→</span>
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
 
             <div className="pt-3 border-t border-slate-100 flex justify-end">
               <button
                 type="button"
                 onClick={() => setShowCancelledListModal(false)}
-                className="rounded-xl bg-slate-100 px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-200 cursor-pointer"
+                className="w-full rounded-xl bg-slate-100 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-200 active:scale-95 transition text-center cursor-pointer"
               >
                 Đóng
               </button>
@@ -2930,53 +3046,181 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
         />
       )}
 
-      {/* 🟡 MODAL THANH TOÁN (PAYMENT BOTTOM SHEET) - GIỐNG HỆT THIẾT KẾ MẪU */}
+      {/* 🟡 MODAL THANH TOÁN (PAYMENT BOTTOM SHEET) - CHUẨN THEO TOBE_CHAY.bpmn */}
       {showPaymentModal && pendingBookingData && (
         <div className="fixed inset-0 z-[160] flex items-end sm:items-center justify-center bg-slate-900/60 p-0 sm:p-4 backdrop-blur-sm animate-in fade-in duration-300">
           <div className="w-full max-w-md rounded-t-3xl sm:rounded-3xl bg-white p-6 shadow-2xl animate-in slide-in-from-bottom-8 duration-300 flex flex-col items-center max-h-[94vh] overflow-y-auto">
             <div className="w-12 h-1.5 bg-slate-200 rounded-full mb-4 sm:hidden"></div>
             
-            <h3 className="text-lg font-black text-slate-900 uppercase tracking-wide">THANH TOÁN ĐƠN HÀNG</h3>
-            <p className="text-xs text-slate-500 mt-1 mb-4 text-center">Quét mã VietQR bằng ứng dụng ngân hàng</p>
-
-            <div className="w-full rounded-2xl border-2 border-emerald-500 bg-emerald-50/50 p-5 relative overflow-hidden text-center">
-              <div className="flex justify-between items-center mb-3">
-                <p className="font-extrabold text-slate-900 text-sm">MB BANK</p>
-                <span className="rounded bg-emerald-100 px-2 py-1 text-[10px] font-black text-emerald-700">VIETQR</span>
-              </div>
-              
-              <QrCodeArtwork className="mx-auto h-40 w-40" />
-
-              <div className="mt-4 space-y-1 text-xs">
-                <p className="text-slate-500">Số tiền thanh toán:</p>
-                <p className="text-2xl font-black text-emerald-600">{pendingBookingData.total.replace(' ', '')}</p>
-                <p className="text-slate-500 mt-2">Nội dung chuyển khoản:</p>
-                <p className="font-mono font-bold text-slate-900 bg-white py-1 rounded border border-slate-200 uppercase">
-                  CX {pendingBookingData.court.replace(/ /g, '').toUpperCase()} {pendingBookingData.phone.replace(/[\s.-]/g, '')}
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-6 flex flex-col items-center gap-3 w-full">
-              <div className="relative flex h-10 w-10 items-center justify-center">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex h-6 w-6 rounded-full bg-emerald-500 items-center justify-center">
-                  <span className="h-2 w-2 bg-white rounded-full"></span>
+            {/* Trạng thái Tạm giữ sân (Activity_056bcoz) */}
+            <div className="w-full mb-3 flex items-center justify-between bg-emerald-50 border border-emerald-300 rounded-xl px-3 py-1.5 text-[11px] text-emerald-900 font-bold">
+              <span className="flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                Đang tạm giữ {pendingBookingData.court}
+              </span>
+              <span className="text-[10px] font-semibold flex items-center gap-1">
+                <span className="text-emerald-800">Tạm giữ sân:</span>
+                <span className={`font-mono font-bold px-1.5 py-0.5 rounded transition ${
+                  adminPaymentCountdown <= 20
+                    ? 'bg-amber-100 text-amber-800 animate-pulse ring-1 ring-amber-300'
+                    : 'bg-emerald-100/90 text-emerald-900'
+                }`}>
+                  {Math.floor(adminPaymentCountdown / 60)}:{(adminPaymentCountdown % 60).toString().padStart(2, '0')}
                 </span>
-              </div>
-              <p className="text-sm font-semibold text-emerald-700 text-center">
-                Đang chờ ghi nhận thanh toán qua VietQR…
-              </p>
+              </span>
             </div>
 
-            {bookingSaveError && <p role="alert" className="mt-4 rounded-xl bg-red-50 p-3 text-xs text-red-700">{bookingSaveError}</p>}
-            <div className="w-full mt-6">
+            {/* Thông báo nhắc nhở sau 20s (Event_1510897 -> Activity_0xxhd0u) */}
+            {adminPaymentNotification && (
+              <div className="w-full mb-3 rounded-xl bg-amber-500 text-white p-2.5 text-xs font-bold flex items-center justify-between shadow-md animate-in slide-in-from-top-2">
+                <div className="flex items-center gap-2">
+                  <Bell className="h-4 w-4 shrink-0" />
+                  <span className="text-[11px] leading-tight">{adminPaymentNotification}</span>
+                </div>
+                <button type="button" onClick={() => setAdminPaymentNotification(null)} className="text-white/80 hover:text-white ml-2 text-xs">✕</button>
+              </div>
+            )}
+
+            <h3 className="text-lg font-black text-slate-900 uppercase tracking-wide">THANH TOÁN ĐƠN HÀNG</h3>
+            <p className="text-xs text-slate-500 mt-0.5 mb-3 text-center">Quét mã VietQR bằng ứng dụng ngân hàng</p>
+
+            {/* Trường hợp lỗi kỹ thuật thanh toán (Boundary Error Event Event_02s9rdl -> Activity_1mjvkbj) */}
+            {adminPaymentTechnicalError ? (
+              <div className="w-full space-y-4 my-2 animate-in fade-in">
+                <div className="rounded-2xl border-2 border-red-300 bg-red-50 p-4 text-center space-y-2">
+                  <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-red-100 text-red-600">
+                    <AlertTriangle className="h-6 w-6" />
+                  </div>
+                  <h4 className="text-xs font-black text-red-950 uppercase tracking-wide">Thông báo lỗi kỹ thuật thanh toán</h4>
+                  <p className="text-[11px] text-red-700 leading-relaxed font-medium">
+                    {adminPaymentTechnicalError}
+                  </p>
+                </div>
+
+                {/* Exclusive Gateway Gateway_1ukmj3e: Thanh toán lại ? */}
+                <div className="rounded-xl bg-slate-50 p-2.5 text-center border border-slate-200">
+                  <p className="text-[11px] font-bold text-slate-700">Khách có muốn thanh toán lại không?</p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={handleRetryAdminPayment}
+                    className="flex items-center justify-center gap-1.5 rounded-xl bg-emerald-600 py-2.5 text-xs font-bold text-white shadow-md hover:bg-emerald-700 active:scale-95 transition cursor-pointer"
+                  >
+                    <RefreshCw className="h-3.5 w-3.5" />
+                    Thanh toán lại
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleCancelAfterAdminPaymentError}
+                    className="rounded-xl border border-slate-200 bg-white py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-100 active:scale-95 transition cursor-pointer"
+                  >
+                    Hủy bỏ
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="w-full rounded-2xl border-2 border-emerald-500 bg-emerald-50/50 p-4 relative overflow-hidden text-center">
+                  <div className="flex justify-between items-center mb-2">
+                    <p className="font-extrabold text-slate-900 text-sm">MB BANK</p>
+                    <span className="rounded bg-emerald-100 px-2 py-0.5 text-[10px] font-black text-emerald-700">VIETQR</span>
+                  </div>
+                  
+                  <QrCodeArtwork className="mx-auto h-36 w-36" value={adminMobilePaymentUrl} />
+                  <div className="mt-2 text-center">
+                    <p className="text-[11px] font-bold text-slate-700">📱 Lấy điện thoại quét mã QR để chuyển tiền</p>
+                    <a
+                      href={adminMobilePaymentUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-block mt-0.5 text-[10px] font-bold text-blue-600 hover:text-blue-800 underline"
+                    >
+                      (Hoặc bấm vào đây để mở trang giả lập điện thoại)
+                    </a>
+                  </div>
+
+                  <div className="mt-3 space-y-1 text-xs">
+                    <p className="text-slate-500">Số tiền thanh toán:</p>
+                    <p className="text-2xl font-black text-emerald-600">{pendingBookingData.total.replace(' ', '')}</p>
+                    <p className="text-slate-500 mt-1.5">Nội dung chuyển khoản:</p>
+                    <p className="font-mono font-bold text-slate-900 bg-white py-1 rounded border border-slate-200 uppercase text-xs">
+                      CX {pendingBookingData.court.replace(/ /g, '').toUpperCase()} {pendingBookingData.phone.replace(/[\s.-]/g, '')}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-4 flex flex-col items-center gap-2.5 w-full">
+                  <div className="relative flex h-8 w-8 items-center justify-center">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
+                    <span className="relative inline-flex h-5 w-5 rounded-full bg-emerald-500 items-center justify-center">
+                      <span className="h-1.5 w-1.5 bg-white rounded-full"></span>
+                    </span>
+                  </div>
+                  <p className="text-xs font-semibold text-emerald-700 text-center">
+                    Đang chờ ghi nhận thanh toán qua VietQR…
+                  </p>
+                </div>
+
+                {bookingSaveError && <p role="alert" className="mt-3 rounded-xl bg-red-50 p-2.5 text-xs text-red-700">{bookingSaveError}</p>}
+                
+                <div className="w-full mt-3">
+                  <button
+                    type="button"
+                    onClick={handleCancelPayment}
+                    className="w-full rounded-xl border border-slate-200 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-50 cursor-pointer active:scale-95 transition"
+                  >
+                    Hủy giao dịch
+                  </button>
+                </div>
+
+
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* 🔴 EVENT SUB-PROCESS: KHÁCH XÁC NHẬN THOÁT KHỎI QUÁ TRÌNH THANH TOÁN ĐẶT SÂN (Activity_1clhmdn) */}
+      {showAdminCancelSubprocessModal && pendingBookingData && (
+        <div className="fixed inset-0 z-[170] flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="w-full max-w-sm rounded-3xl border border-amber-300 bg-white p-5 shadow-2xl space-y-4 animate-in zoom-in-95 duration-150">
+            <div className="flex items-center gap-3 border-b border-slate-100 pb-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-amber-100 text-amber-700">
+                <AlertTriangle className="h-5 w-5" />
+              </div>
+              <div>
+                <h4 className="text-sm font-black text-slate-900">Xác nhận hủy thanh toán</h4>
+                <p className="text-[10px] font-bold text-amber-700 uppercase tracking-wide">Quy trình phụ (Event Sub-process)</p>
+              </div>
+            </div>
+
+            <div className="rounded-xl bg-amber-50/70 p-3 text-xs text-amber-900 border border-amber-200/70 space-y-2 leading-relaxed">
+              <p className="font-semibold">
+                Xác nhận hủy giao dịch và thoát? Hệ thống sẽ kích hoạt quy trình phụ để xử lý:
+              </p>
+              <ul className="list-disc pl-4 space-y-1 text-[11px] text-amber-800">
+                <li>Hủy yêu cầu đặt sân hiện tại</li>
+                <li>Giải phóng khung giờ <strong className="font-bold">{pendingBookingData.time} ({pendingBookingData.court})</strong> trên lịch sân</li>
+                <li>Ghi nhận phiên đặt sân bị hủy vào hệ thống</li>
+              </ul>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 pt-1">
               <button
                 type="button"
-                onClick={handleCancelPayment}
-                className="w-full rounded-xl border border-slate-200 py-3 text-xs font-bold text-slate-600 hover:bg-slate-50 cursor-pointer active:scale-95"
+                onClick={() => setShowAdminCancelSubprocessModal(false)}
+                className="rounded-xl bg-slate-100 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-200 active:scale-95 transition cursor-pointer"
               >
-                Hủy giao dịch
+                Tiếp tục thanh toán
+              </button>
+              <button
+                type="button"
+                onClick={handleExecuteAdminCancelSubprocess}
+                className="rounded-xl bg-red-600 py-2.5 text-xs font-bold text-white shadow-md hover:bg-red-700 active:scale-95 transition cursor-pointer"
+              >
+                Xác nhận hủy yêu cầu
               </button>
             </div>
           </div>

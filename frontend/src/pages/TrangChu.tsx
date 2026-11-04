@@ -1,3 +1,4 @@
+import { supabase } from '../lib/supabaseClient';
 import { downloadBookingReceipt, printBookingReceipt, type BookingReceiptData } from '../utils/bookingReceipt';
 import {staffAuthService} from '../services/staffAuthService';
 import AdminDashboard from './AdminDashboard';
@@ -15,7 +16,7 @@ import { addBookingRequest } from '../types/bookingRequest';
 import type { IncidentReporter } from '../utils/incidentStorage';
 import { isCourtLocked } from '../hooks/useCourtAvailability';
 import { useState, useRef, useEffect, useMemo } from 'react';
-import { Download, Search, MapPin, Phone, Clock, Play, Home, Calendar as CalendarIcon, X, Zap, User, Lock, Eye, EyeOff, ArrowLeft, ArrowRight, ChevronLeft, ChevronRight, ChevronDown, Trophy, CheckCircle2, RefreshCw, MessageSquare, Copy, Check, AlertTriangle } from 'lucide-react';
+import { Download, Search, MapPin, Phone, Clock, Play, Home, Calendar as CalendarIcon, X, Zap, User, Lock, Eye, EyeOff, ArrowLeft, ArrowRight, ChevronLeft, ChevronRight, ChevronDown, Trophy, CheckCircle2, RefreshCw, MessageSquare, Copy, Check, AlertTriangle, Bell } from 'lucide-react';
 
 const venueDirectionsUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent('Đường số 6, An Hải, Đà Nẵng, Việt Nam')}`;
 
@@ -969,17 +970,113 @@ export default function TrangChu() {
         return;
       }
 
+      setPaymentSessionId('PAY_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6));
       setShowPayment(true);
     } else {
       setOtpError(true);
     }
   };
 
-  const [paymentCd, setPaymentCd] = useState<number>(5);
+  const [paymentCd, setPaymentCd] = useState<number>(60);
+  const [paymentSessionId, setPaymentSessionId] = useState<string>('');
+  // URL xác nhận thanh toán mô phỏng cho điện thoại quét QR
+  const mobilePaymentUrl = useMemo(() => {
+    if (!showPayment || !paymentSessionId) return '';
+    let host = typeof window !== 'undefined' ? window.location.hostname : '192.168.1.81';
+    if (host === 'localhost' || host === '127.0.0.1') {
+      host = '192.168.1.81'; // IP mạng nội bộ Wi-Fi để điện thoại truy cập
+    }
+    const port = typeof window !== 'undefined' && window.location.port ? ':' + window.location.port : '';
+    const protocol = typeof window !== 'undefined' ? window.location.protocol : 'http:';
+    const q = new URLSearchParams({
+      view: 'phone-payment',
+      session: paymentSessionId,
+      court: selectedCourt,
+      amount: String(totalPrice),
+      phone: customerPhone,
+      time: selectedStartTime + ' (' + selectedDuration + 'p)',
+      name: customerName,
+    });
+    return protocol + '//' + host + port + '/?' + q.toString();
+  }, [showPayment, paymentSessionId, selectedCourt, totalPrice, customerPhone, selectedStartTime, selectedDuration, customerName]);
+
+  // Lắng nghe tín hiệu xác nhận từ điện thoại qua Supabase Realtime & LocalStorage
+  useEffect(() => {
+    if (!showPayment || !paymentSessionId) return;
+
+    // Kênh Supabase Realtime Broadcast
+    const channel = supabase.channel('payment_session_' + paymentSessionId);
+    channel
+      .on('broadcast', { event: 'PAYMENT_CONFIRMED' }, () => {
+        void confirmPaymentReceived();
+      })
+      .on('broadcast', { event: 'PAYMENT_CANCELLED' }, () => {
+        handleExecuteCancelSubprocess();
+      })
+      .subscribe();
+
+    // Fallback nếu mở giả lập cùng trình duyệt
+    const interval = setInterval(() => {
+      try {
+        const item = localStorage.getItem('courtx_confirmed_' + paymentSessionId);
+        if (item) {
+          localStorage.removeItem('courtx_confirmed_' + paymentSessionId);
+          void confirmPaymentReceived();
+        }
+      } catch {
+        // ignore
+      }
+    }, 600);
+
+    return () => {
+      clearInterval(interval);
+      void channel.unsubscribe();
+    };
+  }, [showPayment, paymentSessionId]);
+
+  // TOBE_CHAY.bpmn: Quản lý logic Thanh toán theo sơ đồ BPMN TOBE
+  const [showCancelSubprocessModal, setShowCancelSubprocessModal] = useState<boolean>(false);
+  const [paymentTechnicalError, setPaymentTechnicalError] = useState<string | null>(null);
+  const [paymentNotification, setPaymentNotification] = useState<string | null>(null);
+
+  // Kích hoạt Event Sub-process hủy thanh toán (Activity_1clhmdn)
+  const handleCancelPaymentClick = () => {
+    setShowCancelSubprocessModal(true);
+  };
+
+  // Xác nhận thực hiện Event Sub-process
+  const handleExecuteCancelSubprocess = () => {
+    setShowCancelSubprocessModal(false);
+    setShowPayment(false);
+    setPaymentCd(60);
+    setPaymentTechnicalError(null);
+    setPaymentNotification(null);
+  };
+
+  // Gateway_1ukmj3e: Chọn "Thanh toán lại" (Flow_0shou4r)
+  const handleRetryPayment = () => {
+    setPaymentTechnicalError(null);
+    setPaymentCd(60);
+  };
+
+  // Gateway_1ukmj3e: Chọn "Hủy" (Flow_1tklgpa -> Activity_1sokaaf -> Event_0rjnoap)
+  const handleCancelAfterPaymentError = () => {
+    setPaymentTechnicalError(null);
+    setShowPayment(false);
+    setPaymentCd(60);
+  };
+
+  // Boundary Timer: Hết hạn giữ sân sau 1 phút (Event_0w7d5j0 -> Activity_1a9aema -> Event_18vovxa)
+  const handleTrigger10MinTimeout = () => {
+    setShowPayment(false);
+    setPaymentCd(60);
+    setPaymentTechnicalError(null);
+    setPaymentNotification(null);
+  };
 
   const confirmPaymentReceived = async () => {
     setShowPayment(false);
-    setPaymentCd(5);
+    setPaymentCd(60);
     setIsSubmitted(true);
 
     try {
@@ -1032,19 +1129,23 @@ export default function TrangChu() {
     }
   };
 
-  // Tự động đếm 5 giây rồi chuyển sang màn hình thành công
+  // Tự động kiểm tra thời gian thanh toán theo TOBE_CHAY.bpmn (40s nhắc nhở, 1 phút hết hạn)
   useEffect(() => {
-    if (!showPayment) {
-      setPaymentCd(5);
+    if (!showPayment || paymentTechnicalError || showCancelSubprocessModal) {
       return;
     }
+    // Khi đã trôi qua 40 giây (còn 20s: paymentCd === 20): tự động kích hoạt Boundary Timer nhắc nhở
+    if (paymentCd === 20 && !paymentNotification) {
+      setPaymentNotification('🔔 Nhắc nhở thanh toán (sau 40s): Sân đang tạm giữ sắp hết hạn trong 20 giây, vui lòng quét mã VietQR để hoàn tất!');
+    }
+    // Khi hết 1 phút (60 giây): tự động kích hoạt Boundary Timer hết hạn giữ sân
     if (paymentCd <= 0) {
-      confirmPaymentReceived();
+      handleTrigger10MinTimeout();
       return;
     }
     const t = setTimeout(() => setPaymentCd((c) => c - 1), 1000);
     return () => clearTimeout(t);
-  }, [showPayment, paymentCd]);
+  }, [showPayment, paymentCd, paymentTechnicalError, showCancelSubprocessModal, paymentNotification]);
 
 
   const handleLookupSearch = async (event: React.FormEvent) => {
@@ -3027,48 +3128,177 @@ export default function TrangChu() {
       {/* 🟡 MODAL THANH TOÁN (PAYMENT BOTTOM SHEET) */}
       {showPayment && (
         <div className="fixed top-0 bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md z-50 flex items-end sm:items-center justify-center bg-slate-900/60 p-0 sm:p-4 backdrop-blur-sm animate-in fade-in duration-300">
-          <div className="w-full max-w-md rounded-t-3xl sm:rounded-3xl bg-white p-6 shadow-2xl animate-in slide-in-from-bottom-8 duration-300 flex flex-col items-center">
+          <div className="w-full max-w-md rounded-t-3xl sm:rounded-3xl bg-white p-6 shadow-2xl animate-in slide-in-from-bottom-8 duration-300 flex flex-col items-center max-h-[92vh] overflow-y-auto">
             <div className="w-12 h-1.5 bg-slate-200 rounded-full mb-4 sm:hidden"></div>
 
-            <h3 className="text-lg font-black text-slate-900 uppercase tracking-wide">Thanh toán đơn hàng</h3>
-            <p className="text-xs text-slate-500 mt-1 mb-4 text-center">Quét mã VietQR bằng ứng dụng ngân hàng</p>
-
-            <div className="w-full rounded-2xl border-2 border-emerald-500 bg-emerald-50/50 p-5 relative overflow-hidden text-center">
-              <div className="flex justify-between items-center mb-3">
-                <p className="font-extrabold text-slate-900 text-sm">MB BANK</p>
-                <span className="rounded bg-emerald-100 px-2 py-1 text-[10px] font-black text-emerald-700">VIETQR</span>
-              </div>
-
-              <QrCodeArtwork className="mx-auto h-40 w-40" />
-
-              <div className="mt-4 space-y-1 text-xs">
-                <p className="text-slate-500">Số tiền thanh toán:</p>
-                <p className="text-2xl font-black text-emerald-600">{totalPrice.toLocaleString('vi-VN')} VND</p>
-                <p className="text-slate-500 mt-2">Nội dung chuyển khoản:</p>
-                <p className="font-mono font-bold text-slate-900 bg-white py-1 rounded border border-slate-200 uppercase">CX {selectedCourt.replace(/ /g, '')} {customerPhone}</p>
-              </div>
-            </div>
-
-            <div className="mt-6 flex flex-col items-center gap-3 w-full">
-              <div className="relative flex h-10 w-10 items-center justify-center">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex h-6 w-6 rounded-full bg-emerald-500 items-center justify-center">
-                  <span className="h-2 w-2 bg-white rounded-full"></span>
+            {/* Trạng thái Tạm giữ sân (Activity_056bcoz) */}
+            <div className="w-full mb-3 flex items-center justify-between bg-emerald-50 border border-emerald-300 rounded-xl px-3 py-1.5 text-[11px] text-emerald-900 font-bold">
+              <span className="flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                Đang tạm giữ {selectedCourt}
+              </span>
+              <span className="text-[10px] font-semibold flex items-center gap-1">
+                <span className="text-emerald-800">Tạm giữ sân:</span>
+                <span className={`font-mono font-bold px-1.5 py-0.5 rounded transition ${
+                  paymentCd <= 20
+                    ? 'bg-amber-100 text-amber-800 animate-pulse ring-1 ring-amber-300'
+                    : 'bg-emerald-100/90 text-emerald-900'
+                }`}>
+                  {Math.floor(paymentCd / 60)}:{(paymentCd % 60).toString().padStart(2, '0')}
                 </span>
-              </div>
-              <p className="text-sm font-semibold text-emerald-700 text-center">
-                Đang chờ ghi nhận thanh toán qua VietQR…
-              </p>
-
+              </span>
             </div>
 
-            <div className="w-full mt-4">
+            {/* Thông báo nhắc nhở sau 8 phút (Event_1510897 -> Activity_0xxhd0u) */}
+            {paymentNotification && (
+              <div className="w-full mb-3 rounded-xl bg-amber-500 text-white p-2.5 text-xs font-bold flex items-center justify-between shadow-md animate-in slide-in-from-top-2">
+                <div className="flex items-center gap-2">
+                  <Bell className="h-4 w-4 shrink-0" />
+                  <span className="text-[11px] leading-tight">{paymentNotification}</span>
+                </div>
+                <button type="button" onClick={() => setPaymentNotification(null)} className="text-white/80 hover:text-white ml-2 text-xs">✕</button>
+              </div>
+            )}
+
+            <h3 className="text-lg font-black text-slate-900 uppercase tracking-wide">Thanh toán đơn hàng</h3>
+            <p className="text-xs text-slate-500 mt-0.5 mb-3 text-center">Quét mã VietQR bằng ứng dụng ngân hàng</p>
+
+            {/* Trường hợp lỗi kỹ thuật thanh toán (Boundary Error Event Event_02s9rdl -> Activity_1mjvkbj) */}
+            {paymentTechnicalError ? (
+              <div className="w-full space-y-4 my-2 animate-in fade-in">
+                <div className="rounded-2xl border-2 border-red-300 bg-red-50 p-4 text-center space-y-2">
+                  <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-red-100 text-red-600">
+                    <AlertTriangle className="h-6 w-6" />
+                  </div>
+                  <h4 className="text-xs font-black text-red-950 uppercase tracking-wide">Thông báo lỗi kỹ thuật thanh toán</h4>
+                  <p className="text-[11px] text-red-700 leading-relaxed font-medium">
+                    {paymentTechnicalError}
+                  </p>
+                </div>
+
+                {/* Exclusive Gateway Gateway_1ukmj3e: Thanh toán lại ? */}
+                <div className="rounded-xl bg-slate-50 p-2.5 text-center border border-slate-200">
+                  <p className="text-[11px] font-bold text-slate-700">Khách có muốn thanh toán lại không?</p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={handleRetryPayment}
+                    className="flex items-center justify-center gap-1.5 rounded-xl bg-emerald-600 py-2.5 text-xs font-bold text-white shadow-md hover:bg-emerald-700 active:scale-95 transition cursor-pointer"
+                  >
+                    <RefreshCw className="h-3.5 w-3.5" />
+                    Thanh toán lại
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleCancelAfterPaymentError}
+                    className="rounded-xl border border-slate-200 bg-white py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-100 active:scale-95 transition cursor-pointer"
+                  >
+                    Hủy bỏ
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <>
+                {/* Thẻ VietQR chuẩn */}
+                <div className="w-full rounded-2xl border-2 border-emerald-500 bg-emerald-50/50 p-4 relative overflow-hidden text-center">
+                  <div className="flex justify-between items-center mb-2">
+                    <p className="font-extrabold text-slate-900 text-sm">MB BANK</p>
+                    <span className="rounded bg-emerald-100 px-2 py-0.5 text-[10px] font-black text-emerald-700">VIETQR</span>
+                  </div>
+
+                  <QrCodeArtwork className="mx-auto h-36 w-36" value={mobilePaymentUrl} />
+                  <div className="mt-2 text-center">
+                    <p className="text-[11px] font-bold text-slate-700">📱 Lấy điện thoại quét mã QR để chuyển tiền</p>
+                    <a
+                      href={mobilePaymentUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-block mt-0.5 text-[10px] font-bold text-blue-600 hover:text-blue-800 underline"
+                    >
+                      (Hoặc bấm vào đây để mở trang giả lập điện thoại)
+                    </a>
+                  </div>
+
+                  <div className="mt-3 space-y-1 text-xs">
+                    <p className="text-slate-500">Số tiền thanh toán:</p>
+                    <p className="text-2xl font-black text-emerald-600">{totalPrice.toLocaleString('vi-VN')} VND</p>
+                    <p className="text-slate-500 mt-1.5">Nội dung chuyển khoản:</p>
+                    <p className="font-mono font-bold text-slate-900 bg-white py-1 rounded border border-slate-200 uppercase text-xs">
+                      CX {selectedCourt.replace(/ /g, '')} {customerPhone}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-4 flex flex-col items-center gap-2.5 w-full">
+                  <div className="relative flex h-8 w-8 items-center justify-center">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
+                    <span className="relative inline-flex h-5 w-5 rounded-full bg-emerald-500 items-center justify-center">
+                      <span className="h-1.5 w-1.5 bg-white rounded-full"></span>
+                    </span>
+                  </div>
+                  <p className="text-xs font-semibold text-emerald-700 text-center">
+                    Đang chờ ghi nhận thanh toán qua VietQR…
+                  </p>
+                </div>
+
+                <div className="w-full mt-3">
+                  <button
+                    onClick={handleCancelPaymentClick}
+                    type="button"
+                    className="w-full rounded-xl border border-slate-200 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-50 cursor-pointer active:scale-95 transition"
+                  >
+                    Hủy giao dịch
+                  </button>
+                </div>
+
+
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* 🔴 EVENT SUB-PROCESS: KHÁCH XÁC NHẬN THOÁT KHỎI QUÁ TRÌNH THANH TOÁN ĐẶT SÂN (Activity_1clhmdn) */}
+      {showCancelSubprocessModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="w-full max-w-sm rounded-3xl border border-amber-300 bg-white p-5 shadow-2xl space-y-4 animate-in zoom-in-95 duration-150">
+            <div className="flex items-center gap-3 border-b border-slate-100 pb-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-amber-100 text-amber-700">
+                <AlertTriangle className="h-5 w-5" />
+              </div>
+              <div>
+                <h4 className="text-sm font-black text-slate-900">Xác nhận hủy thanh toán</h4>
+                <p className="text-[10px] font-bold text-amber-700 uppercase tracking-wide">Quy trình phụ (Event Sub-process)</p>
+              </div>
+            </div>
+
+            <div className="rounded-xl bg-amber-50/70 p-3 text-xs text-amber-900 border border-amber-200/70 space-y-2 leading-relaxed">
+              <p className="font-semibold">
+                Bạn có chắc chắn muốn hủy thanh toán và thoát? Hệ thống sẽ kích hoạt quy trình phụ để xử lý:
+              </p>
+              <ul className="list-disc pl-4 space-y-1 text-[11px] text-amber-800">
+                <li>Hủy yêu cầu đặt sân hiện tại</li>
+                <li>Giải phóng khung giờ <strong className="font-bold">{selectedStartTime} ({selectedCourt})</strong> trên lịch sân</li>
+                <li>Ghi nhận phiên đặt sân bị hủy vào hệ thống</li>
+              </ul>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 pt-1">
               <button
-                onClick={() => { setShowPayment(false); setPaymentCd(5); }}
                 type="button"
-                className="w-full rounded-xl border border-slate-200 py-3 text-xs font-bold text-slate-600 hover:bg-slate-50 cursor-pointer active:scale-95"
+                onClick={() => setShowCancelSubprocessModal(false)}
+                className="rounded-xl bg-slate-100 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-200 active:scale-95 transition cursor-pointer"
               >
-                Hủy giao dịch
+                Tiếp tục thanh toán
+              </button>
+              <button
+                type="button"
+                onClick={handleExecuteCancelSubprocess}
+                className="rounded-xl bg-red-600 py-2.5 text-xs font-bold text-white shadow-md hover:bg-red-700 active:scale-95 transition cursor-pointer"
+              >
+                Xác nhận hủy yêu cầu
               </button>
             </div>
           </div>
