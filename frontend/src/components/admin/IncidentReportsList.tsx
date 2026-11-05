@@ -36,12 +36,23 @@ export default function IncidentReportsList({ incidents, onView, onDelete, onCre
     </div>
     {visible.length === 0 && <p className="rounded-xl border border-slate-200 p-4 text-center text-xs text-slate-500">Chưa có sự cố trong mục này.</p>}
     <div key={filter} role="region" aria-label="Danh sách sự cố" tabIndex={visible.length > 4 ? 0 : undefined} className={`grid auto-rows-[112px] gap-2 ${visible.length > 4 ? 'incident-list-scroll max-h-[472px] overflow-y-auto overscroll-contain pr-1' : ''}`}>
-    {visible.map(incident => <article key={incident.id} className="min-h-0 space-y-1 rounded-xl border border-slate-200 bg-white px-3 py-2">
+    {visible.map(incident => <article
+      key={incident.id}
+      onClick={() => onView(incident.id)}
+      className="min-h-0 space-y-1 rounded-xl border border-slate-200 bg-white px-3 py-2 cursor-pointer transition hover:border-emerald-500 hover:bg-slate-50/70 hover:shadow-xs active:scale-[0.99] select-none group"
+      title="Bấm để xem chi tiết & xử lý sự cố này"
+    >
       <div className="flex items-center justify-between gap-2">
-        <span className="rounded-lg bg-slate-100 px-2 py-1 text-[11px] font-bold text-slate-900">#{incident.id}</span>
+        <span className="rounded-lg bg-slate-100 px-2 py-1 text-[11px] font-bold text-slate-900 group-hover:bg-emerald-100 group-hover:text-emerald-800 transition">#{incident.id}</span>
         <div className="flex items-center gap-2">
           <span className="text-[10px] text-slate-500">{incident.reportedAt}</span>
-          <details name="incident-actions" className="relative" onKeyDown={event => { if (event.key === 'Escape') event.currentTarget.removeAttribute('open'); }} onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) event.currentTarget.removeAttribute('open'); }}>
+          <details
+            name="incident-actions"
+            className="relative"
+            onClick={event => event.stopPropagation()}
+            onKeyDown={event => { if (event.key === 'Escape') event.currentTarget.removeAttribute('open'); }}
+            onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) event.currentTarget.removeAttribute('open'); }}
+          >
             <summary aria-label={`Thao tác sự cố ${incident.id}`} title="Thao tác" className="flex h-7 w-7 cursor-pointer list-none items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100 [&::-webkit-details-marker]:hidden"><MoreVertical className="h-4 w-4" /></summary>
             <div className="absolute right-0 top-8 z-20 min-w-32 space-y-1 rounded-xl border border-slate-200 bg-white p-1.5 shadow-lg">
               <button type="button" onClick={event => { closeMenu(event.currentTarget); onView(incident.id); }} className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-xs font-semibold text-emerald-800 hover:bg-emerald-50"><Eye className="h-4 w-4" />Xem chi tiết</button>
@@ -50,10 +61,10 @@ export default function IncidentReportsList({ incidents, onView, onDelete, onCre
           </details>
         </div>
       </div>
-      <h3 className="truncate text-xs font-bold leading-snug text-slate-900" title={incident.title}>{incident.title}</h3>
+      <h3 className="truncate text-xs font-bold leading-snug text-slate-900 group-hover:text-emerald-800 transition" title={incident.title}>{incident.title}</h3>
       <p className="truncate text-[11px] text-slate-600" title={incident.description}>{incident.description}</p>
       <div className="flex items-center justify-between gap-2 text-[10px]">
-        <span className={incident.status === 'da_khac_phuc' ? 'text-emerald-700' : 'text-amber-700'}>{incident.statusLabel}</span>
+        <span className={incident.status === 'da_khac_phuc' ? 'text-emerald-700 font-semibold' : 'text-amber-700 font-semibold'}>{incident.statusLabel}</span>
         <span className="font-semibold text-emerald-800">Giá áp dụng: {(incident.compensationPrice || 0).toLocaleString('vi-VN')} VND{incident.liability === 'BAO_HANH_SAN_VAN_DONG' ? ' · Sân chịu' : ' · Khách chịu'}</span>
       </div>
     </article>)}

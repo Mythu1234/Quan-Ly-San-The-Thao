@@ -1036,9 +1036,8 @@ export default function CustomerSchedule({
         </p>
       )}
 
-      {/* 3. MODAL CONFIRMATION (WHEN NOT IN INLINE MODE) */}
       {!isInlineBookingMode && selectedSlotModal && (
-        <div className="fixed top-0 bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md z-50 flex items-end sm:items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="w-full max-w-sm rounded-3xl bg-white p-5 shadow-2xl animate-in slide-in-from-bottom-6 duration-200 space-y-4 border border-slate-100">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center">

@@ -293,6 +293,8 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
   const [pendingBookingData, setPendingBookingData] = useState<BookingDetail | null>(null);
   const [paymentSuccessBooking, setPaymentSuccessBooking] = useState<BookingDetail | null>(null);
   const [showReceipt, setShowReceipt] = useState<boolean>(false);
+  const adminPaymentProcessedSessionRef = useRef<string | null>(null);
+  const isProcessingAdminPaymentRef = useRef<boolean>(false);
 
   const getAdminReceiptData = (): BookingReceiptData | null => paymentSuccessBooking ? ({
     bookingCode: paymentSuccessBooking.code,
@@ -743,6 +745,8 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
 
     const newSession = 'PAY_ADMIN_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
     const bDate = pendingBooking.bookingDate || calendarBookingDate(selectedDate);
+    adminPaymentProcessedSessionRef.current = null;
+    isProcessingAdminPaymentRef.current = false;
     setBookingSaveError('');
     setPendingBookingData(pendingBooking);
     setAdminPaymentSessionId(newSession);
@@ -763,9 +767,21 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
   };
 
   const handleConfirmPaymentSuccess = async () => {
-    if (bookingSaving) return;
-    if (!pendingBookingData) return;
+    if (bookingSaving || isProcessingAdminPaymentRef.current) return;
+    if (!pendingBookingData || !adminPaymentSessionId) {
+      setShowPaymentModal(false);
+      return;
+    }
+    // Ngăn chặn gọi trùng lặp nhiều lần cho cùng một phiên thanh toán
+    if (adminPaymentProcessedSessionRef.current === adminPaymentSessionId) {
+      console.log('ℹ️ Phiên thanh toán Admin đã được xử lý hoàn tất trước đó:', adminPaymentSessionId);
+      return;
+    }
+    adminPaymentProcessedSessionRef.current = adminPaymentSessionId;
+    isProcessingAdminPaymentRef.current = true;
+
     if (isCourtLocked(pendingBookingData.courtCode || pendingBookingData.court)) {
+      isProcessingAdminPaymentRef.current = false;
       showAlert('Sân đang bị khóa', 'Sân đang bị khóa, không thể xác nhận đặt sân.', 'warning');
       return;
     }
@@ -778,15 +794,17 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
     const eM = (endMins % 60).toString().padStart(2, '0');
     const bDate = pendingBookingData.bookingDate || calendarBookingDate(selectedDate);
 
-    // 1. Kiểm tra tranh chấp thực tế trên Database (Ai thanh toán trước thì tính cho khách đó)
+    // 1. Kiểm tra tranh chấp thực tế trên Database (Ai thanh toán trước thì tính cho khách đó, bỏ qua chính SĐT của khách này)
     const conflictCheck = await courtHoldService.checkRealBookingConflict(
       pendingBookingData.court,
       bDate,
       `${sH}:${sM}`,
-      endMins - startMins
+      endMins - startMins,
+      pendingBookingData.phone
     );
 
     if (conflictCheck.hasConflict) {
+      isProcessingAdminPaymentRef.current = false;
       setShowPaymentModal(false);
       setPendingBookingData(null);
       setAdminPaymentCountdown(60);
@@ -829,6 +847,7 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
       setBookingSaveError(err?.message || 'Chưa lưu được lượt đặt.');
     } finally {
       setBookingSaving(false);
+      isProcessingAdminPaymentRef.current = false;
     }
   };
 
@@ -872,14 +891,29 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
   // Lắng nghe tín hiệu xác nhận từ điện thoại qua Supabase Realtime & LocalStorage
   useEffect(() => {
     if (!showPaymentModal || !adminPaymentSessionId) return;
+    let isHandled = false;
+
+    const triggerConfirm = () => {
+      if (isHandled) return;
+      isHandled = true;
+      try {
+        localStorage.removeItem('courtx_confirmed_' + adminPaymentSessionId);
+      } catch {
+        // ignore
+      }
+      void handleConfirmPaymentSuccess();
+    };
 
     const channel = supabase.channel('payment_session_' + adminPaymentSessionId);
     channel
       .on('broadcast', { event: 'PAYMENT_CONFIRMED' }, () => {
-        void handleConfirmPaymentSuccess();
+        triggerConfirm();
       })
       .on('broadcast', { event: 'PAYMENT_CANCELLED' }, () => {
-        handleExecuteAdminCancelSubprocess();
+        if (!isHandled) {
+          isHandled = true;
+          handleExecuteAdminCancelSubprocess();
+        }
       })
       .subscribe();
 
@@ -887,13 +921,12 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
       try {
         const item = localStorage.getItem('courtx_confirmed_' + adminPaymentSessionId);
         if (item) {
-          localStorage.removeItem('courtx_confirmed_' + adminPaymentSessionId);
-          void handleConfirmPaymentSuccess();
+          triggerConfirm();
         }
       } catch {
         // ignore
       }
-    }, 600);
+    }, 500);
 
     return () => {
       clearInterval(interval);

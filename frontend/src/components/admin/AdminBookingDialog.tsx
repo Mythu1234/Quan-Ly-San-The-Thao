@@ -40,7 +40,7 @@ export default function AdminBookingDialog(props: Props) {
         role="dialog"
         aria-modal="true"
         aria-labelledby="admin-booking-title"
-        className="flex max-h-[94dvh] w-full flex-col overflow-hidden rounded-3xl border border-white/80 bg-white shadow-2xl animate-in slide-in-from-bottom-6 duration-200"
+        className="flex max-h-[94dvh] w-full max-w-md flex-col overflow-hidden rounded-3xl border border-white/80 bg-white shadow-2xl animate-in slide-in-from-bottom-6 duration-200"
       >
         <div className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-100 px-4 py-3">
           <div className="flex items-center gap-2.5">

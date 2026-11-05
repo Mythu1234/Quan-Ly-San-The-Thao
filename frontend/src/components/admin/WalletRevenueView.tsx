@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import {
   Banknote,
@@ -15,10 +15,12 @@ import {
   ReceiptText,
   RotateCcw,
   ShieldCheck,
+  Sparkles,
   X,
 } from 'lucide-react';
 import type { Transaction } from '../../types/admin';
 import IncidentSelect from './IncidentSelect';
+import CancellationWorkflowDashboard from './CancellationWorkflowDashboard';
 
 interface WalletRevenueViewProps {
   transactions: Transaction[];
@@ -153,17 +155,24 @@ function StatusPill({ status, compact = false }: { status: Transaction['status']
 }
 
 export default function WalletRevenueView({ transactions, onProcessRefund, isLoading = false }: WalletRevenueViewProps) {
-  if (isLoading) {
-    return (
-      <div className="flex flex-col items-center justify-center h-60 gap-4 text-slate-400">
-        <svg className="animate-spin h-8 w-8 text-emerald-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-        </svg>
-        <p className="text-sm font-medium">Đang tải dữ liệu thống kê…</p>
-      </div>
-    );
-  }
+  const [subTab, setSubTabState] = useState<'revenue' | 'ai_cancellation'>(() => {
+    try {
+      const saved = localStorage.getItem('courtx_admin_revenue_subtab');
+      if (saved === 'ai_cancellation' || saved === 'revenue') return saved;
+    } catch {
+      // ignore storage error
+    }
+    return 'revenue';
+  });
+
+  const setSubTab = (tab: 'revenue' | 'ai_cancellation') => {
+    setSubTabState(tab);
+    try {
+      localStorage.setItem('courtx_admin_revenue_subtab', tab);
+    } catch {
+      // ignore
+    }
+  };
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [sportFilter, setSportFilter] = useState('all');
   const [reportPeriod, setReportPeriod] = useState<ReportPeriod>('day');
@@ -345,12 +354,48 @@ export default function WalletRevenueView({ transactions, onProcessRefund, isLoa
     setRefundTransaction(transaction);
   };
 
-  if (isLoading) {
-    return <div role="status" className="flex h-60 items-center justify-center text-sm text-slate-400">Đang tải dữ liệu thống kê…</div>;
-  }
-
   return (
     <main className="relative @container min-w-0 w-full flex-1 space-y-6 overflow-x-hidden bg-white p-4 pb-28 sm:p-6 lg:p-8">
+      {/* 🟢 SUB-TAB NAVIGATION: THỐNG KÊ DOANH THU & ĐẶT SÂN VS BÁO CÁO PHÂN TÍCH HỦY SÂN AI (CHƯƠNG 4) */}
+      <div className="flex items-center gap-2 border-b border-slate-200 pb-3 flex-wrap">
+        <button
+          type="button"
+          onClick={() => setSubTab('revenue')}
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-black transition cursor-pointer ${
+            subTab === 'revenue'
+              ? 'bg-emerald-700 text-white shadow-sm'
+              : 'bg-slate-100 text-slate-600 hover:bg-slate-200/70'
+          }`}
+        >
+          <ReceiptText className="w-4 h-4" />
+          <span>Thống kê Đặt sân & Doanh thu</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setSubTab('ai_cancellation')}
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
+            subTab === 'ai_cancellation'
+              ? 'bg-emerald-700 text-white shadow-sm'
+              : 'bg-slate-100 text-slate-600 hover:bg-slate-200/70'
+          }`}
+        >
+          <Sparkles className="w-4 h-4" />
+          <span>Phân tích Hủy sân</span>
+        </button>
+      </div>
+
+      {subTab === 'revenue' && (
+        isLoading && transactions.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-60 gap-4 text-slate-400">
+            <svg className="animate-spin h-8 w-8 text-emerald-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+            </svg>
+            <p className="text-sm font-medium">Đang tải dữ liệu thống kê…</p>
+          </div>
+        ) : (
+          <>
       <header className="flex min-w-0 flex-col gap-4 @4xl:flex-row @4xl:items-end @4xl:justify-between">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-semibold text-slate-500">
@@ -654,6 +699,13 @@ export default function WalletRevenueView({ transactions, onProcessRefund, isLoa
           </div>
         )}
       </section>
+          </>
+        )
+      )}
+
+      {subTab === 'ai_cancellation' && (
+        <CancellationWorkflowDashboard />
+      )}
 
       {selectedTransaction && (
         <div
