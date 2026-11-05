@@ -70,22 +70,27 @@ export default function AdminDashboard({ onLogout, currentUser }: { onLogout: ()
   // Load real transactions from Supabase for Thống kê đặt sân
   useEffect(() => {
     let mounted = true;
-    const loadTransactions = async () => {
-      setTransactionsLoading(true);
+    const loadTransactions = async (isInitial = false) => {
+      if (isInitial && transactions.length === 0) setTransactionsLoading(true);
       try {
         const data = await paymentBookingService.fetchAllTransactions();
         if (mounted) setTransactions(data);
       } catch {
         // fallback: keep current state
       } finally {
-        if (mounted) setTransactionsLoading(false);
+        if (mounted && isInitial) setTransactionsLoading(false);
       }
     };
-    void loadTransactions();
-    // Refresh every 30s to catch new bookings
-    const timer = setInterval(() => { void loadTransactions(); }, 30000);
-    window.addEventListener('focus', () => { void loadTransactions(); });
-    return () => { mounted = false; clearInterval(timer); };
+    void loadTransactions(true);
+    // Refresh every 30s silently in background without triggering full page reloads
+    const timer = setInterval(() => { void loadTransactions(false); }, 30000);
+    const handleFocus = () => { void loadTransactions(false); };
+    window.addEventListener('focus', handleFocus);
+    return () => {
+      mounted = false;
+      clearInterval(timer);
+      window.removeEventListener('focus', handleFocus);
+    };
   }, []);
 
   // Staff handlers connected to backend

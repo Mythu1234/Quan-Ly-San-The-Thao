@@ -202,7 +202,7 @@ export const paymentBookingService = {
       // 4.5. Kiểm tra tranh chấp (race condition): Đảm bảo chưa có khách nào thanh toán trước khung giờ này
       const { data: existingBookings } = await supabase
         .from('dat_san')
-        .select('ma_dat_san, gio_bat_dau, gio_ket_thuc, trang_thai')
+        .select('ma_dat_san, gio_bat_dau, gio_ket_thuc, trang_thai, ma_khach_hang')
         .eq('ma_san', courtId)
         .eq('ngay_dat', dateFormatted)
         .neq('trang_thai', 'DA_HUY');
@@ -216,6 +216,8 @@ export const paymentBookingService = {
         const reqEndMins = toMins(end);
 
         const hasConflict = existingBookings.some((eb: any) => {
+          // Bỏ qua nếu đơn đặt thuộc về chính khách hàng này
+          if (eb.ma_khach_hang && eb.ma_khach_hang === customerId) return false;
           const ebStart = toMins((eb.gio_bat_dau || '').slice(0, 5));
           const ebEnd = toMins((eb.gio_ket_thuc || '').slice(0, 5));
           return Math.max(reqStartMins, ebStart) < Math.min(reqEndMins, ebEnd);

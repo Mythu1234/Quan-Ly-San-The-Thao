@@ -59,9 +59,10 @@ interface NotificationModalProps {
   isOpen?: boolean;
   onClose?: () => void;
   onBack?: () => void;
+  onNavigate?: (notif: SystemNotification) => void;
 }
 
-export default function NotificationModal({ isOpen, onClose, onBack }: NotificationModalProps) {
+export default function NotificationModal({ isOpen, onClose, onBack, onNavigate }: NotificationModalProps) {
   const [notifications, setNotifications] = useState<SystemNotification[]>(() => readNotifications(DEFAULT_NOTIFICATIONS));
   const [filter, setFilter] = useState<'all' | 'unread'>('all');
   const [now, setNow] = useState(Date.now);
@@ -224,7 +225,10 @@ export default function NotificationModal({ isOpen, onClose, onBack }: Notificat
           filteredNotifications.map((notif) => (
             <div
               key={notif.id}
-              onClick={() => handleMarkAsRead(notif.id)}
+              onClick={() => {
+                handleMarkAsRead(notif.id);
+                if (onNavigate) onNavigate(notif);
+              }}
               className={`p-3 rounded-xl border transition cursor-pointer relative ${
                 notif.isRead
                   ? 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'

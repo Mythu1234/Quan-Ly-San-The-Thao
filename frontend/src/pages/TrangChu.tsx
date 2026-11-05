@@ -25,8 +25,9 @@ import {
   syncCourtsWithBackend,
   COURTS_UPDATED_EVENT,
 } from '../utils/dynamicCourtStorage';
+import { cancellationWorkflowService } from '../services/cancellationWorkflowService';
 import { useState, useRef, useEffect, useMemo } from 'react';
-import { Download, Search, MapPin, Phone, Clock, Play, Home, Calendar as CalendarIcon, X, Zap, User, Lock, Eye, EyeOff, ArrowLeft, ArrowRight, ChevronLeft, ChevronRight, ChevronDown, Trophy, CheckCircle2, RefreshCw, MessageSquare, Check, AlertTriangle, Bell } from 'lucide-react';
+import { Download, Search, MapPin, Phone, Clock, Play, Home, Calendar as CalendarIcon, X, Zap, User, Lock, Eye, EyeOff, ArrowLeft, ArrowRight, ChevronLeft, ChevronRight, ChevronDown, Trophy, CheckCircle2, RefreshCw, MessageSquare, Check, AlertTriangle, Bell, Sparkles } from 'lucide-react';
 
 const venueDirectionsUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent('Đường số 6, An Hải, Đà Nẵng, Việt Nam')}`;
 
@@ -441,6 +442,7 @@ export default function TrangChu() {
   const [lookupError,setLookupError]=useState('');
   useEffect(()=>{setLookupResults([]);setLookupError('');setHasSearched(false);},[activeTab]);
   const [cancelConfirmation, setCancelConfirmation] = useState<any>(null);
+  const [cancelReasonInput, setCancelReasonInput] = useState<string>('');
   const [pendingCancelTicket, setPendingCancelTicket] = useState<any>(null);
 
   // Tự động tắt popup thông báo hủy thành công sau 3.5 giây
@@ -1032,6 +1034,8 @@ export default function TrangChu() {
 
   const [paymentCd, setPaymentCd] = useState<number>(60);
   const [paymentSessionId, setPaymentSessionId] = useState<string>('');
+  const paymentProcessedSessionRef = useRef<string | null>(null);
+  const isProcessingPaymentRef = useRef<boolean>(false);
   const [holdTrigger, setHoldTrigger] = useState<number>(0);
 
   useEffect(() => {
@@ -1190,6 +1194,8 @@ export default function TrangChu() {
       }
 
       const newSession = 'PAY_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
+      paymentProcessedSessionRef.current = null;
+      isProcessingPaymentRef.current = false;
       setPaymentSessionId(newSession);
       setPaymentCd(60);
 
@@ -1255,15 +1261,30 @@ export default function TrangChu() {
   // Lắng nghe tín hiệu xác nhận từ điện thoại qua Supabase Realtime & LocalStorage
   useEffect(() => {
     if (!showPayment || !paymentSessionId) return;
+    let isHandled = false;
+
+    const triggerConfirm = () => {
+      if (isHandled) return;
+      isHandled = true;
+      try {
+        localStorage.removeItem('courtx_confirmed_' + paymentSessionId);
+      } catch {
+        // ignore
+      }
+      void confirmPaymentReceived();
+    };
 
     // Kênh Supabase Realtime Broadcast
     const channel = supabase.channel('payment_session_' + paymentSessionId);
     channel
       .on('broadcast', { event: 'PAYMENT_CONFIRMED' }, () => {
-        void confirmPaymentReceived();
+        triggerConfirm();
       })
       .on('broadcast', { event: 'PAYMENT_CANCELLED' }, () => {
-        handleExecuteCancelSubprocess();
+        if (!isHandled) {
+          isHandled = true;
+          handleExecuteCancelSubprocess();
+        }
       })
       .subscribe();
 
@@ -1272,13 +1293,12 @@ export default function TrangChu() {
       try {
         const item = localStorage.getItem('courtx_confirmed_' + paymentSessionId);
         if (item) {
-          localStorage.removeItem('courtx_confirmed_' + paymentSessionId);
-          void confirmPaymentReceived();
+          triggerConfirm();
         }
       } catch {
         // ignore
       }
-    }, 600);
+    }, 500);
 
     return () => {
       clearInterval(interval);
@@ -1329,21 +1349,33 @@ export default function TrangChu() {
   };
 
   const confirmPaymentReceived = async () => {
+    if (isProcessingPaymentRef.current) return;
+    if (!showPayment || !paymentSessionId) return;
+    // Ngăn chặn gọi trùng lặp nhiều lần cho cùng một phiên thanh toán
+    if (paymentProcessedSessionRef.current === paymentSessionId) {
+      console.log('ℹ️ Phiên thanh toán Khách đã được xử lý hoàn tất trước đó:', paymentSessionId);
+      return;
+    }
+    paymentProcessedSessionRef.current = paymentSessionId;
+    isProcessingPaymentRef.current = true;
+
     try {
       const dYear = scheduleDateObj.getFullYear();
       const dMonth = (scheduleDateObj.getMonth() + 1).toString().padStart(2, '0');
       const dDay = scheduleDateObj.getDate().toString().padStart(2, '0');
       const formattedDate = `${dYear}-${dMonth}-${dDay}`;
 
-      // 1. Kiểm tra tranh chấp thực tế trên Database (Ai thanh toán trước thì tính cho khách đó)
+      // 1. Kiểm tra tranh chấp thực tế trên Database (Ai thanh toán trước thì tính cho khách đó, bỏ qua chính SĐT của khách này)
       const conflictCheck = await courtHoldService.checkRealBookingConflict(
         selectedCourt,
         formattedDate,
         selectedStartTime,
-        selectedDuration
+        selectedDuration,
+        customerPhone
       );
 
       if (conflictCheck.hasConflict) {
+        isProcessingPaymentRef.current = false;
         setShowPayment(false);
         setPaymentCd(60);
         courtHoldService.releaseSlot(paymentSessionId);
@@ -1420,6 +1452,8 @@ export default function TrangChu() {
           message: 'Rất tiếc! Khung giờ này vừa có khách khác hoàn tất thanh toán trước. Số tiền của bạn sẽ được hoàn lại tự động qua VietQR.',
         });
       }
+    } finally {
+      isProcessingPaymentRef.current = false;
     }
   };
 
@@ -1481,6 +1515,7 @@ export default function TrangChu() {
       return;
     }
     // Mở popup xác nhận hỏi rõ khách hàng trước khi hủy (cho cả nhánh >= 24h và < 24h theo đúng BPMN)
+    setCancelReasonInput('');
     setCancelConfirmation(ticket);
   };
 
@@ -1497,14 +1532,28 @@ export default function TrangChu() {
         ? (ticket.rawTotal || Number(String(ticket.total || '').replace(/\D/g, '')) || 120000)
         : 0;
 
-      const reason = refundEligible
+      const fallbackReason = refundEligible
         ? 'Khách hàng tự hủy trên website trước >= 24h (Đủ điều kiện hoàn tiền 100%)'
         : 'Khách hàng tự hủy trên website dưới 24h (Không đủ điều kiện hoàn tiền)';
+
+      const finalReason = cancelReasonInput.trim() || fallbackReason;
+
+      // Kích hoạt phân loại AI & đồng bộ luồng n8n (Chương 4)
+      void cancellationWorkflowService.processCancellation({
+        booking_id: ticket.code || `DS_${Date.now()}`,
+        customer_name: ticket.name,
+        customer_phone: ticket.phone,
+        court_name: ticket.court || 'Sân thi đấu',
+        cancel_reason: finalReason,
+        booking_date: ticket.date,
+        booking_time: ticket.time,
+        refund_amount: rawRefund,
+      });
 
       const res = await bookingApiService.cancelBooking({
         code: ticket.code,
         isEligible: refundEligible,
-        reason,
+        reason: finalReason,
         customerPhone: ticket.phone,
         customerName: ticket.name,
         refundAmount: rawRefund,
@@ -2436,7 +2485,7 @@ export default function TrangChu() {
       )}
       {/* 🎪 MODAL ĐĂNG KÝ SỰ KIỆN & CHUỖI NGÀY */}
       {showEventModal && (
-        <div className="fixed top-0 bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md z-50 flex items-end sm:items-center justify-center bg-slate-900/60 p-0 sm:p-4 backdrop-blur-sm animate-in fade-in duration-300">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/60 p-0 sm:p-4 backdrop-blur-sm animate-in fade-in duration-300">
           <div className="w-full max-w-md rounded-t-3xl sm:rounded-3xl bg-white p-6 shadow-2xl animate-in slide-in-from-bottom-8 duration-300 max-h-[92vh] overflow-y-auto flex flex-col border border-slate-100">
             <div className="w-12 h-1.5 bg-slate-200 rounded-full mb-3 mx-auto sm:hidden"></div>
 
@@ -2647,7 +2696,7 @@ export default function TrangChu() {
 
       {/* 🟠 MODAL XÁC THỰC OTP */}
       {showOTP && (
-        <div className="fixed inset-y-0 left-1/2 z-50 flex w-full max-w-md -translate-x-1/2 items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm animate-in fade-in duration-200">
           <div role="dialog" aria-modal="true" aria-labelledby="otp-title" className="flex max-h-[90dvh] w-full max-w-xs flex-col items-center overflow-y-auto rounded-2xl bg-white p-5 shadow-2xl animate-in zoom-in-95 duration-200">
 
             <div className="mx-auto mb-2.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700">
@@ -3272,6 +3321,35 @@ export default function TrangChu() {
                 </div>
               )}
 
+              {/* Ô nhập lý do hủy (Phân loại AI n8n - Chương 4) */}
+              <div className="text-left space-y-1.5 pt-1">
+                <label className="text-[11px] font-bold text-slate-700 flex items-center justify-between">
+                  <span>Lý do hủy sân:</span>
+                  <span className="text-[10px] text-emerald-600 font-semibold flex items-center gap-1">
+                    <Sparkles className="w-3 h-3 text-emerald-500" /> Phân loại tự động AI
+                  </span>
+                </label>
+                <textarea
+                  rows={2}
+                  value={cancelReasonInput}
+                  onChange={(e) => setCancelReasonInput(e.target.value)}
+                  placeholder="Nhập lý do hủy (VD: Trời mưa bão to ngập đường, bận việc đột xuất, thiếu người chơi...)"
+                  className="w-full rounded-xl border border-slate-300 bg-slate-50 p-2.5 text-xs text-slate-800 placeholder-slate-400 focus:bg-white focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 transition shadow-2xs"
+                />
+                <div className="flex items-center gap-1 flex-wrap text-[10px]">
+                  {['Mưa bão ngập đường', 'Bận việc cá nhân', 'Đội hình thiếu người', 'Đặt nhầm ngày giờ'].map((sample) => (
+                    <button
+                      key={sample}
+                      type="button"
+                      onClick={() => setCancelReasonInput(sample)}
+                      className="rounded-md bg-slate-100 hover:bg-emerald-50 hover:text-emerald-700 text-slate-600 px-1.5 py-0.5 transition cursor-pointer border border-slate-200"
+                    >
+                      {sample}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               <p className="text-xs text-slate-700 font-medium">
                 Bạn có chắc chắn muốn hủy lịch đặt sân này?
               </p>
@@ -3302,7 +3380,7 @@ export default function TrangChu() {
 
       {/* 🟣 CUSTOM POPUP */}
       {popup && (
-        <div className="fixed top-0 bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md z-[60] flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="w-full max-w-sm rounded-3xl bg-white p-6 shadow-2xl animate-in zoom-in-95 duration-200 text-center border border-slate-100">
             {popup.type === 'processing' ? (
               <div className="space-y-3 py-2">
@@ -3371,8 +3449,8 @@ export default function TrangChu() {
 
       {/* Booking details */}
       {showBookingPopup && (
-        <div className="fixed inset-y-0 left-1/2 z-50 flex w-full max-w-md -translate-x-1/2 items-end justify-center bg-slate-900/60 p-2 backdrop-blur-sm sm:items-center sm:p-4">
-          <div role="dialog" aria-modal="true" aria-labelledby="booking-popup-title" className="flex max-h-[94dvh] w-full flex-col overflow-hidden rounded-3xl border border-white/80 bg-white shadow-2xl animate-in slide-in-from-bottom-6 duration-200">
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/60 p-2 backdrop-blur-sm sm:items-center sm:p-4 animate-in fade-in duration-200">
+          <div role="dialog" aria-modal="true" aria-labelledby="booking-popup-title" className="flex max-h-[94dvh] w-full max-w-md flex-col overflow-hidden rounded-3xl border border-white/80 bg-white shadow-2xl animate-in slide-in-from-bottom-6 duration-200">
             <div className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-100 px-4 py-3">
               <div className="flex items-center gap-2.5">
                 <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700"><CalendarIcon className="h-4 w-4" /></div>
@@ -3500,7 +3578,7 @@ export default function TrangChu() {
 
       {/* 🟡 MODAL THANH TOÁN (PAYMENT BOTTOM SHEET) */}
       {showPayment && (
-        <div className="fixed top-0 bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md z-50 flex items-end sm:items-center justify-center bg-slate-900/60 p-0 sm:p-4 backdrop-blur-sm animate-in fade-in duration-300">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/60 p-0 sm:p-4 backdrop-blur-sm animate-in fade-in duration-300">
           <div className="w-full max-w-md rounded-t-3xl sm:rounded-3xl bg-white p-6 shadow-2xl animate-in slide-in-from-bottom-8 duration-300 flex flex-col items-center max-h-[92vh] overflow-y-auto">
             <div className="w-12 h-1.5 bg-slate-200 rounded-full mb-4 sm:hidden"></div>
 
@@ -3690,7 +3768,7 @@ export default function TrangChu() {
       {/* 🔴 MODAL XÁC NHẬN ĐẶT SÂN THÀNH CÔNG                    */}
       {/* ======================================================== */}
       {isSubmitted && (
-        <div className="fixed top-0 bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md border-x border-slate-200 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm animate-fade-in">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm animate-fade-in">
           <div className="w-full max-w-sm rounded-3xl border border-emerald-300 bg-white p-6 text-center space-y-4 shadow-2xl">
             <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 text-3xl text-emerald-600 border border-emerald-300">
               ✓
@@ -3748,7 +3826,7 @@ export default function TrangChu() {
       {/* 📋 MODAL BIÊN NHẬN ĐẶT SÂN (KHÁCH HÀNG)                  */}
       {/* ======================================================== */}
       {showReceipt && isSubmitted && (
-        <div className="fixed top-0 bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md border-x border-slate-200 z-[200] flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm animate-fade-in">
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm animate-fade-in">
           <div className="w-full max-w-sm rounded-3xl bg-white shadow-2xl overflow-hidden">
             {/* Header */}
             <div className="bg-emerald-700 px-5 py-4 flex items-center justify-between">

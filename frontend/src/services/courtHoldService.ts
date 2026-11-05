@@ -224,7 +224,8 @@ export const courtHoldService = {
     courtName: string,
     bookingDate: string,
     startTime: string,
-    duration: number
+    duration: number,
+    excludeCustomerPhone?: string
   ): Promise<{ hasConflict: boolean; message?: string }> {
     try {
       const reqStart = parseTimeToMinutes(startTime);
@@ -243,14 +244,22 @@ export const courtHoldService = {
       // Tra cứu tất cả đơn đặt hợp lệ trên sân đó trong ngày
       const { data: bookings, error } = await supabase
         .from('dat_san')
-        .select('ma_dat_san, gio_bat_dau, gio_ket_thuc, trang_thai, khach_hang(ho_ten)')
+        .select('ma_dat_san, gio_bat_dau, gio_ket_thuc, trang_thai, khach_hang(ho_ten, so_dien_thoai)')
         .eq('ma_san', courtId)
         .eq('ngay_dat', bookingDate)
         .neq('trang_thai', 'DA_HUY');
 
       if (error || !bookings) return { hasConflict: false };
 
+      const cleanExcludePhone = excludeCustomerPhone ? excludeCustomerPhone.trim().replace(/[\s.-]/g, '') : '';
+
       for (const b of bookings as any[]) {
+        const bPhone = (b.khach_hang?.so_dien_thoai || '').trim().replace(/[\s.-]/g, '');
+        // Nếu đơn trên hệ thống trùng với chính số điện thoại của khách hàng đang hoàn tất thanh toán, bỏ qua không coi là xung đột
+        if (cleanExcludePhone && bPhone && bPhone === cleanExcludePhone) {
+          continue;
+        }
+
         const bStart = parseTimeToMinutes((b.gio_bat_dau || '').slice(0, 5));
         const bEnd = parseTimeToMinutes((b.gio_ket_thuc || '').slice(0, 5));
 
