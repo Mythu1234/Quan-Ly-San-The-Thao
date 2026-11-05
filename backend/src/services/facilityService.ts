@@ -65,6 +65,14 @@ export class FacilityService {
     return repository.deleteEquipment(id);
   }
   async listCourts() {return repository.getAllCourts();}
+  async listSports() {return repository.getAllSports();}
+  async createSportWithCourts(params: { name: string; pricePerHour: number; prefix?: string; initialCourtCount: number }) {
+    return repository.createSportWithCourts(params);
+  }
+  async createCourtsForSport(params: { sportId: string; quantity: number; pricePerHour?: number }) {
+    return repository.createCourtsForSport(params);
+  }
+  async deleteCourt(id: string) {return repository.deleteCourt(id);}
   async toggleCourtLock(id:string,isLocked:boolean,reason?:string,lockedBy?:string) {
     const row=await repository.updateCourtLock(id,isLocked,reason,lockedBy);
     if(!row)throw Error('Không tìm thấy sân.');

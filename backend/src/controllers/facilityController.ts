@@ -217,6 +217,54 @@ export class FacilityController {
     }
   }
 
+  public async getSports(_req: Request, res: Response): Promise<void> {
+    try {
+      const sports = await facilityService.listSports();
+      res.status(200).json({ success: true, total: sports.length, data: sports });
+    } catch (err: any) {
+      res.status(err.status || 500).json({ success: false, message: err.message || 'Lỗi khi lấy danh sách bộ môn' });
+    }
+  }
+
+  public async createSport(req: Request, res: Response): Promise<void> {
+    try {
+      const { name, pricePerHour, prefix, initialCourtCount } = req.body;
+      const result = await facilityService.createSportWithCourts({
+        name,
+        pricePerHour: Number(pricePerHour) || 120000,
+        prefix,
+        initialCourtCount: Number(initialCourtCount) || 0,
+      });
+      res.status(201).json({ success: true, message: 'Đã tạo bộ môn thành công trên Supabase', data: result });
+    } catch (err: any) {
+      res.status(err.status || 400).json({ success: false, message: err.message || 'Lỗi khi tạo bộ môn' });
+    }
+  }
+
+  public async createCourts(req: Request, res: Response): Promise<void> {
+    try {
+      const { sportId, quantity, pricePerHour } = req.body;
+      const result = await facilityService.createCourtsForSport({
+        sportId,
+        quantity: Number(quantity) || 1,
+        pricePerHour: pricePerHour ? Number(pricePerHour) : undefined,
+      });
+      res.status(201).json({ success: true, message: 'Đã thêm sân thành công trên Supabase', data: result });
+    } catch (err: any) {
+      res.status(err.status || 400).json({ success: false, message: err.message || 'Lỗi khi thêm sân' });
+    }
+  }
+
+  public async deleteCourt(req: Request, res: Response): Promise<void> {
+    try {
+      const id = String(req.params.id);
+      const deleted = await facilityService.deleteCourt(id);
+      res.status(200).json({ success: true, message: 'Đã xóa sân trên Supabase', deleted });
+    } catch (err: any) {
+      res.status(err.status || 400).json({ success: false, message: err.message || 'Lỗi khi xóa sân' });
+    }
+  }
+
   public async toggleCourtLock(req: Request, res: Response): Promise<void> {
     try {
       const id = String(req.params.id);

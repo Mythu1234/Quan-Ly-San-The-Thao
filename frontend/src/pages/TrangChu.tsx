@@ -3,11 +3,12 @@ import { downloadBookingReceipt, printBookingReceipt, type BookingReceiptData } 
 import {staffAuthService} from '../services/staffAuthService';
 import AdminDashboard from './AdminDashboard';
 import CustomerSchedule from '../components/CustomerSchedule';
-import useSharedBookings from '../hooks/useSharedBookings';
+import useSharedBookings, { refreshSharedBookings } from '../hooks/useSharedBookings';
 import useVietnamToday from '../hooks/useVietnamToday';
 import { scheduleBookingsForDate } from '../utils/courtBookingWarnings';
 import { bookingApiService } from '../services/bookingService';
 import { paymentBookingService } from '../services/paymentBookingService';
+import { courtHoldService } from '../services/courtHoldService';
 import { validateCustomerName, validateCustomerPhone } from '../utils/bookingValidation';
 import QrCodeArtwork from '../components/QrCodeArtwork';
 import IncidentSelect from '../components/admin/IncidentSelect';
@@ -16,8 +17,16 @@ import VipCustomerDashboard from './VipCustomerDashboard';
 import { addBookingRequest } from '../types/bookingRequest';
 import type { IncidentReporter } from '../utils/incidentStorage';
 import { isCourtLocked } from '../hooks/useCourtAvailability';
+import {
+  type SportCategoryItem,
+  type AdminCourtItem,
+  getAdminSports,
+  getAdminCourts,
+  syncCourtsWithBackend,
+  COURTS_UPDATED_EVENT,
+} from '../utils/dynamicCourtStorage';
 import { useState, useRef, useEffect, useMemo } from 'react';
-import { Download, Search, MapPin, Phone, Clock, Play, Home, Calendar as CalendarIcon, X, Zap, User, Lock, Eye, EyeOff, ArrowLeft, ArrowRight, ChevronLeft, ChevronRight, ChevronDown, Trophy, CheckCircle2, RefreshCw, MessageSquare, Copy, Check, AlertTriangle, Bell } from 'lucide-react';
+import { Download, Search, MapPin, Phone, Clock, Play, Home, Calendar as CalendarIcon, X, Zap, User, Lock, Eye, EyeOff, ArrowLeft, ArrowRight, ChevronLeft, ChevronRight, ChevronDown, Trophy, CheckCircle2, RefreshCw, MessageSquare, Check, AlertTriangle, Bell } from 'lucide-react';
 
 const venueDirectionsUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent('Đường số 6, An Hải, Đà Nẵng, Việt Nam')}`;
 
@@ -66,24 +75,39 @@ const VolleyballIcon = () => (
   </svg>
 );
 
-
+const TennisIcon = () => (
+  <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="10" />
+    <path d="M17.93 6.07a10 10 0 0 1 0 11.86" />
+    <path d="M6.07 17.93a10 10 0 0 1 0-11.86" />
+  </svg>
+);
 
 export default function TrangChu() {
   const today=useVietnamToday();
   const [sharedBookings,,bookingsState]=useSharedBookings();
   const [currentUser, setCurrentUser] = useState<IncidentReporter | null>(null);
+
+  // Danh sách môn và sân đồng bộ trực tiếp từ Supabase
+  const [allSports, setAllSports] = useState<SportCategoryItem[]>(() => getAdminSports());
+  const [allCourts, setAllCourts] = useState<AdminCourtItem[]>(() => getAdminCourts());
+
+  useEffect(() => {
+    void syncCourtsWithBackend();
+    const handleUpdate = () => {
+      setAllSports(getAdminSports());
+      setAllCourts(getAdminCourts());
+    };
+    window.addEventListener(COURTS_UPDATED_EVENT, handleUpdate);
+    return () => window.removeEventListener(COURTS_UPDATED_EVENT, handleUpdate);
+  }, []);
   // Navigation tab state
   const [activeTab, setActiveTab] = useState<'booking' | 'lookup'>('booking');
 
   // Booking Form State
-  const [selectedSportId, setSelectedSportId] = useState<'badminton' | 'football' | 'volleyball' | null>(null);
+  const [selectedSportId, setSelectedSportId] = useState<string | null>(null);
   const [sportError, setSportError] = useState<string | null>(null);
-  const [selectedDate, setSelectedDate] = useState<string>(() => {
-    const now = new Date();
-    const dStr = now.getDate().toString().padStart(2, '0');
-    const mStr = (now.getMonth() + 1).toString().padStart(2, '0');
-    return `Hôm nay (${dStr}/${mStr})`;
-  });
+  const [selectedDate, setSelectedDate] = useState<string>('');
   const [dateError, setDateError] = useState<string | null>(null);
   const [selectedCourt, setSelectedCourt] = useState<string>('');
 
@@ -187,24 +211,23 @@ export default function TrangChu() {
 
   // Forgot Password Flow State
   const [loginView, setLoginView] = useState<'login' | 'forgot_password'>('login');
-  const [forgotStep, setForgotStep] = useState<'account' | 'otp' | 'success'>('account');
+  const [forgotStep, setForgotStep] = useState<'account' | 'otp' | 'new_password' | 'success'>('account');
   const [forgotAccountInput, setForgotAccountInput] = useState<string>('');
   const [matchedAccountKey, setMatchedAccountKey] = useState<string>('');
   const [forgotOtpInput, setForgotOtpInput] = useState<string>('');
   const [forgotOtpCountdown, setForgotOtpCountdown] = useState<number>(60);
   const [generatedOtp, setGeneratedOtp] = useState<string>('');
-  const [generatedNewPassword, setGeneratedNewPassword] = useState<string>('');
-  const [forgotNewPassword, setForgotNewPassword] = useState<string>('');
-  const [copiedPassword, setCopiedPassword] = useState<boolean>(false);
-  const [customPasswordInput, setCustomPasswordInput] = useState<string>('');
-  const [showCustomPasswordForm, setShowCustomPasswordForm] = useState<boolean>(false);
+  const [forgotNewPassInput, setForgotNewPassInput] = useState<string>('');
+  const [forgotConfirmPassInput, setForgotConfirmPassInput] = useState<string>('');
+  const [showNewPass, setShowNewPass] = useState<boolean>(false);
+  const [showConfirmPass, setShowConfirmPass] = useState<boolean>(false);
+  const [forgotLoading, setForgotLoading] = useState<boolean>(false);
   const [forgotError, setForgotError] = useState<string | null>(null);
   const [smsToast, setSmsToast] = useState<{
     sender: string;
     phone: string;
     message: string;
     otp?: string;
-    newPassword?: string;
   } | null>(null);
 
   // Auto-dismiss SMS toast after 15s
@@ -231,125 +254,158 @@ export default function TrangChu() {
   }, [loginView, forgotStep, forgotOtpCountdown]);
 
   // Step 1: Send OTP to Phone
-  const handleSendForgotOtp = (targetPhone?: string) => {
+  const handleSendForgotOtp = async (targetPhone?: string) => {
     const raw = (targetPhone !== undefined ? targetPhone : forgotAccountInput).trim().replace(/\s+/g, '');
     if (!raw) {
-      setForgotError('Vui lòng nhập số điện thoại đã đăng ký!');
+      setForgotError('Vui lòng nhập số điện thoại.');
       return;
     }
 
     const phoneClean = raw.replace(/\D/g, '');
-    if (!/^0[0-9]{9}$/.test(phoneClean)) {
-      setForgotError('Số điện thoại không hợp lệ! Vui lòng nhập số điện thoại gồm 10 chữ số bắt đầu bằng 0 (ví dụ: 0912345678).');
+    if (!/^0[35789][0-9]{8}$/.test(phoneClean)) {
+      setForgotError('Số điện thoại không hợp lệ (10 chữ số, bắt đầu bằng 0).');
       return;
     }
 
-    // Match against accountCredentials by phone
-    let foundKey = Object.keys(accountCredentials).find(
-      (k) => accountCredentials[k].phone.replace(/\s+/g, '') === phoneClean
-    );
-
-    // If not found, match by standard demo phones
-    if (!foundKey) {
-      if (phoneClean === '0901234567') foundKey = 'admin';
-      else if (phoneClean === '0912345678') foundKey = 'nhanvien';
-      else if (phoneClean === '0988888888') foundKey = 'vip';
-    }
-
-    if (!foundKey) {
-      setForgotError(`Số điện thoại "${phoneClean}" chưa được đăng ký trong hệ thống CourtX! Vui lòng kiểm tra lại số điện thoại (Gợi ý: Quản trị 0901234567, Nhân viên 0912345678, Khách VIP 0988888888).`);
-      return;
-    }
-
-    // Generate real 6-digit random OTP
-    const newOtp = Math.floor(100000 + Math.random() * 900000).toString();
-    setGeneratedOtp(newOtp);
-    setMatchedAccountKey(foundKey);
+    setForgotLoading(true);
     setForgotError(null);
-    setForgotStep('otp');
-    setForgotOtpCountdown(60);
-    setForgotOtpInput('');
 
-    // Trigger SMS Push Notification banner
-    setSmsToast({
-      sender: 'COURTX-OTP',
-      phone: phoneClean,
-      message: `Mã OTP xác thực đặt lại mật khẩu cho số điện thoại ${phoneClean} là: ${newOtp} (hiệu lực 60s). Tuyệt đối không chia sẻ mã này cho người khác.`,
-      otp: newOtp,
-    });
+    try {
+      // 1. Gọi backend API
+      const res = await staffAuthService.sendForgotOtp(phoneClean);
+      const otp = res.otp || Math.floor(100000 + Math.random() * 900000).toString();
+      setGeneratedOtp(otp);
+      setMatchedAccountKey(phoneClean);
+      setForgotStep('otp');
+      setForgotOtpCountdown(60);
+      setForgotOtpInput('');
+      setSmsToast({
+        sender: 'COURTX-OTP',
+        phone: phoneClean,
+        message: `Mã xác thực OTP của bạn là: ${otp} (hiệu lực 60s).`,
+        otp,
+      });
+    } catch (err: any) {
+      // 2. Fallback kiểm tra accountCredentials
+      const matchedKey = Object.keys(accountCredentials).find(
+        (k) => accountCredentials[k].phone.replace(/\s+/g, '') === phoneClean
+      );
+      if (matchedKey || phoneClean === '0901234567' || phoneClean === '0912345678' || phoneClean === '0988888888') {
+        const key = matchedKey || (phoneClean === '0901234567' ? 'admin' : phoneClean === '0912345678' ? 'nhanvien' : 'vip');
+        const otp = Math.floor(100000 + Math.random() * 900000).toString();
+        setGeneratedOtp(otp);
+        setMatchedAccountKey(key);
+        setForgotStep('otp');
+        setForgotOtpCountdown(60);
+        setForgotOtpInput('');
+        setSmsToast({
+          sender: 'COURTX-OTP',
+          phone: phoneClean,
+          message: `Mã xác thực OTP của bạn là: ${otp} (hiệu lực 60s).`,
+          otp,
+        });
+      } else {
+        setForgotError('Số điện thoại chưa được đăng ký trong hệ thống!');
+      }
+    } finally {
+      setForgotLoading(false);
+    }
   };
 
-  // Step 2: Verify OTP and automatically send new password via SMS
-  const handleVerifyForgotOtp = () => {
-    if (!forgotOtpInput.trim()) {
-      setForgotError('Vui lòng nhập mã OTP xác thực (6 số) được gửi về tin nhắn SMS!');
+  // Step 2: Verify OTP
+  const handleVerifyForgotOtp = async () => {
+    const cleanOtp = forgotOtpInput.trim();
+    if (!cleanOtp) {
+      setForgotError('Vui lòng nhập mã OTP.');
       return;
     }
 
-    if (forgotOtpInput.trim() !== generatedOtp) {
-      setForgotError(`Mã OTP không chính xác! Vui lòng kiểm tra lại tin nhắn SMS vừa được gửi tới số điện thoại ${accountCredentials[matchedAccountKey]?.phone || forgotAccountInput}.`);
+    const phoneClean = forgotAccountInput.trim().replace(/\D/g, '');
+    setForgotLoading(true);
+    setForgotError(null);
+
+    try {
+      await staffAuthService.verifyForgotOtp(phoneClean, cleanOtp);
+      setForgotStep('new_password');
+      setForgotNewPassInput('');
+      setForgotConfirmPassInput('');
+      setSmsToast(null);
+    } catch {
+      if (cleanOtp === generatedOtp) {
+        setForgotStep('new_password');
+        setForgotNewPassInput('');
+        setForgotConfirmPassInput('');
+        setSmsToast(null);
+      } else {
+        setForgotError('Mã OTP không chính xác. Vui lòng kiểm tra lại!');
+      }
+    } finally {
+      setForgotLoading(false);
+    }
+  };
+
+  // Step 3: Set New Password & Confirm Password
+  const handleResetPassword = async () => {
+    setForgotError(null);
+    if (!forgotNewPassInput || forgotNewPassInput.length < 8) {
+      setForgotError('Mật khẩu mới phải có tối thiểu 8 ký tự!');
+      return;
+    }
+    if (!/[a-zA-Z]/.test(forgotNewPassInput)) {
+      setForgotError('Mật khẩu mới phải chứa ít nhất 1 chữ cái!');
+      return;
+    }
+    if (!/[0-9]/.test(forgotNewPassInput)) {
+      setForgotError('Mật khẩu mới phải chứa ít nhất 1 chữ số!');
+      return;
+    }
+    if (!/[^a-zA-Z0-9]/.test(forgotNewPassInput)) {
+      setForgotError('Mật khẩu mới phải chứa ít nhất 1 ký tự đặc biệt (VD: @, #, $, %, !...)!');
+      return;
+    }
+    if (forgotNewPassInput !== forgotConfirmPassInput) {
+      setForgotError('Mật khẩu xác nhận không khớp!');
       return;
     }
 
-    // Generate secure new password: CX@ + 4 random digits
-    const randomSuffix = Math.floor(1000 + Math.random() * 9000).toString();
-    const newPass = `CX@${randomSuffix}`;
-    setGeneratedNewPassword(newPass);
-    setForgotNewPassword(newPass);
+    const phoneClean = forgotAccountInput.trim().replace(/\D/g, '');
 
-    // Save directly to accountCredentials
+    // 1. Kiểm tra nhanh nếu trùng mật khẩu cũ đã lưu trên frontend
+    const matchedCred = (matchedAccountKey && accountCredentials[matchedAccountKey]) ||
+      Object.values(accountCredentials).find(
+        (c) => c.phone.replace(/\D/g, '') === phoneClean
+      );
+    if (matchedCred && matchedCred.password === forgotNewPassInput) {
+      setForgotError('Bạn đã nhập mật khẩu cũ. Vui lòng chọn mật khẩu mới khác với mật khẩu cũ!');
+      return;
+    }
+
+    setForgotLoading(true);
+
+    try {
+      await staffAuthService.resetPassword(phoneClean, forgotOtpInput.trim(), forgotNewPassInput);
+    } catch (err: any) {
+      const errMsg = err?.message || '';
+      if (errMsg.includes('mật khẩu cũ') || errMsg.includes('mật khẩu hiện tại') || err?.status === 400) {
+        setForgotError(errMsg || 'Bạn đã nhập mật khẩu cũ. Vui lòng chọn mật khẩu mới khác với mật khẩu cũ!');
+        setForgotLoading(false);
+        return;
+      }
+      console.warn('Backend reset password notice:', err);
+    }
+
     if (matchedAccountKey) {
       setAccountCredentials((prev) => ({
         ...prev,
         [matchedAccountKey]: {
           ...prev[matchedAccountKey],
-          password: newPass,
+          password: forgotNewPassInput,
         },
       }));
-    } ``
+    }
 
-    setForgotError(null);
     setForgotStep('success');
-
-    // Send new password via SMS to user's phone ("gửi mật khẩu về đoàng hoàng")
-    const phone = accountCredentials[matchedAccountKey]?.phone || forgotAccountInput;
-    setSmsToast({
-      sender: 'COURTX-SECURITY',
-      phone: phone,
-      message: `COURTX: Mật khẩu mới cho tài khoản SĐT ${phone} của quý khách là: ${newPass}. Vui lòng sử dụng mật khẩu này để đăng nhập ngay.`,
-      newPassword: newPass,
-    });
-  };
-
-  // Optional: User custom password update
-  const handleSaveCustomPassword = () => {
-    if (!customPasswordInput || customPasswordInput.length < 6) {
-      setForgotError('Mật khẩu tự chọn phải có tối thiểu 6 ký tự!');
-      return;
-    }
-
-    if (matchedAccountKey) {
-      setAccountCredentials((prev) => ({
-        ...prev,
-        [matchedAccountKey]: {
-          ...prev[matchedAccountKey],
-          password: customPasswordInput,
-        },
-      }));
-    }
-
-    setGeneratedNewPassword(customPasswordInput);
-    setForgotNewPassword(customPasswordInput);
-    setShowCustomPasswordForm(false);
-    setForgotError(null);
-
-    const phone = accountCredentials[matchedAccountKey]?.phone || forgotAccountInput;
-    setSmsToast({
-      sender: 'COURTX-SECURITY',
-      phone: phone,
-      message: `COURTX: Quý khách đã đổi sang mật khẩu tùy chỉnh: ${customPasswordInput}. Vui lòng ghi nhớ để đăng nhập.`,
-      newPassword: customPasswordInput,
-    });
+    setForgotLoading(false);
   };
 
   const [otpInput, setOtpInput] = useState<string>('');
@@ -408,7 +464,7 @@ export default function TrangChu() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const scrollToBooking = (sportId?: 'badminton' | 'volleyball' | 'football') => {
+  const scrollToBooking = (sportId?: string) => {
     if (sportId) {
       setSelectedSportId(sportId);
       setSportError(null);
@@ -423,29 +479,26 @@ export default function TrangChu() {
     }
   };
 
-  const scrollToFacility = () => {
-    if (activeTab !== 'booking') {
-      setActiveTab('booking');
-      setTimeout(() => {
-        facilityRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }, 100);
-    } else {
-      facilityRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
-  };
-
   const [showScheduleModal, setShowScheduleModal] = useState<boolean>(false);
+  const [isPlayingVideo, setIsPlayingVideo] = useState<boolean>(false);
+  const bannerVideoRef = useRef<HTMLDivElement>(null);
 
   const handleSelectSlotFromSchedule = (
-    sportId: 'badminton' | 'volleyball' | 'football',
+    sportId: string,
     courtName: string,
     time: string,
     dateStr: string,
     fromScheduleTab?: boolean
   ) => {
-    // Tự động gán môn theo sân mà khách bấm chọn
-    setSelectedSportId(sportId);
-    setSportError(null);
+    // Nếu khách chưa chọn môn ở Bước 1 và bấm vào lịch thì báo chữ đỏ & cuộn lên Bước 1
+    if (!selectedSportId && !fromScheduleTab) {
+      setSportError('Vui lòng chọn môn thể thao ở Bước 1 trước khi chọn sân và giờ!');
+      const el = document.getElementById('step-1-sport-section');
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+      return;
+    }
 
     // Nếu khách chưa chọn ngày ở Bước 2 và bấm vào lịch thì báo chữ đỏ & cuộn lên Bước 2
     if (!selectedDate && !fromScheduleTab) {
@@ -454,6 +507,42 @@ export default function TrangChu() {
       if (el) {
         el.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }
+      return;
+    }
+
+    if (fromScheduleTab) {
+      setSelectedSportId(sportId);
+      setSportError(null);
+    }
+
+    // Kiểm tra xem khung giờ này có đang được người khác tạm giữ thanh toán không
+    let checkDate = '';
+    if (dateStr) {
+      const match = dateStr.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+      if (match) {
+        checkDate = `${match[3]}-${match[2].padStart(2, '0')}-${match[1].padStart(2, '0')}`;
+      }
+    }
+    if (!checkDate && scheduleDateObj) {
+      const dYear = scheduleDateObj.getFullYear();
+      const dMonth = (scheduleDateObj.getMonth() + 1).toString().padStart(2, '0');
+      const dDay = scheduleDateObj.getDate().toString().padStart(2, '0');
+      checkDate = `${dYear}-${dMonth}-${dDay}`;
+    }
+
+    const held = courtHoldService.isSlotHeldByAnother(
+      courtName,
+      checkDate,
+      time,
+      30,
+      paymentSessionId
+    );
+
+    if (held) {
+      showAlert(
+        'Sân đang tạm giữ thanh toán!',
+        `Khung giờ ${time} trên ${courtName} hiện đang được một khách hàng khác tạm giữ để quét mã VietQR.\n\nVui lòng chọn khung giờ khác hoặc chờ hết thời gian giữ sân!`
+      );
       return;
     }
 
@@ -499,53 +588,77 @@ export default function TrangChu() {
     setShowBookingPopup(true);
   };
 
-  // Sports Data Definitions
-  const sportsData = {
-    badminton: {
-      id: 'badminton',
-      name: 'Cầu Lông',
-      badge: 'CẦU LÔNG',
-      tagline: 'THI ĐẤU QUỐC TẾ',
-      title: 'Tổ hợp 5 sân Cầu Lông (CL-01 -> CL-05)',
-      description: 'Mặt thảm BWF tiêu chuẩn 4.5mm chống trượt, hệ thống đèn chiếu sáng chống chói Lux LED 1000+, trần cao 11m.',
-      specs: ['MẶT THẢM BWF', 'CHỐNG CHÓI', 'CHUẨN 4.5MM'],
-      pricePerHour: 120000,
-      priceLabel: '120.000 VND / GIỜ',
-      image: '/images/badminton.jpg',
-      icon: ShuttlecockIcon,
-      courts: ['Sân CL-01', 'Sân CL-02', 'Sân CL-03', 'Sân CL-04', 'Sân CL-05'],
-    },
-    football: {
-      id: 'football',
-      name: 'Bóng Đá',
-      badge: 'BÓNG ĐÁ',
-      tagline: 'SÂN CỎ NHÂN TẠO',
-      title: '4 Sân Bóng Đá Mini (BD-01 -> BD-04)',
-      description: 'Sân bóng đá cỏ nhân tạo đạt chuẩn thi đấu mini 5 - 7 người, hệ thống đèn LED chuyên nghiệp, bóng thi đấu đạt chuẩn.',
-      specs: ['SÂN 5 - 7 NGƯỜI', 'ĐÈN LUX 1000', 'CỎ NHÂN TẠO'],
-      pricePerHour: 200000,
-      priceLabel: '200.000 VND / GIỜ',
-      image: '/images/hero_arena.jpg',
-      icon: FootballIcon,
-      courts: ['Sân BD-01', 'Sân BD-02', 'Sân BD-03', 'Sân BD-04'],
-    },
-    volleyball: {
-      id: 'volleyball',
-      name: 'Bóng Chuyền',
-      badge: 'BÓNG CHUYỀN',
-      tagline: 'TRONG NHÀ CAO CẤP',
-      title: '5 Sân Bóng Chuyền (BC-01 -> BC-05)',
-      description: 'Sân bóng chuyền trong nhà mái che cao 12m, thảm thi đấu Taraflex xịn, trụ và lưới căng chuẩn FIVB thi đấu.',
-      specs: ['THẢM TARAFLEX', 'MÁI CHE 12M', 'ĐÈN LUX 1000'],
-      pricePerHour: 150000,
-      priceLabel: '150.000 VND / GIỜ',
-      image: '/images/volleyball.jpg',
-      icon: VolleyballIcon,
-      courts: ['Sân BC-01', 'Sân BC-02', 'Sân BC-03', 'Sân BC-04', 'Sân BC-05'],
-    },
-  };
+  // Dynamic Sports Data Definitions based on Supabase and dynamicCourtStorage
+  const sportsData = useMemo(() => {
+    const baseMeta: Record<string, any> = {
+      badminton: {
+        badge: 'CẦU LÔNG',
+        tagline: 'THI ĐẤU QUỐC TẾ',
+        description: 'Mặt thảm BWF tiêu chuẩn 4.5mm chống trượt, hệ thống đèn chiếu sáng chống chói Lux LED 1000+, trần cao 11m.',
+        specs: ['MẶT THẢM BWF', 'CHỐNG CHÓI', 'CHUẨN 4.5MM'],
+        image: '/images/badminton.jpg',
+        iconComp: ShuttlecockIcon,
+      },
+      football: {
+        badge: 'BÓNG ĐÁ',
+        tagline: 'SÂN CỎ NHÂN TẠO',
+        description: 'Sân bóng đá cỏ nhân tạo đạt chuẩn thi đấu mini 5 - 7 người, hệ thống đèn LED chuyên nghiệp, bóng thi đấu đạt chuẩn.',
+        specs: ['SÂN 5 - 7 NGƯỜI', 'ĐÈN LUX 1000', 'CỎ NHÂN TẠO'],
+        image: '/images/hero_arena.jpg',
+        iconComp: FootballIcon,
+      },
+      volleyball: {
+        badge: 'BÓNG CHUYỀN',
+        tagline: 'TRONG NHÀ CAO CẤP',
+        description: 'Sân bóng chuyền trong nhà mái che cao 12m, thảm thi đấu Taraflex xịn, trụ và lưới căng chuẩn FIVB thi đấu.',
+        specs: ['THẢM TARAFLEX', 'MÁI CHE 12M', 'ĐÈN LUX 1000'],
+        image: '/images/volleyball.jpg',
+        iconComp: VolleyballIcon,
+      },
+      tennis: {
+        badge: 'TENNIS',
+        tagline: 'MẶT SÂN CỨNG TIÊU CHUẨN',
+        description: 'Sân tennis mặt sân cứng Acrylic chuyên nghiệp độ nảy chuẩn ITF, chống trơn trượt, đèn chiếu sáng ban đêm công suất lớn.',
+        specs: ['MẶT SÂN ACRYLIC', 'CHUẨN ITF', 'ĐÈN ĐÊM LUX 1000+'],
+        image: '/images/hero_arena.jpg',
+        iconComp: TennisIcon,
+      },
+    };
 
-  const currentSport = selectedSportId ? sportsData[selectedSportId] : null;
+    const map: Record<string, any> = {};
+    allSports.forEach((sp) => {
+      const courtsInSport = allCourts.filter((c) => c.sportId === sp.id);
+      const courtNames = courtsInSport.map((c) => c.name);
+      const meta = baseMeta[sp.id] || {
+        badge: sp.name.toUpperCase(),
+        tagline: 'TIÊU CHUẨN HIỆN ĐẠI',
+        description: `Hệ thống sân ${sp.name} tiêu chuẩn chất lượng cao, hệ thống chiếu sáng chuyên nghiệp, thảm thi đấu hiện đại.`,
+        specs: ['CHUẨN THI ĐẤU', 'ĐÈN LUX 1000+', 'KHÔNG GIAN THOÁNG'],
+        image: '/images/hero_arena.jpg',
+      };
+
+      map[sp.id] = {
+        id: sp.id,
+        name: sp.name,
+        badge: meta.badge,
+        tagline: meta.tagline,
+        title: `${courtsInSport.length} Sân ${sp.name}`,
+        description: meta.description,
+        specs: meta.specs,
+        pricePerHour: sp.pricePerHour,
+        priceLabel: `${sp.pricePerHour.toLocaleString('vi-VN')} VND / GIỜ`,
+        image: meta.image,
+        icon: sp.icon,
+        iconComp: meta.iconComp,
+        courts: courtNames.length > 0 ? courtNames : [`Sân ${sp.prefix}-01`],
+        courtCount: courtsInSport.length,
+      };
+    });
+
+    return map;
+  }, [allSports, allCourts]);
+
+  const currentSport = selectedSportId ? (sportsData as Record<string, any>)[selectedSportId] : null;
 
 
   // --- EVENT & MULTI-DAY SERIES STATE & CALCULATOR ---
@@ -917,13 +1030,24 @@ export default function TrangChu() {
     setSelectedDuration(newDur);
   };
 
+  const [paymentCd, setPaymentCd] = useState<number>(60);
+  const [paymentSessionId, setPaymentSessionId] = useState<string>('');
+  const [holdTrigger, setHoldTrigger] = useState<number>(0);
+
+  useEffect(() => {
+    return courtHoldService.subscribe(() => {
+      setHoldTrigger((v) => v + 1);
+    });
+  }, []);
+
   // Real-time Booking Conflict Detection:
   const conflictBooking = useMemo(() => {
     if (!selectedCourt || !selectedStartTime || !selectedDuration) return null;
     const reqStart = parseTimeToMinutes(selectedStartTime);
     const reqEnd = reqStart + selectedDuration;
 
-    return liveSchedule.find((b) => {
+    // 1. Kiểm tra với lịch đã đặt chính thức trên hệ thống
+    const booked = liveSchedule.find((b) => {
       const isSameCourt =
         b.courtName === selectedCourt ||
         b.courtCode === selectedCourt ||
@@ -936,7 +1060,37 @@ export default function TrangChu() {
       // Overlap condition: Math.max(start1, start2) < Math.min(end1, end2)
       return Math.max(reqStart, bStart) < Math.min(reqEnd, bEnd);
     });
-  }, [selectedCourt, selectedStartTime, selectedDuration, liveSchedule]);
+
+    if (booked) return booked;
+
+    // 2. Kiểm tra xem có khách khác đang tạm giữ sân trong thời gian ưu tiên không
+    const dYear = scheduleDateObj.getFullYear();
+    const dMonth = (scheduleDateObj.getMonth() + 1).toString().padStart(2, '0');
+    const dDay = scheduleDateObj.getDate().toString().padStart(2, '0');
+    const formattedDate = `${dYear}-${dMonth}-${dDay}`;
+
+    const held = courtHoldService.isSlotHeldByAnother(
+      selectedCourt,
+      formattedDate,
+      selectedStartTime,
+      selectedDuration,
+      paymentSessionId
+    );
+
+    if (held) {
+      return {
+        title: 'Đang có khách tạm giữ thanh toán',
+        courtName: held.courtName,
+        courtCode: held.courtName,
+        startH: Math.floor(parseTimeToMinutes(held.startTime) / 60),
+        startM: parseTimeToMinutes(held.startTime) % 60,
+        endH: Math.floor((parseTimeToMinutes(held.startTime) + held.duration) / 60),
+        endM: (parseTimeToMinutes(held.startTime) + held.duration) % 60,
+      } as any;
+    }
+
+    return null;
+  }, [selectedCourt, selectedStartTime, selectedDuration, liveSchedule, scheduleDateObj, paymentSessionId, holdTrigger]);
 
   // Price Calculation
   const durationHours = selectedDuration / 60;
@@ -948,7 +1102,17 @@ export default function TrangChu() {
     e.preventDefault();
     // Khong chan dat san neu backend loi ket noi
     if(bookingsState.error) { console.warn('Lịch sân warning:', bookingsState.error); }
+    if (!selectedSportId) {
+      setSportError('Vui lòng chọn môn thể thao ở Bước 1!');
+      const el = document.getElementById('step-1-sport-section');
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      showAlert('Chưa chọn môn thể thao', 'Vui lòng chọn môn thể thao ở Bước 1!');
+      return;
+    }
     if (!selectedDate) {
+      setDateError('Vui lòng chọn ngày thi đấu ở Bước 2!');
+      const el = document.getElementById('step-2-date-section');
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
       showAlert('Chưa chọn ngày', 'Vui lòng chọn ngày thi đấu ở Bước 2!');
       return;
     }
@@ -1025,21 +1189,38 @@ export default function TrangChu() {
         return;
       }
 
-      setPaymentSessionId('PAY_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6));
+      const newSession = 'PAY_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
+      setPaymentSessionId(newSession);
+      setPaymentCd(60);
+
+      const dYear = scheduleDateObj.getFullYear();
+      const dMonth = (scheduleDateObj.getMonth() + 1).toString().padStart(2, '0');
+      const dDay = scheduleDateObj.getDate().toString().padStart(2, '0');
+      const formattedDate = `${dYear}-${dMonth}-${dDay}`;
+
+      courtHoldService.holdSlot({
+        sessionId: newSession,
+        courtName: selectedCourt,
+        bookingDate: formattedDate,
+        startTime: selectedStartTime,
+        duration: selectedDuration,
+        customerName,
+        customerPhone,
+        holdSeconds: 60,
+      });
+
       setShowPayment(true);
     } else {
       setOtpError(true);
     }
   };
 
-  const [paymentCd, setPaymentCd] = useState<number>(60);
-  const [paymentSessionId, setPaymentSessionId] = useState<string>('');
-  // URL xác nhận thanh toán mô phỏng cho điện thoại quét QR
+  // URL xác nhận thanh toán mô phỏng cho điện thoại quét QR (sử dụng IP Wi-Fi thực tế của máy)
   const mobilePaymentUrl = useMemo(() => {
     if (!showPayment || !paymentSessionId) return '';
-    let host = typeof window !== 'undefined' ? window.location.hostname : '192.168.1.81';
+    let host = typeof window !== 'undefined' ? window.location.hostname : '192.168.1.65';
     if (host === 'localhost' || host === '127.0.0.1') {
-      host = '192.168.1.81'; // IP mạng nội bộ Wi-Fi để điện thoại truy cập
+      host = '192.168.1.65'; // IP mạng Wi-Fi thực tế của máy tính
     }
     const port = typeof window !== 'undefined' && window.location.port ? ':' + window.location.port : '';
     const protocol = typeof window !== 'undefined' ? window.location.protocol : 'http:';
@@ -1053,6 +1234,22 @@ export default function TrangChu() {
       name: customerName,
     });
     return protocol + '//' + host + port + '/?' + q.toString();
+  }, [showPayment, paymentSessionId, selectedCourt, totalPrice, customerPhone, selectedStartTime, selectedDuration, customerName]);
+
+  // URL mở trực tiếp trên trình duyệt máy tính mà không bị lỗi kết nối IP
+  const localSimulatorUrl = useMemo(() => {
+    if (!showPayment || !paymentSessionId) return '';
+    const q = new URLSearchParams({
+      view: 'phone-payment',
+      session: paymentSessionId,
+      court: selectedCourt,
+      amount: String(totalPrice),
+      phone: customerPhone,
+      time: selectedStartTime + ' (' + selectedDuration + 'p)',
+      name: customerName,
+    });
+    const origin = typeof window !== 'undefined' ? window.location.origin : '';
+    return origin ? `${origin}/?${q.toString()}` : `/?${q.toString()}`;
   }, [showPayment, paymentSessionId, selectedCourt, totalPrice, customerPhone, selectedStartTime, selectedDuration, customerName]);
 
   // Lắng nghe tín hiệu xác nhận từ điện thoại qua Supabase Realtime & LocalStorage
@@ -1106,6 +1303,7 @@ export default function TrangChu() {
     setPaymentCd(60);
     setPaymentTechnicalError(null);
     setPaymentNotification(null);
+    courtHoldService.releaseSlot(paymentSessionId);
   };
 
   // Gateway_1ukmj3e: Chọn "Thanh toán lại" (Flow_0shou4r)
@@ -1119,26 +1317,49 @@ export default function TrangChu() {
     setPaymentTechnicalError(null);
     setShowPayment(false);
     setPaymentCd(60);
+    courtHoldService.releaseSlot(paymentSessionId);
   };
 
-  // Boundary Timer: Hết hạn giữ sân sau 1 phút (Event_0w7d5j0 -> Activity_1a9aema -> Event_18vovxa)
+  // Boundary Timer: Hết hạn giữ sân sau 1 phút
+  // Quy định: Hết thời gian giữ ưu tiên thì giải phóng giữ độc quyền (người khác có thể đặt),
+  // nhưng khách hiện tại VẪN THANH TOÁN ĐƯỢC nếu chưa có ai nhảy vào đặt trước!
   const handleTrigger10MinTimeout = () => {
-    setShowPayment(false);
-    setPaymentCd(60);
-    setPaymentTechnicalError(null);
+    courtHoldService.releaseSlot(paymentSessionId);
     setPaymentNotification(null);
   };
 
   const confirmPaymentReceived = async () => {
-    setShowPayment(false);
-    setPaymentCd(60);
-    setIsSubmitted(true);
-
     try {
       const dYear = scheduleDateObj.getFullYear();
       const dMonth = (scheduleDateObj.getMonth() + 1).toString().padStart(2, '0');
       const dDay = scheduleDateObj.getDate().toString().padStart(2, '0');
       const formattedDate = `${dYear}-${dMonth}-${dDay}`;
+
+      // 1. Kiểm tra tranh chấp thực tế trên Database (Ai thanh toán trước thì tính cho khách đó)
+      const conflictCheck = await courtHoldService.checkRealBookingConflict(
+        selectedCourt,
+        formattedDate,
+        selectedStartTime,
+        selectedDuration
+      );
+
+      if (conflictCheck.hasConflict) {
+        setShowPayment(false);
+        setPaymentCd(60);
+        courtHoldService.releaseSlot(paymentSessionId);
+        void refreshSharedBookings();
+        setPopup({
+          type: 'alert',
+          title: 'Khung giờ đã có người thanh toán trước!',
+          message: `${conflictCheck.message || 'Khung giờ này vừa có khách khác hoàn tất thanh toán trước.'}\n\nDo bạn đã hết thời gian ưu tiên giữ sân nên hệ thống ưu tiên khách thanh toán trước. Nếu bạn đã chuyển khoản, số tiền sẽ được tự động hoàn lại 100% qua VietQR. Vui lòng chọn khung giờ khác!`,
+        });
+        return;
+      }
+
+      setShowPayment(false);
+      setPaymentCd(60);
+      courtHoldService.releaseSlot(paymentSessionId);
+      setIsSubmitted(true);
 
       const sMins = parseTimeToMinutes(selectedStartTime);
       const eMins = sMins + selectedDuration;
@@ -1163,6 +1384,14 @@ export default function TrangChu() {
         if (res.success) {
           if (res.bookingCode) setOrderCode(res.bookingCode);
           if (res.paymentCode) setPaymentCode(res.paymentCode);
+        } else if ((res as any).conflict) {
+          void refreshSharedBookings();
+          setPopup({
+            type: 'alert',
+            title: 'Khung giờ đã có người thanh toán trước!',
+            message: 'Rất tiếc! Khung giờ này vừa có khách khác hoàn tất thanh toán trước. Số tiền của bạn sẽ được hoàn lại tự động qua VietQR.',
+          });
+          return;
         }
       } catch {
         // Fallback qua backend API nếu có
@@ -1181,22 +1410,30 @@ export default function TrangChu() {
         if (saved?.booking?.paymentCode) setPaymentCode(saved.booking.paymentCode);
       }
       window.dispatchEvent(new Event('focus'));
-    } catch (err) {
+    } catch (err: any) {
       console.warn('Lỗi ghi đơn lên Supabase:', err);
-    } finally {
+      if (err?.message?.includes('Khung giờ đã có lượt đặt')) {
+        void refreshSharedBookings();
+        setPopup({
+          type: 'alert',
+          title: 'Khung giờ đã có người thanh toán trước!',
+          message: 'Rất tiếc! Khung giờ này vừa có khách khác hoàn tất thanh toán trước. Số tiền của bạn sẽ được hoàn lại tự động qua VietQR.',
+        });
+      }
     }
   };
 
-  // Tự động kiểm tra thời gian thanh toán theo TOBE_CHAY.bpmn (40s nhắc nhở, 1 phút hết hạn)
+  // Tự động kiểm tra thời gian thanh toán theo TOBE_CHAY.bpmn (40s nhắc nhở, 1 phút hết hạn giữ ưu tiên)
   useEffect(() => {
     if (!showPayment || paymentTechnicalError || showCancelSubprocessModal) {
       return;
     }
-    // Khi đã trôi qua 40 giây (còn 20s: paymentCd === 20): tự động kích hoạt Boundary Timer nhắc nhở
+    // Khi đã trôi qua 40 giây (giả lập 8 phút trong BPMN, còn 20s: paymentCd === 20): tự động kích hoạt Boundary Timer nhắc nhở
     if (paymentCd === 20 && !paymentNotification) {
-      setPaymentNotification('🔔 Nhắc nhở thanh toán (sau 40s): Sân đang tạm giữ sắp hết hạn trong 20 giây, vui lòng quét mã VietQR để hoàn tất!');
+      setPaymentNotification('Nhắc nhở thanh toán: Sân tạm giữ sẽ hết hạn trong 20 giây tới, vui lòng quét mã QR để hoàn tất!');
     }
-    // Khi hết 1 phút (60 giây): tự động kích hoạt Boundary Timer hết hạn giữ sân
+    // Khi hết 1 phút (60 giây): Hết thời gian ưu tiên giữ sân
+    // Giải phóng lượt giữ độc quyền nhưng KHÔNG đóng modal, khách vẫn có thể thanh toán tiếp nếu chưa ai đặt trước!
     if (paymentCd <= 0) {
       handleTrigger10MinTimeout();
       return;
@@ -1204,7 +1441,6 @@ export default function TrangChu() {
     const t = setTimeout(() => setPaymentCd((c) => c - 1), 1000);
     return () => clearTimeout(t);
   }, [showPayment, paymentCd, paymentTechnicalError, showCancelSubprocessModal, paymentNotification]);
-
 
   const handleLookupSearch = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -1401,33 +1637,90 @@ export default function TrangChu() {
               </button>
               <button
                 type="button"
-                onClick={scrollToFacility}
-                className="flex h-10 items-center justify-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50 px-2 text-[11px] font-bold uppercase text-emerald-700 shadow-xs transition active:scale-95 hover:bg-emerald-100 cursor-pointer"
+                onClick={() => {
+                  setIsPlayingVideo((prev) => !prev);
+                  if (!isPlayingVideo) {
+                    bannerVideoRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                  }
+                }}
+                className={`flex h-10 items-center justify-center gap-1.5 rounded-xl border px-2 text-[11px] font-bold uppercase shadow-xs transition active:scale-95 cursor-pointer ${
+                  isPlayingVideo
+                    ? 'border-emerald-600 bg-emerald-700 text-white shadow-emerald-500/20'
+                    : 'border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
+                }`}
               >
-                <Play className='w-4 h-4 fill-current' /> XEM VIDEO
+                <Play className={`w-4 h-4 fill-current ${isPlayingVideo ? 'text-white' : 'text-emerald-700'}`} />
+                {isPlayingVideo ? 'ĐANG PHÁT VIDEO' : 'XEM VIDEO'}
               </button>
             </div>
 
-            {/* Banner Photo Card */}
-            <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-md">
-              <img
-                src="/images/hero_arena.jpg"
-                alt="COURTX Arena Overview"
-                className="h-36 w-full object-cover transition duration-500 hover:scale-105 min-[380px]:h-40"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-slate-950/70 via-transparent to-transparent"></div>
-              <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between gap-2">
-                <span className="rounded-md bg-emerald-500/90 px-2 py-1 text-[8px] font-bold uppercase tracking-wide text-white backdrop-blur-md shadow">
-                  CHUẨN THI ĐẤU BWF & FIVB
-                </span>
-                <span className="shrink-0 text-[8px] font-bold text-white shadow">1000 Lux LED</span>
-              </div>
+            {/* Banner Photo Card / Inline Video Player */}
+            <div 
+              ref={bannerVideoRef}
+              className="relative overflow-hidden rounded-2xl border border-slate-200 bg-slate-950 shadow-md group transition-all aspect-video w-full"
+            >
+              {isPlayingVideo ? (
+                <div className="relative w-full h-full bg-black flex items-center justify-center overflow-hidden">
+                  <video
+                    src="/video_san.mp4"
+                    controls
+                    autoPlay
+                    playsInline
+                    onEnded={() => setIsPlayingVideo(false)}
+                    className="w-full h-full object-cover"
+                  >
+                    Trình duyệt của bạn không hỗ trợ phát video MP4.
+                  </video>
+                  {/* Nút thu nhỏ / đóng video trở lại ảnh bìa */}
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsPlayingVideo(false);
+                    }}
+                    className="absolute top-2.5 right-2.5 z-20 flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-900/85 hover:bg-slate-900 text-white text-[10px] font-bold shadow-md backdrop-blur-xs transition cursor-pointer border border-white/20 active:scale-95"
+                    title="Thu nhỏ và đóng video"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                    <span>Thu nhỏ</span>
+                  </button>
+                </div>
+              ) : (
+                <div
+                  onClick={() => setIsPlayingVideo(true)}
+                  className="relative w-full h-full cursor-pointer"
+                  title="Bấm để phát video giới thiệu sân CourtX ngay tại đây"
+                >
+                  <img
+                    src="/images/hero_arena.jpg"
+                    alt="COURTX Arena Overview"
+                    className="w-full h-full object-cover transition duration-500 group-hover:scale-105 opacity-90 group-hover:opacity-100"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-slate-950/20 to-transparent group-hover:bg-slate-950/40 transition"></div>
+                  
+                  {/* Play Badge Overlay */}
+                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    <div className="w-12 h-12 rounded-full bg-emerald-600/95 text-white flex items-center justify-center shadow-lg shadow-emerald-950/50 backdrop-blur-xs group-hover:scale-110 group-hover:bg-emerald-500 transition duration-200">
+                      <Play className="w-5 h-5 fill-current ml-0.5" />
+                    </div>
+                  </div>
+
+                  <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between gap-2 pointer-events-none">
+                    <span className="rounded-md bg-emerald-500/90 px-2 py-1 text-[8px] font-bold uppercase tracking-wide text-white backdrop-blur-md shadow">
+                      CHUẨN THI ĐẤU BWF & FIVB
+                    </span>
+                    <span className="shrink-0 text-[8px] font-bold text-white shadow flex items-center gap-1 bg-black/50 px-2 py-0.5 rounded-full backdrop-blur-xs">
+                      <Play className="w-2.5 h-2.5 fill-current text-emerald-400" /> Xem video sân
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* 3 Stats Counters Grid */}
             <div className="grid grid-cols-3 gap-2">
               {[
-                ['03', 'MÔN ĐỈNH CAO'],
+                [allSports.length.toString().padStart(2, '0'), 'MÔN ĐỈNH CAO'],
                 ['100%', 'SÂN THI ĐẤU'],
                 ['1000', 'LUX LED'],
               ].map(([val, lbl]) => (
@@ -1449,7 +1742,7 @@ export default function TrangChu() {
                 <p className="text-[10px] font-extrabold uppercase tracking-widest text-emerald-600">
                   ● MẶT BẰNG & TRANG THIẾT BỊ
                 </p>
-                <h2 className="mt-0.5 text-xl font-black text-slate-900">TỔ HỢP 3 MÔN CHUẨN ĐẤU</h2>
+                <h2 className="mt-0.5 text-xl font-black text-slate-900">TỔ HỢP {allSports.length} MÔN CHUẨN ĐẤU</h2>
               </div>
               <button
                 type="button"
@@ -1489,7 +1782,7 @@ export default function TrangChu() {
                     </div>
 
                     <div className="flex flex-wrap gap-1.5">
-                      {sport.specs.map((spec) => (
+                      {sport.specs.map((spec: string) => (
                         <span key={spec} className="rounded bg-slate-100 border border-slate-200 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-slate-600">
                           {spec}
                         </span>
@@ -1535,12 +1828,19 @@ export default function TrangChu() {
 
             {/* ⚡ BƯỚC 1: CHỌN MÔN ĐẶT SÂN */}
             {/* ⚡ BƯỚC 1: CHỌN MÔN THỂ THAO & NIÊM YẾT GIÁ */}
-            <div id="step-1-sport-section" className="rounded-2xl border border-slate-200 bg-white p-3 space-y-2.5 shadow-xs scroll-mt-20">
+            <div
+              id="step-1-sport-section"
+              className={`rounded-2xl bg-white p-3 space-y-2.5 shadow-xs scroll-mt-20 transition-all ${
+                sportError ? 'border-2 border-rose-500 ring-4 ring-rose-100 shadow-md' : 'border border-slate-200'
+              }`}
+            >
               {/* Header: 1 CHỌN MÔN ĐẶT SÂN & NIÊM YẾT CHÍNH THỨC */}
               <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-100">
                 <div className="flex items-center gap-1.5">
-                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-700 text-[10px] font-bold text-white shrink-0">1</span>
-                  <h3 className="text-[11px] font-bold uppercase text-slate-900">
+                  <span className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold text-white shrink-0 ${
+                    sportError ? 'bg-rose-500 animate-pulse' : 'bg-emerald-700'
+                  }`}>1</span>
+                  <h3 className={`text-[11px] font-bold uppercase ${sportError ? 'text-rose-600' : 'text-slate-900'}`}>
                     CHỌN MÔN ĐẶT SÂN
                   </h3>
                 </div>
@@ -1555,115 +1855,76 @@ export default function TrangChu() {
               </div>
 
               {sportError && (
-                <div className="rounded-xl bg-red-50 border border-red-200 p-2.5 text-xs font-bold text-red-600 flex items-center gap-2 animate-bounce">
-                  <AlertTriangle className="w-4 h-4 shrink-0 text-red-600" />
+                <div className="rounded-xl border border-rose-300 bg-rose-50 p-2.5 text-xs font-black text-rose-700 flex items-center gap-2 animate-bounce">
+                  <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
                   <span>{sportError}</span>
                 </div>
               )}
 
-              {/* Bảng chọn 3 môn thể thao & giá niêm yết */}
+              {/* Bảng chọn các môn thể thao & giá niêm yết (Đồng bộ Real-time từ Supabase) */}
               <div className="divide-y divide-slate-100 overflow-hidden rounded-xl border border-slate-200 bg-slate-50/40">
-                {/* Cầu Lông */}
-                <div
-                  onClick={() => {
-                    setSelectedSportId('badminton');
-                    setSportError(null);
-                  }}
-                  className={`min-h-14 px-2 py-2 transition-all cursor-pointer flex items-center justify-between gap-2 ${selectedSportId === 'badminton'
-                      ? 'bg-emerald-50/90 border-l-2 border-l-emerald-700 shadow-2xs'
-                      : 'hover:bg-slate-100/60'
-                    }`}
-                >
-                  <div className="flex items-center gap-2 min-w-0">
-                    <div className={`flex h-8 w-8 items-center justify-center rounded-lg shrink-0 transition [&>svg]:h-5 [&>svg]:w-5 ${selectedSportId === 'badminton' ? 'bg-emerald-700 text-white shadow-xs' : 'bg-emerald-100 text-emerald-800'
-                      }`}>
-                      <ShuttlecockIcon />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="text-[11px] font-bold text-slate-900">Cầu Lông</span>
-                        <span className="text-[8px] font-medium text-slate-500 bg-white px-1 py-0.5 rounded border border-slate-200">5 sân</span>
-                        {selectedSportId === 'badminton' && (
-                          <span className="rounded-full bg-emerald-700 px-1.5 py-0.5 text-[8px] font-bold text-white flex items-center gap-0.5">
-                            <Check className="w-2.5 h-2.5" /> ĐÃ CHỌN
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="text-right shrink-0">
-                    <div className="text-xs font-bold text-emerald-700">120.000 VND</div>
-                    <div className="text-[9px] font-medium text-slate-400">/ giờ / sân</div>
-                  </div>
-                </div>
+                {allSports.map((sportItem) => {
+                  const spDetail = (sportsData as Record<string, any>)[sportItem.id] || sportItem;
+                  const sportCourts = allCourts.filter((c) => c.sportId === sportItem.id);
+                  const isSelected = selectedSportId === sportItem.id;
+                  const IconComp = spDetail.iconComp;
 
-                {/* Bóng Chuyền */}
-                <div
-                  onClick={() => {
-                    setSelectedSportId('volleyball');
-                    setSportError(null);
-                  }}
-                  className={`min-h-14 px-2 py-2 transition-all cursor-pointer flex items-center justify-between gap-2 ${selectedSportId === 'volleyball'
-                      ? 'bg-emerald-50/90 border-l-2 border-l-emerald-700 shadow-2xs'
-                      : 'hover:bg-slate-100/60'
-                    }`}
-                >
-                  <div className="flex items-center gap-2 min-w-0">
-                    <div className={`flex h-8 w-8 items-center justify-center rounded-lg shrink-0 transition [&>svg]:h-5 [&>svg]:w-5 ${selectedSportId === 'volleyball' ? 'bg-emerald-700 text-white shadow-xs' : 'bg-emerald-100 text-emerald-800'
-                      }`}>
-                      <VolleyballIcon />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="text-[11px] font-bold text-slate-900">Bóng Chuyền</span>
-                        <span className="text-[8px] font-medium text-slate-500 bg-white px-1 py-0.5 rounded border border-slate-200">5 sân</span>
-                        {selectedSportId === 'volleyball' && (
-                          <span className="rounded-full bg-emerald-700 px-1.5 py-0.5 text-[8px] font-bold text-white flex items-center gap-0.5">
-                            <Check className="w-2.5 h-2.5" /> ĐÃ CHỌN
-                          </span>
-                        )}
+                  return (
+                    <div
+                      key={sportItem.id}
+                      onClick={() => {
+                        setSelectedSportId(sportItem.id);
+                        setSportError(null);
+                      }}
+                      className={`min-h-14 px-2.5 py-2.5 transition-all cursor-pointer flex items-center justify-between gap-2 ${
+                        isSelected
+                          ? 'bg-emerald-50/90 border-l-4 border-l-emerald-700 shadow-2xs'
+                          : 'hover:bg-slate-100/60'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div
+                          className={`flex h-8 w-8 items-center justify-center rounded-lg shrink-0 transition text-base ${
+                            isSelected
+                              ? 'bg-emerald-700 text-white shadow-xs'
+                              : 'bg-emerald-100 text-emerald-800'
+                          }`}
+                        >
+                          {IconComp ? (
+                            <div className="[&>svg]:h-5 [&>svg]:w-5 flex items-center justify-center">
+                              <IconComp />
+                            </div>
+                          ) : (
+                            <span>{sportItem.icon || '🏅'}</span>
+                          )}
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="text-[11px] font-bold text-slate-900">
+                              {sportItem.name}
+                            </span>
+                            <span className="text-[8px] font-medium text-slate-500 bg-white px-1.5 py-0.5 rounded border border-slate-200">
+                              {sportCourts.length} sân
+                            </span>
+                            {isSelected && (
+                              <span className="rounded-full bg-emerald-700 px-1.5 py-0.5 text-[8px] font-bold text-white flex items-center gap-0.5">
+                                <Check className="w-2.5 h-2.5" /> ĐÃ CHỌN
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <div className="text-xs font-bold text-emerald-700">
+                          {sportItem.pricePerHour.toLocaleString('vi-VN')} VND
+                        </div>
+                        <div className="text-[9px] font-medium text-slate-400">
+                          / giờ / sân
+                        </div>
                       </div>
                     </div>
-                  </div>
-                  <div className="text-right shrink-0">
-                    <div className="text-xs font-bold text-emerald-700">150.000 VND</div>
-                    <div className="text-[9px] font-medium text-slate-400">/ giờ / sân</div>
-                  </div>
-                </div>
-
-                {/* Bóng Đá Mini */}
-                <div
-                  onClick={() => {
-                    setSelectedSportId('football');
-                    setSportError(null);
-                  }}
-                  className={`min-h-14 px-2 py-2 transition-all cursor-pointer flex items-center justify-between gap-2 ${selectedSportId === 'football'
-                      ? 'bg-emerald-50/90 border-l-2 border-l-emerald-700 shadow-2xs'
-                      : 'hover:bg-slate-100/60'
-                    }`}
-                >
-                  <div className="flex items-center gap-2 min-w-0">
-                    <div className={`flex h-8 w-8 items-center justify-center rounded-lg shrink-0 transition [&>svg]:h-5 [&>svg]:w-5 ${selectedSportId === 'football' ? 'bg-emerald-700 text-white shadow-xs' : 'bg-emerald-100 text-emerald-800'
-                      }`}>
-                      <FootballIcon />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="text-[11px] font-bold text-slate-900">Bóng Đá Mini</span>
-                        <span className="text-[8px] font-medium text-slate-500 bg-white px-1 py-0.5 rounded border border-slate-200">4 sân</span>
-                        {selectedSportId === 'football' && (
-                          <span className="rounded-full bg-emerald-700 px-1.5 py-0.5 text-[8px] font-bold text-white flex items-center gap-0.5">
-                            <Check className="w-2.5 h-2.5" /> ĐÃ CHỌN
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="text-right shrink-0">
-                    <div className="text-xs font-bold text-emerald-700">200.000 VND</div>
-                    <div className="text-[9px] font-medium text-slate-400">/ giờ / sân</div>
-                  </div>
-                </div>
+                  );
+                })}
               </div>
 
               {/* Note bar */}
@@ -2633,9 +2894,12 @@ export default function TrangChu() {
                       <button
                         type="button"
                         onClick={() => {
-                          showAlert('Hỗ trợ mật khẩu','Liên hệ chủ sân để đặt lại mật khẩu. Sau khi đăng nhập, bạn có thể đổi mật khẩu trong Hồ sơ cá nhân.');
+                          setLoginView('forgot_password');
+                          setForgotStep('account');
+                          setForgotAccountInput(username.trim());
+                          setForgotError(null);
                         }}
-                        className="text-xs font-bold text-emerald-700 hover:underline"
+                        className="text-xs font-bold text-emerald-700 hover:underline cursor-pointer"
                       >Quên mật khẩu?</button>
                     </div>
                     {loginError&&<p role="alert" className="text-xs text-red-600">{loginError}</p>}
@@ -2649,7 +2913,23 @@ export default function TrangChu() {
                           setIsAdminLoggedIn(account.authRole==='ADMIN');
                           setIsEmployeeLoggedIn(account.authRole==='STAFF');
                           setShowLogin(false);setUsername('');setPasswordInput('');
-                        }catch(error){setLoginError(error instanceof Error?error.message:'Chưa đăng nhập được.');}
+                        }catch(error){
+                          // Hỗ trợ đăng nhập fallback bằng tài khoản cục bộ / sau khi vừa đổi mật khẩu qua Quên mật khẩu
+                          const cleanUser = username.trim().toLowerCase();
+                          const matchedKey = Object.keys(accountCredentials).find(
+                            k => k.toLowerCase() === cleanUser || accountCredentials[k].phone.replace(/\s+/g, '') === cleanUser.replace(/\s+/g, '')
+                          );
+                          if (matchedKey && accountCredentials[matchedKey].password === passwordInput) {
+                            const cred = accountCredentials[matchedKey];
+                            setCurrentUser({ id: matchedKey, name: cred.name, phone: cred.phone, role: cred.role as any });
+                            setIsAdminLoggedIn(cred.role === 'admin');
+                            setIsEmployeeLoggedIn(cred.role === 'employee');
+                            setIsVipLoggedIn(cred.role === 'vip');
+                            setShowLogin(false); setUsername(''); setPasswordInput('');
+                            return;
+                          }
+                          setLoginError(error instanceof Error?error.message:'Chưa đăng nhập được.');
+                        }
                         finally{setLoginSaving(false);}
                       }}
                       className="flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-emerald-700 px-3 text-xs font-black uppercase tracking-wide text-white shadow-sm transition hover:bg-emerald-800 active:scale-[0.98] cursor-pointer"
@@ -2668,6 +2948,7 @@ export default function TrangChu() {
                   onClick={() => {
                     setLoginView('login');
                     setForgotError(null);
+                    setForgotStep('account');
                   }}
                   className="inline-flex items-center gap-1.5 text-xs font-black text-slate-500 hover:text-emerald-700 transition cursor-pointer"
                 >
@@ -2675,11 +2956,11 @@ export default function TrangChu() {
                 </button>
 
                 <div>
-                  <h2 className="text-2xl font-black text-slate-900 uppercase tracking-tight">
+                  <h2 className="text-xl sm:text-2xl font-black text-slate-900 uppercase tracking-tight">
                     QUÊN MẬT KHẨU
                   </h2>
-                  <p className="mt-1 text-xs text-slate-500">
-                    Khôi phục mật khẩu tài khoản CourtX an toàn và nhanh chóng qua mã OTP.
+                  <p className="mt-0.5 text-xs text-slate-500">
+                    Khôi phục mật khẩu tài khoản qua mã xác thực OTP.
                   </p>
                 </div>
 
@@ -2691,25 +2972,22 @@ export default function TrangChu() {
                   <div className={`flex flex-col gap-1 text-center border-b-2 pb-1.5 transition ${forgotStep === 'otp' ? 'border-emerald-600 text-emerald-800' : 'border-slate-200 text-slate-400'}`}>
                     <span className="text-[10px] font-black uppercase">2. Mã OTP</span>
                   </div>
-                  <div className={`flex flex-col gap-1 text-center border-b-2 pb-1.5 transition ${forgotStep === 'success' ? 'border-emerald-600 text-emerald-800' : 'border-slate-200 text-slate-400'}`}>
-                    <span className="text-[10px] font-black uppercase">3. Nhận mật khẩu</span>
+                  <div className={`flex flex-col gap-1 text-center border-b-2 pb-1.5 transition ${forgotStep === 'new_password' || forgotStep === 'success' ? 'border-emerald-600 text-emerald-800' : 'border-slate-200 text-slate-400'}`}>
+                    <span className="text-[10px] font-black uppercase">3. Mật khẩu mới</span>
                   </div>
                 </div>
 
-                {/* Error Banner */}
+                {/* Error Banner (Không chứa gợi ý) */}
                 {forgotError && (
-                  <div className="rounded-2xl border border-red-200 bg-red-50 p-3 text-xs font-bold text-red-700 animate-in fade-in">
-                    {forgotError}
+                  <div className="rounded-2xl border border-red-200 bg-red-50 p-3 text-xs font-bold text-red-700 animate-in fade-in flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 text-red-600 shrink-0" />
+                    <span>{forgotError}</span>
                   </div>
                 )}
 
-                {/* STEP 1: PHONE NUMBER */}
+                {/* BƯỚC 1: NHẬP SỐ ĐIỆN THOẠI */}
                 {forgotStep === 'account' && (
                   <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
-                    <p className="text-xs font-bold text-slate-700">
-                      Nhập số điện thoại đã đăng ký để nhận mã OTP và mật khẩu mới qua SMS:
-                    </p>
-
                     <div>
                       <label className="mb-1.5 block text-xs font-black text-slate-700 uppercase tracking-wider">
                         Số điện thoại đăng ký <span className="text-red-500">*</span>
@@ -2720,7 +2998,7 @@ export default function TrangChu() {
                         </div>
                         <input
                           type="tel"
-                          placeholder="Ví dụ: 0912345678"
+                          placeholder="Nhập số điện thoại đăng ký"
                           value={forgotAccountInput}
                           onChange={(e) => {
                             setForgotAccountInput(e.target.value);
@@ -2729,42 +3007,29 @@ export default function TrangChu() {
                           className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-3.5 pl-12 pr-4 text-sm font-bold text-slate-900 placeholder-slate-400 outline-none focus:border-emerald-500 focus:bg-white transition"
                         />
                       </div>
-                      <p className="mt-1.5 text-[11px] text-slate-400 font-medium leading-relaxed">
-                        Hệ thống sẽ gửi mã xác thực 6 số qua tin nhắn SMS tới số điện thoại này.
-                      </p>
                     </div>
 
                     <button
                       type="button"
+                      disabled={forgotLoading}
                       onClick={() => handleSendForgotOtp()}
                       className="w-full flex items-center justify-center gap-2 rounded-2xl bg-emerald-700 py-3.5 text-xs font-black uppercase tracking-wider text-white shadow-md shadow-emerald-500/20 hover:bg-emerald-800 active:scale-95 transition cursor-pointer"
                     >
-                      Tiếp tục & Gửi mã OTP qua SMS <Zap className="w-4 h-4 fill-current" />
+                      {forgotLoading ? 'Đang gửi mã...' : 'Tiếp tục & Gửi mã OTP'} <Zap className="w-4 h-4 fill-current" />
                     </button>
                   </div>
                 )}
 
-                {/* STEP 2: VERIFY OTP */}
+                {/* BƯỚC 2: NHẬP MÃ OTP */}
                 {forgotStep === 'otp' && (
                   <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
-                    {/* Header info */}
-                    <div className="rounded-2xl bg-emerald-50 border border-emerald-100 p-3.5 flex items-center justify-between text-xs font-bold text-emerald-900">
-                      <div>
-                        <span className="text-[10px] text-emerald-600 uppercase block font-black">Khôi phục tài khoản:</span>
-                        <span>{accountCredentials[matchedAccountKey]?.name || matchedAccountKey}</span>
-                      </div>
-                      <span className="font-mono text-xs px-2.5 py-1 rounded-lg bg-emerald-200/70 text-emerald-900 font-black">
-                        {accountCredentials[matchedAccountKey]?.phone || forgotAccountInput}
+                    <div className="rounded-2xl bg-emerald-50 border border-emerald-100 p-3 flex items-center justify-between text-xs font-bold text-emerald-900">
+                      <span>Mã xác thực đã gửi tới SĐT:</span>
+                      <span className="font-mono text-xs px-2 py-0.5 rounded-lg bg-emerald-200/70 text-emerald-900 font-black">
+                        {forgotAccountInput}
                       </span>
                     </div>
 
-                    <p className="text-xs text-slate-600 leading-relaxed font-medium">
-                      Mã xác thực OTP gồm 6 chữ số đã được gửi qua tin nhắn SMS tới số điện thoại{' '}
-                      <strong className="text-slate-900 font-black">{accountCredentials[matchedAccountKey]?.phone || forgotAccountInput}</strong>.
-                      Vui lòng kiểm tra tin nhắn và nhập mã xác thực bên dưới:
-                    </p>
-
-                    {/* OTP Input */}
                     <div>
                       <label className="mb-2 block text-xs font-black text-slate-700 uppercase tracking-wider text-center">
                         Nhập mã xác thực 6 số (OTP) <span className="text-red-500">*</span>
@@ -2791,22 +3056,10 @@ export default function TrangChu() {
                       ) : (
                         <button
                           type="button"
-                          onClick={() => {
-                            const newOtp = Math.floor(100000 + Math.random() * 900000).toString();
-                            setGeneratedOtp(newOtp);
-                            setForgotOtpCountdown(60);
-                            setForgotError(null);
-                            const phone = accountCredentials[matchedAccountKey]?.phone || forgotAccountInput;
-                            setSmsToast({
-                              sender: 'COURTX-OTP',
-                              phone: phone,
-                              message: `Mã OTP xác thực mới của quý khách là: ${newOtp} (hiệu lực 60s). Tuyệt đối không chia sẻ mã này.`,
-                              otp: newOtp,
-                            });
-                          }}
+                          onClick={() => handleSendForgotOtp()}
                           className="inline-flex items-center gap-1 font-bold text-emerald-600 hover:underline cursor-pointer"
                         >
-                          <RefreshCw className="w-3.5 h-3.5" /> Gửi lại mã OTP qua SMS
+                          <RefreshCw className="w-3.5 h-3.5" /> Gửi lại mã OTP
                         </button>
                       )}
 
@@ -2824,15 +3077,114 @@ export default function TrangChu() {
 
                     <button
                       type="button"
+                      disabled={forgotLoading}
                       onClick={handleVerifyForgotOtp}
                       className="w-full flex items-center justify-center gap-2 rounded-2xl bg-emerald-700 py-3.5 text-xs font-black uppercase tracking-wider text-white shadow-md shadow-emerald-500/20 hover:bg-emerald-800 active:scale-95 transition cursor-pointer"
                     >
-                      Xác nhận mã OTP & Nhận mật khẩu mới <Zap className="w-4 h-4 fill-current" />
+                      {forgotLoading ? 'Đang xác thực...' : 'Xác nhận mã OTP'} <Zap className="w-4 h-4 fill-current" />
                     </button>
                   </div>
                 )}
 
-                {/* STEP 3: SUCCESS VIEW - RECEIVED NEW PASSWORD VIA SMS */}
+                {/* BƯỚC 3: NHẬP MẬT KHẨU MỚI VÀ XÁC NHẬN MẬT KHẨU */}
+                {forgotStep === 'new_password' && (
+                  <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
+                    <p className="text-xs font-bold text-slate-700">
+                      Tạo mật khẩu mới cho tài khoản SĐT <span className="text-emerald-700 font-black">{forgotAccountInput}</span>:
+                    </p>
+
+                    <div>
+                      <label className="mb-1.5 block text-xs font-black text-slate-700 uppercase tracking-wider">
+                        Mật khẩu mới <span className="text-red-500">*</span>
+                      </label>
+                      <div className="relative">
+                        <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none text-slate-400">
+                          <Lock className="w-5 h-5" />
+                        </div>
+                        <input
+                          type={showNewPass ? 'text' : 'password'}
+                          placeholder="Mật khẩu mới (tối thiểu 8 ký tự)"
+                          value={forgotNewPassInput}
+                          onChange={(e) => {
+                            setForgotNewPassInput(e.target.value);
+                            setForgotError(null);
+                          }}
+                          className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-3.5 pl-12 pr-11 text-sm font-bold text-slate-900 placeholder-slate-400 outline-none focus:border-emerald-500 focus:bg-white transition"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowNewPass(!showNewPass)}
+                          className="absolute inset-y-0 right-0 flex items-center pr-3.5 text-slate-400 hover:text-slate-600 cursor-pointer"
+                        >
+                          {showNewPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                      </div>
+
+                      {/* Ràng buộc mật khẩu */}
+                      <p className="mt-2 text-[11px] font-bold text-slate-600 leading-normal">
+                        * Phải có ít nhất 8 ký tự, gồm chữ cái, chữ số và ít nhất 1 ký tự đặc biệt
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="mb-1.5 block text-xs font-black text-slate-700 uppercase tracking-wider">
+                        Xác nhận mật khẩu mới <span className="text-red-500">*</span>
+                      </label>
+                      <div className="relative">
+                        <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none text-slate-400">
+                          <Lock className="w-5 h-5" />
+                        </div>
+                        <input
+                          type={showConfirmPass ? 'text' : 'password'}
+                          placeholder="Nhập lại mật khẩu mới"
+                          value={forgotConfirmPassInput}
+                          onChange={(e) => {
+                            setForgotConfirmPassInput(e.target.value);
+                            setForgotError(null);
+                          }}
+                          className={`w-full rounded-2xl border py-3.5 pl-12 pr-11 text-sm font-bold text-slate-900 placeholder-slate-400 outline-none transition ${
+                            forgotConfirmPassInput.length > 0
+                              ? forgotConfirmPassInput === forgotNewPassInput
+                                ? 'border-emerald-500 bg-emerald-50/20 focus:border-emerald-600 focus:bg-white'
+                                : 'border-red-500 bg-red-50/30 focus:border-red-600 focus:bg-white'
+                              : 'border-slate-200 bg-slate-50 focus:border-emerald-500 focus:bg-white'
+                          }`}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowConfirmPass(!showConfirmPass)}
+                          className="absolute inset-y-0 right-0 flex items-center pr-3.5 text-slate-400 hover:text-slate-600 cursor-pointer"
+                        >
+                          {showConfirmPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                      </div>
+
+                      {/* Thông báo kiểm tra khớp mật khẩu */}
+                      {forgotConfirmPassInput.length > 0 && (
+                        forgotConfirmPassInput === forgotNewPassInput ? (
+                          <p className="mt-1.5 text-[11px] font-bold text-emerald-600 flex items-center gap-1 animate-in fade-in">
+                            <Check className="w-3.5 h-3.5 text-emerald-600" /> Mật khẩu xác nhận đã khớp
+                          </p>
+                        ) : (
+                          <p className="mt-1.5 text-[11px] font-bold text-red-600 flex items-center gap-1 animate-in fade-in">
+                            <AlertTriangle className="w-3.5 h-3.5 text-red-600" /> Mật khẩu xác nhận không khớp
+                          </p>
+                        )
+                      )}
+                    </div>
+
+                    <button
+                      type="button"
+                      disabled={forgotLoading}
+                      onClick={handleResetPassword}
+                      className="w-full flex items-center justify-center gap-2 rounded-2xl bg-emerald-700 py-3.5 text-xs font-black uppercase tracking-wider text-white shadow-md shadow-emerald-500/20 hover:bg-emerald-800 active:scale-95 transition cursor-pointer"
+                    >
+                      {forgotLoading ? 'Đang cập nhật...' : 'Xác nhận đổi mật khẩu'} <Zap className="w-4 h-4 fill-current" />
+                    </button>
+                  </div>
+                )}
+
+                {/* BƯỚC 4: THÀNH CÔNG */}
                 {forgotStep === 'success' && (
                   <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm text-center space-y-4 animate-in zoom-in-95">
                     <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 border-2 border-emerald-300">
@@ -2841,101 +3193,24 @@ export default function TrangChu() {
 
                     <div>
                       <h3 className="text-lg font-black text-slate-900 uppercase">
-                        Mật khẩu mới đã được gửi về SMS!
+                        Đổi mật khẩu thành công!
                       </h3>
                       <p className="mt-1 text-xs text-slate-500 leading-relaxed font-medium">
-                        Hệ thống đã tạo và gửi mật khẩu mới qua tin nhắn SMS tới số điện thoại{' '}
-                        <strong className="text-emerald-700 font-black">{accountCredentials[matchedAccountKey]?.phone || forgotAccountInput}</strong>.
+                        Mật khẩu tài khoản SĐT <strong className="text-emerald-700 font-black">{forgotAccountInput}</strong> đã được cập nhật thành công. Vui lòng đăng nhập với mật khẩu mới.
                       </p>
-                    </div>
-
-                    {/* New Password Card */}
-                    <div className="rounded-2xl bg-slate-50 border border-slate-200 p-4 text-left space-y-2.5">
-                      <div className="flex items-center justify-between text-xs pb-1.5 border-b border-slate-200">
-                        <span className="text-slate-500 font-medium">Tài khoản:</span>
-                        <span className="font-black text-slate-800">{accountCredentials[matchedAccountKey]?.name || matchedAccountKey}</span>
-                      </div>
-                      <div className="flex items-center justify-between text-xs pb-1.5 border-b border-slate-200">
-                        <span className="text-slate-500 font-medium">Số điện thoại:</span>
-                        <span className="font-mono font-bold text-slate-700">{accountCredentials[matchedAccountKey]?.phone || forgotAccountInput}</span>
-                      </div>
-                      <div className="flex items-center justify-between pt-1">
-                        <div>
-                          <span className="text-[10px] text-slate-400 font-bold uppercase block">MẬT KHẨU MỚI:</span>
-                          <span className="font-mono font-black text-base text-emerald-700 tracking-wider">
-                            {generatedNewPassword || forgotNewPassword}
-                          </span>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            navigator.clipboard.writeText(generatedNewPassword || forgotNewPassword);
-                            setCopiedPassword(true);
-                            setTimeout(() => setCopiedPassword(false), 2000);
-                          }}
-                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-emerald-300 bg-white text-emerald-700 hover:bg-emerald-50 text-xs font-bold transition active:scale-95 cursor-pointer shadow-2xs"
-                        >
-                          {copiedPassword ? (
-                            <>
-                              <Check className="w-3.5 h-3.5 text-emerald-600" />
-                              <span>Đã sao chép</span>
-                            </>
-                          ) : (
-                            <>
-                              <Copy className="w-3.5 h-3.5" />
-                              <span>Sao chép</span>
-                            </>
-                          )}
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Option to customize password */}
-                    {!showCustomPasswordForm ? (
-                      <button
-                        type="button"
-                        onClick={() => setShowCustomPasswordForm(true)}
-                        className="text-[11px] font-bold text-emerald-700 hover:underline cursor-pointer block mx-auto"
-                      >
-                        ✏️ Bạn muốn tự đổi mật khẩu theo ý muốn?
-                      </button>
-                    ) : (
-                      <div className="rounded-2xl border border-emerald-200 bg-emerald-50/50 p-3.5 text-left space-y-2 animate-in fade-in">
-                        <span className="text-xs font-black text-slate-800 block">Đặt mật khẩu tùy chỉnh của bạn:</span>
-                        <div className="flex gap-2">
-                          <input
-                            type="text"
-                            placeholder="Nhập mật khẩu mới (>= 6 ký tự)"
-                            value={customPasswordInput}
-                            onChange={(e) => setCustomPasswordInput(e.target.value)}
-                            className="flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-900 outline-none focus:border-emerald-600"
-                          />
-                          <button
-                            type="button"
-                            onClick={handleSaveCustomPassword}
-                            className="rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white px-3 py-2 text-xs font-black active:scale-95 transition cursor-pointer"
-                          >
-                            Lưu
-                          </button>
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="rounded-xl bg-amber-50 border border-amber-200 p-2.5 text-[11px] text-amber-800 text-left font-medium leading-relaxed">
-                      💡 <strong>Lưu ý:</strong> Vui lòng ghi nhớ mật khẩu trên hoặc kiểm tra tin nhắn SMS để sử dụng cho các lần đăng nhập tiếp theo.
                     </div>
 
                     <button
                       type="button"
                       onClick={() => {
                         setLoginView('login');
-                        setUsername(accountCredentials[matchedAccountKey]?.phone || matchedAccountKey);
-                        setPasswordInput(generatedNewPassword || forgotNewPassword);
+                        setUsername(forgotAccountInput);
+                        setPasswordInput(forgotNewPassInput);
                         setForgotStep('account');
                       }}
                       className="w-full flex items-center justify-center gap-2 rounded-2xl bg-emerald-700 py-3.5 text-xs font-black uppercase tracking-wider text-white shadow-md shadow-emerald-500/20 hover:bg-emerald-800 active:scale-95 transition cursor-pointer"
                     >
-                      Đăng nhập ngay với mật khẩu mới <Zap className="w-4 h-4 fill-current" />
+                      Đăng nhập ngay <Zap className="w-4 h-4 fill-current" />
                     </button>
                   </div>
                 )}
@@ -3229,26 +3504,41 @@ export default function TrangChu() {
           <div className="w-full max-w-md rounded-t-3xl sm:rounded-3xl bg-white p-6 shadow-2xl animate-in slide-in-from-bottom-8 duration-300 flex flex-col items-center max-h-[92vh] overflow-y-auto">
             <div className="w-12 h-1.5 bg-slate-200 rounded-full mb-4 sm:hidden"></div>
 
-            {/* Trạng thái Tạm giữ sân (Activity_056bcoz) */}
-            <div className="w-full mb-3 flex items-center justify-between bg-emerald-50 border border-emerald-300 rounded-xl px-3 py-1.5 text-[11px] text-emerald-900 font-bold">
-              <span className="flex items-center gap-1.5">
-                <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                Đang tạm giữ {selectedCourt}
-              </span>
-              <span className="text-[10px] font-semibold flex items-center gap-1">
-                <span className="text-emerald-800">Tạm giữ sân:</span>
-                <span className={`font-mono font-bold px-1.5 py-0.5 rounded transition ${
-                  paymentCd <= 20
-                    ? 'bg-amber-100 text-amber-800 animate-pulse ring-1 ring-amber-300'
-                    : 'bg-emerald-100/90 text-emerald-900'
-                }`}>
-                  {Math.floor(paymentCd / 60)}:{(paymentCd % 60).toString().padStart(2, '0')}
+            {/* Trạng thái Tạm giữ sân */}
+            {paymentCd > 0 ? (
+              <div className="w-full mb-3 flex items-center justify-between bg-emerald-50 border border-emerald-300 rounded-xl px-3 py-1.5 text-[11px] text-emerald-900 font-bold">
+                <span className="flex items-center gap-1.5">
+                  <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                  Đang tạm giữ {selectedCourt}
                 </span>
-              </span>
-            </div>
+                <span className="text-[10px] font-semibold flex items-center gap-1">
+                  <span className="text-emerald-800">Tạm giữ ưu tiên:</span>
+                  <span className={`font-mono font-bold px-1.5 py-0.5 rounded transition ${
+                    paymentCd <= 20
+                      ? 'bg-amber-100 text-amber-800 animate-pulse ring-1 ring-amber-300'
+                      : 'bg-emerald-100/90 text-emerald-900'
+                  }`}>
+                    {Math.floor(paymentCd / 60)}:{(paymentCd % 60).toString().padStart(2, '0')}
+                  </span>
+                </span>
+              </div>
+            ) : (
+              <div className="w-full mb-3 flex items-start gap-2.5 bg-amber-50 border border-amber-300 rounded-xl p-2.5 text-[11px] text-amber-900 leading-tight animate-in fade-in">
+                <Clock className="h-4 w-4 text-amber-700 shrink-0 mt-0.5" />
+                <div>
+                  <div className="flex items-center gap-1.5">
+                    <p className="font-extrabold text-amber-950">Hết thời gian ưu tiên giữ sân</p>
+                    <span className="rounded bg-amber-200/80 px-1 py-0.2 text-[9px] font-black text-amber-900">VẪN THANH TOÁN ĐƯỢC</span>
+                  </div>
+                  <p className="text-[10px] text-amber-800 mt-1 font-medium">
+                    Nếu có khách khác thanh toán trước, hệ thống sẽ ưu tiên khách thanh toán trước.
+                  </p>
+                </div>
+              </div>
+            )}
 
-            {/* Thông báo nhắc nhở sau 8 phút (Event_1510897 -> Activity_0xxhd0u) */}
-            {paymentNotification && (
+            {/* Thông báo nhắc nhở sau 8 phút (chỉ hiển thị khi còn trong thời gian giữ sân paymentCd > 0) */}
+            {paymentNotification && paymentCd > 0 && (
               <div className="w-full mb-3 rounded-xl bg-amber-500 text-white p-2.5 text-xs font-bold flex items-center justify-between shadow-md animate-in slide-in-from-top-2">
                 <div className="flex items-center gap-2">
                   <Bell className="h-4 w-4 shrink-0" />
@@ -3310,7 +3600,7 @@ export default function TrangChu() {
                   <div className="mt-2 text-center">
                     <p className="text-[11px] font-bold text-slate-700">📱 Lấy điện thoại quét mã QR để chuyển tiền</p>
                     <a
-                      href={mobilePaymentUrl}
+                      href={localSimulatorUrl || mobilePaymentUrl}
                       target="_blank"
                       rel="noreferrer"
                       className="inline-block mt-0.5 text-[10px] font-bold text-blue-600 hover:text-blue-800 underline"
@@ -3362,25 +3652,18 @@ export default function TrangChu() {
       {showCancelSubprocessModal && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="w-full max-w-sm rounded-3xl border border-amber-300 bg-white p-5 shadow-2xl space-y-4 animate-in zoom-in-95 duration-150">
-            <div className="flex items-center gap-3 border-b border-slate-100 pb-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-amber-100 text-amber-700">
+            <div className="flex flex-col items-center justify-center text-center border-b border-slate-100 pb-3 gap-2">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-amber-100 text-amber-700">
                 <AlertTriangle className="h-5 w-5" />
               </div>
               <div>
                 <h4 className="text-sm font-black text-slate-900">Xác nhận hủy thanh toán</h4>
-                <p className="text-[10px] font-bold text-amber-700 uppercase tracking-wide">Quy trình phụ (Event Sub-process)</p>
+                <p className="text-[11px] text-slate-500 mt-0.5">Hủy yêu cầu đặt sân</p>
               </div>
             </div>
 
-            <div className="rounded-xl bg-amber-50/70 p-3 text-xs text-amber-900 border border-amber-200/70 space-y-2 leading-relaxed">
-              <p className="font-semibold">
-                Bạn có chắc chắn muốn hủy thanh toán và thoát? Hệ thống sẽ kích hoạt quy trình phụ để xử lý:
-              </p>
-              <ul className="list-disc pl-4 space-y-1 text-[11px] text-amber-800">
-                <li>Hủy yêu cầu đặt sân hiện tại</li>
-                <li>Giải phóng khung giờ <strong className="font-bold">{selectedStartTime} ({selectedCourt})</strong> trên lịch sân</li>
-                <li>Ghi nhận phiên đặt sân bị hủy vào hệ thống</li>
-              </ul>
+            <div className="rounded-xl bg-amber-50/70 p-3.5 text-sm font-semibold text-amber-900 border border-amber-200/70 text-center">
+              Bạn xác nhận muốn hủy không?
             </div>
 
             <div className="grid grid-cols-2 gap-2 pt-1">
@@ -3396,7 +3679,7 @@ export default function TrangChu() {
                 onClick={handleExecuteCancelSubprocess}
                 className="rounded-xl bg-red-600 py-2.5 text-xs font-bold text-white shadow-md hover:bg-red-700 active:scale-95 transition cursor-pointer"
               >
-                Xác nhận hủy yêu cầu
+                Xác nhận hủy
               </button>
             </div>
           </div>
@@ -3563,6 +3846,8 @@ export default function TrangChu() {
           </div>
         </div>
       )}
+
+
 
       {/* ======================================================== */}
       {/* 🟢 FIXED MOBILE BOTTOM NAVIGATION BAR (CONSTRAINED WRAPPER) */}

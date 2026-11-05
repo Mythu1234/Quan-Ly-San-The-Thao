@@ -199,6 +199,38 @@ export const paymentBookingService = {
       const bankRef = `VQR${Date.now().toString().slice(-8)}`;
       console.log('🔑 Mã mới sinh:', { bookingCode, paymentCode, bankRef });
 
+      // 4.5. Kiểm tra tranh chấp (race condition): Đảm bảo chưa có khách nào thanh toán trước khung giờ này
+      const { data: existingBookings } = await supabase
+        .from('dat_san')
+        .select('ma_dat_san, gio_bat_dau, gio_ket_thuc, trang_thai')
+        .eq('ma_san', courtId)
+        .eq('ngay_dat', dateFormatted)
+        .neq('trang_thai', 'DA_HUY');
+
+      if (existingBookings && existingBookings.length > 0) {
+        const toMins = (t: string) => {
+          const [h, m] = t.split(':').map(Number);
+          return (h || 0) * 60 + (m || 0);
+        };
+        const reqStartMins = toMins(start);
+        const reqEndMins = toMins(end);
+
+        const hasConflict = existingBookings.some((eb: any) => {
+          const ebStart = toMins((eb.gio_bat_dau || '').slice(0, 5));
+          const ebEnd = toMins((eb.gio_ket_thuc || '').slice(0, 5));
+          return Math.max(reqStartMins, ebStart) < Math.min(reqEndMins, ebEnd);
+        });
+
+        if (hasConflict) {
+          console.warn('⚠️ Xung đột: Khung giờ đã có khách khác thanh toán trước!');
+          return {
+            success: false,
+            conflict: true,
+            error: new Error('Khung giờ này vừa có khách khác thanh toán trước. Hệ thống sẽ tự động hoàn tiền lại cho bạn.'),
+          };
+        }
+      }
+
       // 5. Tạo bản ghi đơn đặt sân trong bảng `dat_san`
       // Cột chuẩn: ma_nhan_vien (chứ KHÔNG PHẢI ma_nhan_vien_tao)
       const { error: dsError } = await supabase.from('dat_san').insert({

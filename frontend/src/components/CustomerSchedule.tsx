@@ -3,13 +3,22 @@ import useVietnamToday from '../hooks/useVietnamToday';
 import useSharedBookings from '../hooks/useSharedBookings';
 import { scheduleBookingsForDate } from '../utils/courtBookingWarnings';
 import useCourtAvailability, { isCourtLocked } from '../hooks/useCourtAvailability';
-import { Calendar, ChevronLeft, ChevronRight, LayoutGrid, CheckCircle2, ArrowRight, ZoomIn, ZoomOut } from 'lucide-react';
+import { Calendar, ChevronLeft, ChevronRight, LayoutGrid, CheckCircle2, ArrowRight, ZoomIn, ZoomOut, AlertTriangle, CircleX } from 'lucide-react';
+import { courtHoldService } from '../services/courtHoldService';
+import {
+  type SportCategoryItem,
+  type AdminCourtItem,
+  getAdminCourts,
+  getAdminSports,
+  syncCourtsWithBackend,
+  COURTS_UPDATED_EVENT,
+} from '../utils/dynamicCourtStorage';
 
 export interface CourtItem {
   id: string;
   code: string;
   name: string;
-  sportId: 'badminton' | 'volleyball' | 'football';
+  sportId: string;
   sportName: string;
   pricePerHour: number;
 }
@@ -40,7 +49,7 @@ export interface CourtBookingRecord {
   id: string;
   courtCode: string;
   courtName: string;
-  sportId: 'badminton' | 'volleyball' | 'football';
+  sportId: string;
   startH: number;
   startM: number;
   endH: number;
@@ -75,7 +84,7 @@ export const STANDARD_15_BOOKINGS: CourtBookingRecord[] = [
 
 export interface ScheduleBooking {
   id: string;
-  sport: 'badminton' | 'volleyball' | 'football';
+  sport: string;
   sportName: string;
   startH: number;
   startM: number;
@@ -86,13 +95,13 @@ export interface ScheduleBooking {
 }
 
 interface CustomerScheduleProps {
-  initialSport?: 'all' | 'badminton' | 'volleyball' | 'football' | null;
+  initialSport?: string | null;
   initialDate?: Date;
   selectedCourtName?: string;
   selectedTimeStr?: string;
   selectedDurationMinutes?: number;
   onSelectSlot?: (
-    sportId: 'badminton' | 'volleyball' | 'football', 
+    sportId: string, 
     courtName: string, 
     time: string, 
     date: string
@@ -114,7 +123,19 @@ export default function CustomerSchedule({
   hideHeaderControls = false,
 }: CustomerScheduleProps) {
   const [courtStatuses] = useCourtAvailability();
-  const [selectedSport, setSelectedSport] = useState<'all' | 'badminton' | 'volleyball' | 'football'>(initialSport || 'all');
+  const [customerCourts, setCustomerCourts] = useState<AdminCourtItem[]>(() => getAdminCourts());
+  const [customerSports, setCustomerSports] = useState<SportCategoryItem[]>(() => getAdminSports());
+  const [selectedSport, setSelectedSport] = useState<string>(initialSport || 'all');
+
+  useEffect(() => {
+    void syncCourtsWithBackend();
+    const handleUpdate = () => {
+      setCustomerCourts(getAdminCourts());
+      setCustomerSports(getAdminSports());
+    };
+    window.addEventListener(COURTS_UPDATED_EVENT, handleUpdate);
+    return () => window.removeEventListener(COURTS_UPDATED_EVENT, handleUpdate);
+  }, []);
   const today = useVietnamToday();
   const previousTodayRef = useRef(today);
   const [selectedDate, setSelectedDate] = useState<Date>(initialDate || today);
@@ -128,15 +149,42 @@ export default function CustomerSchedule({
     }
     previousTodayRef.current = today;
   }, [today, initialDate]);
+
+  const [, setHoldsTicker] = useState<number>(0);
+  useEffect(() => {
+    const unsub = courtHoldService.subscribe(() => {
+      setHoldsTicker((v) => v + 1);
+    });
+    const interval = setInterval(() => {
+      setHoldsTicker((v) => v + 1);
+    }, 1000);
+    return () => {
+      unsub();
+      clearInterval(interval);
+    };
+  }, []);
+
   const [intervalMode, setIntervalMode] = useState<30 | 60>(60); // 30 mins or 60 mins (default 1h)
+
   const [zoomMode, setZoomMode] = useState<'compact' | 'standard'>('compact'); // 'compact' thu nhỏ nhiều cột (54px), 'standard' mở rộng (72px)
   const [selectedSlotModal, setSelectedSlotModal] = useState<{
-    sportId: 'badminton' | 'volleyball' | 'football';
+    sportId: string;
     sportName: string;
     courtName: string;
     time: string;
     price: string;
   } | null>(null);
+
+  // Custom modal popup thay thế alert mặc định của trình duyệt
+  const [schedulePopup, setSchedulePopup] = useState<{
+    type?: 'warning' | 'info' | 'danger' | 'success';
+    title: string;
+    message: string;
+  } | null>(null);
+
+  const showAlert = (title: string, message: string, type: 'warning' | 'info' | 'danger' | 'success' = 'warning') => {
+    setSchedulePopup({ title, message, type });
+  };
 
   // Sync initialSport if provided
   useEffect(() => {
@@ -255,9 +303,9 @@ export default function CustomerSchedule({
 
   // Filter courts by sport
   const displayedCourts = useMemo(() => {
-    return STANDARD_15_COURTS.filter(c => !isCourtLocked(c.code)
+    return customerCourts.filter(c => !isCourtLocked(c.code)
       && (selectedSport === 'all' || c.sportId === selectedSport));
-  }, [selectedSport, courtStatuses]);
+  }, [selectedSport, courtStatuses, customerCourts]);
 
   const parseTimeToMinutes = (t: string) => {
     const [h, m] = t.split(':').map(Number);
@@ -274,8 +322,20 @@ export default function CustomerSchedule({
     });
   };
 
-  const handleSlotClick = (sportId: 'badminton' | 'volleyball' | 'football', courtName: string, time: string, price: string) => {
+  const handleSlotClick = (sportId: string, courtName: string, time: string, price: string) => {
     if (isCourtLocked(courtName)) return;
+
+    // Kiểm tra xem khung giờ có đang bị khách khác tạm giữ thanh toán không
+    const held = courtHoldService.isSlotHeldByAnother(courtName, htmlDate, time, 30);
+    if (held) {
+      showAlert(
+        'Khung giờ đang được tạm giữ!',
+        `Sân ${courtName} lúc ${time} đang được một khách hàng khác tạm giữ để thanh toán VietQR.\n\nVui lòng chọn khung giờ khác hoặc chờ hết thời gian giữ sân!`,
+        'warning'
+      );
+      return;
+    }
+
     if (onSelectSlot) {
       onSelectSlot(sportId, courtName, time, formatDate(selectedDate));
       return;
@@ -316,7 +376,7 @@ export default function CustomerSchedule({
                   selectedSport === 'all' ? 'bg-emerald-700 text-white shadow-2xs' : 'bg-emerald-50 text-emerald-800'
                 }`}
               >
-                {initialSport && initialSport !== 'all' ? 'Xem tất cả sân đang mở' : `Tất cả ${STANDARD_15_COURTS.filter(c => !isCourtLocked(c.code)).length} sân đang mở`}
+                {initialSport && initialSport !== 'all' ? 'Xem tất cả sân đang mở' : `Tất cả ${customerCourts.filter(c => !isCourtLocked(c.code)).length} sân đang mở`}
               </button>
             </div>
 
@@ -328,6 +388,10 @@ export default function CustomerSchedule({
               <span className="flex items-center gap-1 text-amber-800">
                 <span className="w-2 h-2 rounded bg-amber-100 border border-amber-400"></span> 
                 Trống
+              </span>
+              <span className="flex items-center gap-1 text-amber-900">
+                <span className="w-2 h-2 rounded bg-amber-200 border border-amber-500"></span> 
+                🔒 Đang thanh toán
               </span>
               <span className="flex items-center gap-1 text-slate-400">
                 <span className="w-2 h-2 rounded bg-slate-200 border border-slate-300"></span> 
@@ -455,41 +519,26 @@ export default function CustomerSchedule({
                   : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
               }`}
             >
-              Tất cả {STANDARD_15_COURTS.filter(c => !isCourtLocked(c.code)).length} sân
+              Tất cả {customerCourts.filter(c => !isCourtLocked(c.code)).length} sân
             </button>
-            <button
-              type="button"
-              onClick={() => setSelectedSport('badminton')}
-              className={`px-3 py-1.5 rounded-full text-xs font-black whitespace-nowrap transition-all cursor-pointer ${
-                selectedSport === 'badminton'
-                  ? 'bg-emerald-600 text-white shadow-xs shadow-emerald-600/30'
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-              }`}
-            >
-              Cầu lông ({STANDARD_15_COURTS.filter(c => c.sportId === 'badminton' && !isCourtLocked(c.code)).length} sân)
-            </button>
-            <button
-              type="button"
-              onClick={() => setSelectedSport('volleyball')}
-              className={`px-3 py-1.5 rounded-full text-xs font-black whitespace-nowrap transition-all cursor-pointer ${
-                selectedSport === 'volleyball'
-                  ? 'bg-emerald-600 text-white shadow-xs shadow-emerald-600/30'
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-              }`}
-            >
-              Bóng chuyền ({STANDARD_15_COURTS.filter(c => c.sportId === 'volleyball' && !isCourtLocked(c.code)).length} sân)
-            </button>
-            <button
-              type="button"
-              onClick={() => setSelectedSport('football')}
-              className={`px-3 py-1.5 rounded-full text-xs font-black whitespace-nowrap transition-all cursor-pointer ${
-                selectedSport === 'football'
-                  ? 'bg-emerald-600 text-white shadow-xs shadow-emerald-600/30'
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-              }`}
-            >
-              Bóng đá mini ({STANDARD_15_COURTS.filter(c => c.sportId === 'football' && !isCourtLocked(c.code)).length} sân)
-            </button>
+            {customerSports.map((sp) => {
+              const count = customerCourts.filter(c => c.sportId === sp.id && !isCourtLocked(c.code)).length;
+              return (
+                <button
+                  key={sp.id}
+                  type="button"
+                  onClick={() => setSelectedSport(sp.id)}
+                  className={`px-3 py-1.5 rounded-full text-xs font-black whitespace-nowrap transition-all cursor-pointer flex items-center gap-1 ${
+                    selectedSport === sp.id
+                      ? 'bg-emerald-600 text-white shadow-xs shadow-emerald-600/30'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  <span>{sp.icon}</span>
+                  <span>{sp.name} ({count} sân)</span>
+                </button>
+              );
+            })}
           </div>
 
           {/* Sub-toolbar: Interval & Legend */}
@@ -514,6 +563,10 @@ export default function CustomerSchedule({
               <span className="flex items-center gap-1 text-amber-800">
                 <span className="w-2 h-2 rounded bg-amber-100 border border-amber-400"></span> 
                 Trống
+              </span>
+              <span className="flex items-center gap-1 text-amber-900">
+                <span className="w-2 h-2 rounded bg-amber-200 border border-amber-500"></span> 
+                🔒 Đang giữ
               </span>
               <span className="flex items-center gap-1 text-slate-400">
                 <span className="w-2 h-2 rounded bg-slate-200 border border-slate-300"></span> 
@@ -639,7 +692,12 @@ export default function CustomerSchedule({
                       const bFirst = getBookingAt(court.code, cellStart, cellStart + 30);
                       const bSecond = getBookingAt(court.code, cellStart + 30, cellStart + 60);
 
-                      // Case 1: Both halves occupied
+                      const secondHalfTime = `${t.slice(0, 2)}:30`;
+                      const heldFirst = courtHoldService.isSlotHeldByAnother(court.name, htmlDate, t, 30);
+                      const heldSecond = courtHoldService.isSlotHeldByAnother(court.name, htmlDate, secondHalfTime, 30);
+                      const heldFull = courtHoldService.isSlotHeldByAnother(court.name, htmlDate, t, 60);
+
+                      // Case 1: Both halves occupied (database booking)
                       if (bFirst && bSecond) {
                         return (
                           <div 
@@ -652,9 +710,9 @@ export default function CustomerSchedule({
                         );
                       }
 
-                      // Case 2: First half occupied, second half FREE (e.g. 07:00-07:30 booked, 07:30-08:00 FREE)
+                      // Case 2: First half booked in DB, second half check
                       if (bFirst && !bSecond) {
-                        const tSecond = `${t.slice(0, 2)}:30`;
+                        const tSecond = secondHalfTime;
                         const isSelectedSecond = selectedCourtName === court.name && selStartMin >= 0 && (cellStart + 30) >= selStartMin && (cellStart + 30) < selEndMin;
 
                         return (
@@ -667,8 +725,17 @@ export default function CustomerSchedule({
                             >
                             </div>
 
-                            {/* Right: FREE */}
-                            {isSelectedSecond ? (
+                            {/* Right: held or free */}
+                            {heldSecond ? (
+                              <div
+                                style={{ width: `${slotWidth / 2}px` }}
+                                onClick={() => showAlert('Khung giờ đang được tạm giữ!', `Sân ${court.name} lúc ${tSecond} đang được tạm giữ để thanh toán VietQR.\n\nVui lòng chọn khung giờ khác hoặc chờ hết thời gian giữ sân!`, 'warning')}
+                                className="h-full bg-amber-100/95 flex flex-col items-center justify-center text-center p-0.5 select-none cursor-not-allowed transition hover:bg-amber-200"
+                                title={`${court.name} (${tSecond}) đang được tạm giữ thanh toán`}
+                              >
+                                <span className="text-[7px] font-black text-amber-900 leading-none">🔒 Giữ</span>
+                              </div>
+                            ) : isSelectedSecond ? (
                               <div
                                 style={{ width: `${slotWidth / 2}px` }}
                                 onClick={() => handleSlotClick(court.sportId, court.name, tSecond, `${(court.pricePerHour / 2).toLocaleString('vi-VN')} VND`)}
@@ -690,14 +757,23 @@ export default function CustomerSchedule({
                         );
                       }
 
-                      // Case 3: First half FREE, second half occupied
+                      // Case 3: First half check, second half booked in DB
                       if (!bFirst && bSecond) {
                         const isSelectedFirst = selectedCourtName === court.name && selStartMin >= 0 && cellStart >= selStartMin && cellStart < selEndMin;
 
                         return (
                           <div key={cIdx} style={{ width: `${slotWidth}px` }} className="shrink-0 flex border-r border-slate-200/60">
-                            {/* Left: FREE */}
-                            {isSelectedFirst ? (
+                            {/* Left: held or free */}
+                            {heldFirst ? (
+                              <div
+                                style={{ width: `${slotWidth / 2}px` }}
+                                onClick={() => showAlert('Khung giờ đang được tạm giữ!', `Sân ${court.name} lúc ${t} đang được tạm giữ để thanh toán VietQR.\n\nVui lòng chọn khung giờ khác hoặc chờ hết thời gian giữ sân!`, 'warning')}
+                                className="h-full bg-amber-100/95 border-r border-amber-300 flex flex-col items-center justify-center text-center p-0.5 select-none cursor-not-allowed transition hover:bg-amber-200"
+                                title={`${court.name} (${t}) đang được tạm giữ thanh toán`}
+                              >
+                                <span className="text-[7px] font-black text-amber-900 leading-none">🔒 Giữ</span>
+                              </div>
+                            ) : isSelectedFirst ? (
                               <div
                                 style={{ width: `${slotWidth / 2}px` }}
                                 onClick={() => handleSlotClick(court.sportId, court.name, t, `${(court.pricePerHour / 2).toLocaleString('vi-VN')} VND`)}
@@ -720,14 +796,14 @@ export default function CustomerSchedule({
                             <div 
                               style={{ width: `${slotWidth / 2}px` }} 
                               className="h-full bg-slate-100/90 flex flex-col items-center justify-center text-center p-0.5 select-none cursor-not-allowed"
-                              title={`${court.name} đã đặt lúc ${t.slice(0, 2)}:30`}
+                              title={`${court.name} đã đặt lúc ${secondHalfTime}`}
                             >
                             </div>
                           </div>
                         );
                       }
 
-                      // Case 4: Entire 1 hour FREE
+                      // Case 4: Neither half is booked in DB
                       const nowMin = today.getHours() * 60 + today.getMinutes();
                       if (isToday(selectedDate) && cellStart + 60 <= nowMin) {
                         return (
@@ -741,6 +817,99 @@ export default function CustomerSchedule({
                           </div>
                         );
                       }
+
+                      // Check if held!
+                      if (heldFull || (heldFirst && heldSecond)) {
+                        return (
+                          <div
+                            key={cIdx}
+                            style={{ width: `${slotWidth}px` }}
+                            onClick={() => {
+                              showAlert('Khung giờ đang có người thanh toán!', `Sân ${court.name} (${t}) đang có một khách hàng khác tạm giữ để thanh toán VietQR.\n\nVui lòng chọn khung giờ khác hoặc chờ hết thời gian giữ sân!`, 'warning');
+                            }}
+                            className="shrink-0 border-r border-amber-300 bg-amber-100/90 flex flex-col items-center justify-center text-center p-0.5 select-none cursor-not-allowed group transition hover:bg-amber-200/90"
+                            title={`Sân ${court.name} (${t}) đang có người thanh toán VietQR`}
+                          >
+                            <span className="text-[7.5px] font-black text-amber-900 uppercase flex items-center justify-center gap-0.5 leading-none">
+                              🔒 Đang giữ
+                            </span>
+                            <span className="text-[6.5px] font-bold text-amber-800 mt-0.5 leading-tight text-center">Đang thanh toán</span>
+                          </div>
+                        );
+                      }
+
+                      if (heldFirst && !heldSecond) {
+                        const isSelectedSecond = selectedCourtName === court.name && selStartMin >= 0 && (cellStart + 30) >= selStartMin && (cellStart + 30) < selEndMin;
+                        return (
+                          <div key={cIdx} style={{ width: `${slotWidth}px` }} className="shrink-0 flex border-r border-slate-200/60">
+                            {/* Left: Held */}
+                            <div
+                              style={{ width: `${slotWidth / 2}px` }}
+                              onClick={() => showAlert('Khung giờ đang được tạm giữ!', `Sân ${court.name} lúc ${t} đang được tạm giữ để thanh toán VietQR.\n\nVui lòng chọn khung giờ khác hoặc chờ hết thời gian giữ sân!`, 'warning')}
+                              className="h-full bg-amber-100/95 border-r border-amber-300 flex flex-col items-center justify-center text-center p-0.5 select-none cursor-not-allowed transition hover:bg-amber-200"
+                              title={`${court.name} (${t}) đang được tạm giữ thanh toán`}
+                            >
+                              <span className="text-[7px] font-black text-amber-900 leading-none">🔒 Giữ</span>
+                            </div>
+                            {/* Right: Free */}
+                            {isSelectedSecond ? (
+                              <div
+                                style={{ width: `${slotWidth / 2}px` }}
+                                onClick={() => handleSlotClick(court.sportId, court.name, secondHalfTime, `${(court.pricePerHour / 2).toLocaleString('vi-VN')} VND`)}
+                                className="h-full bg-emerald-500 text-white flex flex-col items-center justify-center text-center p-0.5 shadow-inner cursor-pointer"
+                              >
+                                <span className="text-[7.5px] font-black uppercase">CHỌN</span>
+                              </div>
+                            ) : (
+                              <div
+                                style={{ width: `${slotWidth / 2}px` }}
+                                onClick={() => handleSlotClick(court.sportId, court.name, secondHalfTime, `${(court.pricePerHour / 2).toLocaleString('vi-VN')} VND`)}
+                                className="h-full bg-amber-50/80 hover:bg-amber-100 flex flex-col items-center justify-center text-center cursor-pointer transition active:scale-95 group p-0.5"
+                                title={`Bấm để chọn ${court.name} lúc ${secondHalfTime} (nửa tiếng)`}
+                              >
+                                <span className="text-[7.5px] font-black text-amber-800 uppercase group-hover:scale-105 transition leading-none">Trống</span>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      }
+
+                      if (!heldFirst && heldSecond) {
+                        const isSelectedFirst = selectedCourtName === court.name && selStartMin >= 0 && cellStart >= selStartMin && cellStart < selEndMin;
+                        return (
+                          <div key={cIdx} style={{ width: `${slotWidth}px` }} className="shrink-0 flex border-r border-slate-200/60">
+                            {/* Left: Free */}
+                            {isSelectedFirst ? (
+                              <div
+                                style={{ width: `${slotWidth / 2}px` }}
+                                onClick={() => handleSlotClick(court.sportId, court.name, t, `${(court.pricePerHour / 2).toLocaleString('vi-VN')} VND`)}
+                                className="h-full bg-emerald-500 text-white flex flex-col items-center justify-center text-center p-0.5 shadow-inner cursor-pointer border-r border-emerald-600"
+                              >
+                                <span className="text-[7.5px] font-black uppercase">CHỌN</span>
+                              </div>
+                            ) : (
+                              <div
+                                style={{ width: `${slotWidth / 2}px` }}
+                                onClick={() => handleSlotClick(court.sportId, court.name, t, `${(court.pricePerHour / 2).toLocaleString('vi-VN')} VND`)}
+                                className="h-full bg-amber-50/80 hover:bg-amber-100 flex flex-col items-center justify-center text-center cursor-pointer transition active:scale-95 group p-0.5 border-r border-amber-200/60"
+                                title={`Bấm để chọn ${court.name} lúc ${t} (nửa tiếng)`}
+                              >
+                                <span className="text-[7.5px] font-black text-amber-800 uppercase group-hover:scale-105 transition leading-none">Trống</span>
+                              </div>
+                            )}
+                            {/* Right: Held */}
+                            <div
+                              style={{ width: `${slotWidth / 2}px` }}
+                              onClick={() => showAlert('Khung giờ đang được tạm giữ!', `Sân ${court.name} lúc ${secondHalfTime} đang được tạm giữ để thanh toán VietQR.\n\nVui lòng chọn khung giờ khác hoặc chờ hết thời gian giữ sân!`, 'warning')}
+                              className="h-full bg-amber-100/95 flex flex-col items-center justify-center text-center p-0.5 select-none cursor-not-allowed transition hover:bg-amber-200"
+                              title={`${court.name} (${secondHalfTime}) đang được tạm giữ thanh toán`}
+                            >
+                              <span className="text-[7px] font-black text-amber-900 leading-none">🔒 Giữ</span>
+                            </div>
+                          </div>
+                        );
+                      }
+
                       const isSelected = selectedCourtName === court.name && selStartMin >= 0 && cellStart >= selStartMin && cellStart < selEndMin;
                       if (isSelected) {
                         return (
@@ -774,6 +943,7 @@ export default function CustomerSchedule({
                       // intervalMode === 30 (30-min view)
                       const cellEnd = cellStart + 30;
                       const occupyingBooking = getBookingAt(court.code, cellStart, cellEnd);
+                      const held30 = courtHoldService.isSlotHeldByAnother(court.name, htmlDate, t, 30);
                       const isSelected = selectedCourtName === court.name && selStartMin >= 0 && cellStart >= selStartMin && cellStart < selEndMin;
 
                       if (occupyingBooking) {
@@ -784,6 +954,25 @@ export default function CustomerSchedule({
                             className="shrink-0 border-r border-slate-200/60 bg-slate-100/90 flex flex-col items-center justify-center text-center p-0.5 select-none cursor-not-allowed"
                             title={`${court.name} đã được đặt lúc ${t}`}
                           >
+                          </div>
+                        );
+                      }
+
+                      if (held30) {
+                        return (
+                          <div
+                            key={cIdx}
+                            style={{ width: `${slotWidth}px` }}
+                            onClick={() => {
+                              showAlert('Khung giờ đang có người thanh toán!', `Sân ${court.name} (${t}) đang được một khách hàng khác tạm giữ để thanh toán VietQR.\n\nVui lòng chọn khung giờ khác hoặc chờ hết thời gian giữ sân!`, 'warning');
+                            }}
+                            className="shrink-0 border-r border-amber-300 bg-amber-100/90 flex flex-col items-center justify-center text-center p-0.5 select-none cursor-not-allowed group transition hover:bg-amber-200/90"
+                            title={`Sân ${court.name} (${t}) đang có người thanh toán VietQR`}
+                          >
+                            <span className="text-[7.5px] font-black text-amber-900 uppercase flex items-center justify-center gap-0.5 leading-none">
+                              🔒 Đang giữ
+                            </span>
+                            <span className="text-[6.5px] font-bold text-amber-800 mt-0.5 leading-tight text-center">Đang thanh toán</span>
                           </div>
                         );
                       }
@@ -904,6 +1093,44 @@ export default function CustomerSchedule({
                 className="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white py-3 text-xs font-black uppercase tracking-wider active:scale-95 transition cursor-pointer flex items-center justify-center gap-1 shadow-sm"
               >
                 Đặt sân ngay <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 🟣 CUSTOM POPUP MODAL THAY THẾ ALERT MẶC ĐỊNH */}
+      {schedulePopup && (
+        <div className="fixed inset-0 z-[300] flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="w-full max-w-sm rounded-3xl bg-white p-6 shadow-2xl animate-in zoom-in-95 duration-200 text-center border border-slate-100">
+            {schedulePopup.type === 'danger' ? (
+              <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 border border-rose-100 flex items-center justify-center mx-auto mb-3 shadow-2xs">
+                <CircleX className="w-6 h-6 stroke-[2.2]" />
+              </div>
+            ) : schedulePopup.type === 'success' ? (
+              <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 border border-emerald-100 flex items-center justify-center mx-auto mb-3 shadow-2xs">
+                <CheckCircle2 className="w-6 h-6 stroke-[2.2]" />
+              </div>
+            ) : (
+              <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 border border-amber-100 flex items-center justify-center mx-auto mb-3 shadow-2xs">
+                <AlertTriangle className="w-6 h-6 stroke-[2.2]" />
+              </div>
+            )}
+
+            <h3 className="text-base font-black text-slate-900 uppercase tracking-tight">
+              {schedulePopup.title}
+            </h3>
+            <p className="mt-2 text-xs text-slate-600 leading-relaxed font-medium whitespace-pre-line">
+              {schedulePopup.message}
+            </p>
+
+            <div className="mt-5">
+              <button
+                type="button"
+                onClick={() => setSchedulePopup(null)}
+                className="w-full py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-xs font-bold text-white shadow-sm active:scale-95 transition cursor-pointer"
+              >
+                Đã hiểu
               </button>
             </div>
           </div>

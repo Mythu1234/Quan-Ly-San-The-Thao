@@ -33,7 +33,7 @@ export default function AdminBookingDialog(props: Props) {
   const formattedPrice = `${totalPrice.toLocaleString('vi-VN')}đ`;
 
   return (
-    <div className="fixed inset-y-0 left-1/2 z-[150] flex w-full max-w-md -translate-x-1/2 items-end justify-center bg-slate-900/60 p-2 backdrop-blur-sm sm:items-center sm:p-4">
+    <div className="fixed inset-y-0 left-1/2 z-[150] flex w-full max-w-sm -translate-x-1/2 items-end justify-center bg-slate-900/60 p-2 backdrop-blur-sm sm:items-center sm:p-4">
       <div
         role="dialog"
         aria-modal="true"

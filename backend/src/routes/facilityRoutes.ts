@@ -26,9 +26,13 @@ router.delete('/compensation-prices/:id', async (req,res,next) => {
 router.get('/dashboard', (req, res) => facilityController.getDashboardStats(req, res));
 
 // ==========================================
-// 2. COURTS & MASTER LOCK (UC-04)
+// 2. COURTS & MASTER LOCK (UC-04) + SPORTS
 // ==========================================
+router.get('/sports', (req, res) => facilityController.getSports(req, res));
+router.post('/sports', (req, res) => facilityController.createSport(req, res));
 router.get('/courts', (req, res) => facilityController.getCourts(req, res));
+router.post('/courts', (req, res) => facilityController.createCourts(req, res));
+router.delete('/courts/:id', (req, res) => facilityController.deleteCourt(req, res));
 router.patch('/courts/:id/lock', (req, res) => facilityController.toggleCourtLock(req, res));
 
 // ==========================================

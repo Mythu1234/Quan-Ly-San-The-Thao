@@ -39,6 +39,136 @@ export function createStaffAuthService(db:any=supabase) {
       if(saved.data?.length!==1)throw fail('Tài khoản vừa thay đổi. Vui lòng đăng nhập lại.',409);
       return {message:'Đã cập nhật mật khẩu trong Supabase.'};
     },
+    async sendForgotOtp(phoneInput: unknown) {
+      if (typeof phoneInput !== 'string' || !phoneInput.trim()) {
+        throw fail('Vui lòng nhập số điện thoại hợp lệ.', 400);
+      }
+      const cleanPhone = phoneInput.trim().replace(/[\s().-]/g, '').replace(/^\+?84/, '0');
+      if (!/^0[35789]\d{8}$/.test(cleanPhone)) {
+        throw fail('Số điện thoại không đúng định dạng.', 400);
+      }
+
+      const { data, error } = await db
+        .from('nhan_vien')
+        .select('ma_nhan_vien,ho_ten,so_dien_thoai,trang_thai_hoat_dong')
+        .eq('so_dien_thoai', cleanPhone)
+        .eq('trang_thai_hoat_dong', true)
+        .limit(1);
+
+      if (error) {
+        throw fail('Lỗi kết nối cơ sở dữ liệu. Vui lòng thử lại sau.', 503);
+      }
+
+      const employee = data?.[0];
+      if (!employee) {
+        throw fail('Số điện thoại chưa được đăng ký trong hệ thống!', 404);
+      }
+
+      const otp = Math.floor(100000 + Math.random() * 900000).toString();
+      otpCache.set(cleanPhone, {
+        otp,
+        expiresAt: Date.now() + 60 * 1000,
+        verified: false,
+      });
+
+      return {
+        phone: cleanPhone,
+        otp,
+        employeeName: employee.ho_ten,
+        message: 'Mã xác thực OTP đã được gửi thành công.',
+      };
+    },
+    async verifyForgotOtp(phoneInput: unknown, otpInput: unknown) {
+      if (typeof phoneInput !== 'string' || typeof otpInput !== 'string') {
+        throw fail('Thông tin xác thực không hợp lệ.', 400);
+      }
+      const cleanPhone = phoneInput.trim().replace(/[\s().-]/g, '').replace(/^\+?84/, '0');
+      const cleanOtp = otpInput.trim();
+
+      const session = otpCache.get(cleanPhone);
+      if (!session) {
+        throw fail('Mã OTP đã hết hiệu lực hoặc chưa được gửi. Vui lòng gửi lại mã mới!', 400);
+      }
+      if (Date.now() > session.expiresAt) {
+        otpCache.delete(cleanPhone);
+        throw fail('Mã OTP đã hết hiệu lực. Vui lòng gửi lại mã mới!', 400);
+      }
+      if (session.otp !== cleanOtp) {
+        throw fail('Mã OTP không chính xác. Vui lòng kiểm tra lại!', 400);
+      }
+
+      session.verified = true;
+      return {
+        verified: true,
+        message: 'Xác thực mã OTP thành công. Vui lòng đặt mật khẩu mới.',
+      };
+    },
+    async resetPassword(phoneInput: unknown, otpInput: unknown, newPassword: unknown) {
+      if (typeof phoneInput !== 'string' || typeof otpInput !== 'string' || typeof newPassword !== 'string') {
+        throw fail('Thông tin đặt lại mật khẩu không hợp lệ.', 400);
+      }
+      const cleanPhone = phoneInput.trim().replace(/[\s().-]/g, '').replace(/^\+?84/, '0');
+      const cleanOtp = otpInput.trim();
+
+      if (newPassword.length < 8 || newPassword.length > 256) {
+        throw fail('Mật khẩu mới phải có tối thiểu 8 ký tự!', 400);
+      }
+      if (!/[a-zA-Z]/.test(newPassword)) {
+        throw fail('Mật khẩu mới phải chứa ít nhất 1 chữ cái!', 400);
+      }
+      if (!/[0-9]/.test(newPassword)) {
+        throw fail('Mật khẩu mới phải chứa ít nhất 1 chữ số!', 400);
+      }
+      if (!/[^a-zA-Z0-9]/.test(newPassword)) {
+        throw fail('Mật khẩu mới phải chứa ít nhất 1 ký tự đặc biệt (VD: @, #, $, %, !...)!', 400);
+      }
+
+      const session = otpCache.get(cleanPhone);
+      if (!session || session.otp !== cleanOtp || !session.verified) {
+        throw fail('Phiên xác thực OTP không hợp lệ hoặc đã hết hạn!', 400);
+      }
+
+      // 1. Kiểm tra tài khoản và so sánh mật khẩu cũ
+      const { data: existingUser, error: findError } = await db
+        .from('nhan_vien')
+        .select('ma_nhan_vien,ho_ten,mat_khau')
+        .eq('so_dien_thoai', cleanPhone)
+        .eq('trang_thai_hoat_dong', true)
+        .limit(1);
+
+      if (findError) {
+        throw fail('Lỗi kết nối cơ sở dữ liệu. Vui lòng thử lại sau.', 503);
+      }
+
+      const oldRow = existingUser?.[0];
+      if (!oldRow) {
+        throw fail('Tài khoản không tồn tại hoặc đã ngừng hoạt động!', 404);
+      }
+
+      if (oldRow.mat_khau && verifyPassword(newPassword, oldRow.mat_khau)) {
+        throw fail('Bạn đã nhập mật khẩu cũ. Vui lòng chọn mật khẩu mới khác với mật khẩu cũ!', 400);
+      }
+
+      const hashedPassword = hashPassword(newPassword);
+      const { data, error } = await db
+        .from('nhan_vien')
+        .update({ mat_khau: hashedPassword })
+        .eq('so_dien_thoai', cleanPhone)
+        .eq('trang_thai_hoat_dong', true)
+        .select('ma_nhan_vien,ho_ten');
+
+      if (error) {
+        throw fail('Chưa cập nhật được mật khẩu vào database. Vui lòng thử lại.', 503);
+      }
+
+      otpCache.delete(cleanPhone);
+      return {
+        success: true,
+        message: 'Đặt lại mật khẩu thành công! Bạn có thể đăng nhập ngay.',
+        employeeName: data?.[0]?.ho_ten,
+      };
+    },
   };
 }
+const otpCache = new Map<string, { otp: string; expiresAt: number; verified?: boolean }>();
 export const staffAuthService=createStaffAuthService();

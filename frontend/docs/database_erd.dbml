@@ -1,0 +1,263 @@
+// =====================================================================
+// HỆ THỐNG QUẢN LÝ VẬN HÀNH VÀ ĐẶT SÂN THỂ THAO COURTX ARENA
+// SƠ ĐỒ THỰC THỂ MỐI QUAN HỆ (ERD) - ĐỊNH DẠNG DBML (dbdiagram.io)
+// Chuẩn hóa mã toàn hệ thống: [Tiền tố 2-3 ký tự] + [8 chữ số]
+// Phù hợp 100% với cấu trúc CSDL PostgreSQL / Supabase hiện tại
+// =====================================================================
+
+Project courtx_arena {
+  database_type: 'PostgreSQL / Supabase'
+  Note: '''
+    # HỆ THỐNG QUẢN LÝ VẬN HÀNH VÀ ĐẶT SÂN COURTX ARENA
+    - Đặt sân online & tại quầy qua VietQR
+    - Quản lý trạng thái sân & thiết bị thời gian thực
+    - Quyết toán trả sân, bồi thường hư hại minh bạch
+    - Chính sách hoàn tiền 100% khi hủy trước >= 24h
+  '''
+}
+
+// =====================================================================
+// 1. CÁC ENUMS HỆ THỐNG
+// =====================================================================
+
+Enum vai_tro_noi_bo_enum {
+  ADMIN [note: 'Chủ sân / Quản trị viên toàn quyền']
+  STAFF [note: 'Nhân viên vận hành / Lễ tân trực ca']
+}
+
+Enum trang_thai_san_enum {
+  san_sang [note: 'Sân trống, sẵn sàng nhận khách']
+  dang_su_dung [note: 'Đang có khách thi đấu']
+  bao_tri [note: 'Khóa kỹ thuật / Đang bảo trì sửa chữa']
+  tam_dong [note: 'Tạm ngừng hoạt động']
+}
+
+Enum kenh_dat_enum {
+  TAI_QUAY [note: 'Khách đến đặt trực tiếp tại quầy']
+  ONLINE [note: 'Khách tự đặt trực tuyến trên Website']
+}
+
+Enum trang_thai_dat_san_enum {
+  CHO_THANH_TOAN [note: 'Đang tạm giữ khung giờ chờ thanh toán']
+  DA_THANH_TOAN [note: 'Đã thanh toán đủ, lịch đã xác nhận']
+  DANG_SU_DUNG [note: 'Khách đã check-in vào sân']
+  HOAN_TAT [note: 'Đã kết thúc ca thi đấu và quyết toán checkout']
+  DA_HUY [note: 'Lượt đặt đã bị hủy']
+}
+
+Enum loai_giao_dich_enum {
+  THANH_TOAN_DAT_SAN [note: 'Thanh toán tiền thuê sân']
+  THANH_TOAN_BOI_THUONG [note: 'Thanh toán bồi thường sự cố hư hại thiết bị lúc checkout']
+}
+
+Enum phuong_thuc_thanh_toan_enum {
+  VIETQR [note: 'Chuyển khoản mã VietQR 24/7']
+}
+
+Enum trang_thai_thanh_toan_enum {
+  THANH_CONG [note: 'Giao dịch đối soát thành công']
+  THAT_BAI [note: 'Giao dịch thất bại / Đã hủy']
+}
+
+Enum trang_thai_thiet_bi_enum {
+  san_sang [note: 'Thiết bị tốt, sẵn sàng sử dụng']
+  dang_su_dung [note: 'Đang gán phục vụ thi đấu trên sân']
+  bao_tri [note: 'Đang bảo dưỡng định kỳ']
+  hong [note: 'Hỏng hóc, chờ sửa chữa hoặc thay mới']
+}
+
+Enum nguyen_nhan_su_co_enum {
+  DO_KHACH_LAM_HONG [note: 'Khách làm hư hại (phải bồi thường)']
+  BAO_HANH_SAN_VAN_DONG [note: 'Hao mòn tự nhiên / NCC bảo hành (Khách 0đ)']
+}
+
+Enum trang_thai_su_co_enum {
+  CHO_XU_LY [note: 'Sự cố mới ghi nhận, chờ điều phối']
+  DANG_SUA_CHUA [note: 'Đang tiến hành sửa chữa / thay thế']
+  DA_XU_LY [note: 'Đã khắc phục hoàn tất']
+  CHO_BOI_THUONG [note: 'Chờ đối soát bồi thường']
+}
+
+// =====================================================================
+// 2. CÁC BẢNG DỮ LIỆU CHÍNH (TABLES)
+// =====================================================================
+
+Table nhan_vien {
+  ma_nhan_vien varchar(30) [pk, note: 'Mã nhân viên (NV00000001...)']
+  ho_ten varchar(100) [not null, note: 'Họ và tên nhân viên']
+  so_dien_thoai varchar(15) [unique, not null, note: 'Số điện thoại đăng nhập']
+  email varchar(100) [unique, not null, note: 'Email nội bộ']
+  mat_khau varchar(255) [not null, note: 'Mật khẩu bảo mật']
+  vai_tro vai_tro_noi_bo_enum [not null, default: 'STAFF', note: 'Vai trò: ADMIN hoặc STAFF']
+  trang_thai_hoat_dong boolean [not null, default: true, note: 'Trạng thái tài khoản (Active/Inactive)']
+  ngay_tao timestamptz [default: `now()`, note: 'Thời điểm tạo tài khoản']
+
+  Note: 'Quản lý tài khoản và phân quyền nhân sự nội bộ (Chủ sân và Nhân viên)'
+}
+
+Table khach_hang {
+  ma_khach_hang varchar(30) [pk, note: 'Mã khách hàng (KH00000001...)']
+  ho_ten varchar(100) [not null, note: 'Họ và tên khách hàng']
+  so_dien_thoai varchar(15) [unique, not null, note: 'Số điện thoại định danh khách']
+  email varchar(100) [note: 'Email nhận biên nhận/thông báo']
+  ghi_chu text [note: 'Ghi chú phân loại khách quen/khách đoàn']
+  ngay_tao timestamptz [default: `now()`, note: 'Thời điểm đăng ký đầu tiên']
+
+  Note: 'Thông tin khách hàng đặt sân'
+}
+
+Table bo_mon {
+  ma_bo_mon varchar(20) [pk, note: 'Mã bộ môn (BM00000001...)']
+  ten_bo_mon varchar(50) [not null, note: 'Tên bộ môn: Cầu lông, Bóng chuyền, Bóng đá mini']
+  don_gia_gio numeric(12,2) [not null, note: 'Đơn giá niêm yết theo giờ (120k / 150k / 200k)']
+  mo_ta text [note: 'Mô tả tiêu chuẩn sân và trang thiết bị']
+
+  Note: 'Danh mục bộ môn thể thao và bảng giá giờ chơi chuẩn'
+}
+
+Table san {
+  ma_san varchar(30) [pk, note: 'Mã sân (SAN00000001...)']
+  ten_san varchar(50) [not null, note: 'Tên sân: Sân CL-01 -> CL-05, BC-01 -> BC-05, BD-01 -> BD-04']
+  ma_bo_mon varchar(20) [not null, ref: > bo_mon.ma_bo_mon, note: 'Thuộc bộ môn']
+  trang_thai trang_thai_san_enum [not null, default: 'san_sang', note: 'Trạng thái hoạt động của sân']
+  vi_tri varchar(100) [note: 'Vị trí trong nhà / ngoài trời']
+  thong_tin_bo_sung jsonb [default: `'{}'`, note: 'Metadata tiện ích, hình ảnh, tình trạng']
+
+  Note: 'Danh mục các sân thể thao trong cơ sở'
+}
+
+Table dat_san {
+  ma_dat_san varchar(30) [pk, note: 'Mã đơn đặt sân (DS00000001...)']
+  ma_san varchar(30) [not null, ref: > san.ma_san, note: 'Sân thi đấu được đặt']
+  ma_khach_hang varchar(30) [not null, ref: > khach_hang.ma_khach_hang, note: 'Khách hàng đặt sân']
+  ma_nhan_vien varchar(30) [ref: > nhan_vien.ma_nhan_vien, note: 'Nhân viên hỗ trợ đặt (nếu tại quầy)']
+  ngay_dat date [not null, note: 'Ngày diễn ra trận đấu (YYYY-MM-DD)']
+  gio_bat_dau time [not null, note: 'Giờ bắt đầu sử dụng']
+  gio_ket_thuc time [not null, note: 'Giờ kết thúc sử dụng']
+  kenh_dat kenh_dat_enum [not null, default: 'TAI_QUAY', note: 'Kênh đặt: TAI_QUAY hoặc ONLINE']
+  don_gia_gio numeric(12,2) [not null, note: 'Đơn giá giờ chơi tại thời điểm đặt']
+  tong_tien_san numeric(12,2) [not null, note: 'Tổng tiền sân cần thanh toán']
+  trang_thai trang_thai_dat_san_enum [not null, default: 'CHO_THANH_TOAN', note: 'Trạng thái lượt đặt sân']
+  thoi_gian_checkin timestamptz [note: 'Thời điểm nhân viên check-in mở sân thực tế']
+  thoi_gian_checkout timestamptz [note: 'Thời điểm nhân viên checkout trả sân']
+  thoi_gian_huy timestamptz [note: 'Thời điểm ghi nhận hủy đơn']
+  ly_do_huy text [note: 'Lý do hủy đơn']
+  ma_nhan_vien_huy varchar(30) [ref: > nhan_vien.ma_nhan_vien, note: 'Nhân viên xử lý hủy']
+  ket_qua_checkout jsonb [note: 'Biên bản quyết toán trả sân và bồi thường sự cố (nếu có)']
+  ngay_tao timestamptz [default: `now()`, note: 'Thời điểm tạo yêu cầu']
+
+  Note: 'Quản lý toàn bộ thông tin và vòng đời các lượt đặt sân'
+}
+
+Table thanh_toan {
+  ma_thanh_toan varchar(30) [pk, note: 'Mã thanh toán (TT00000001...)']
+  ma_dat_san varchar(30) [not null, ref: > dat_san.ma_dat_san, note: 'Thuộc lượt đặt sân']
+  so_tien numeric(12,2) [not null, note: 'Số tiền thanh toán']
+  phuong_thuc_thanh_toan phuong_thuc_thanh_toan_enum [not null, default: 'VIETQR', note: 'Phương thức thanh toán']
+  loai_giao_dich loai_giao_dich_enum [not null, note: 'Tiền đặt sân hoặc Tiền bồi thường']
+  ma_giao_dich_ngan_hang varchar(100) [note: 'Mã đối soát giao dịch ngân hàng / VietQR']
+  thoi_gian_thanh_toan timestamptz [default: `now()`, note: 'Thời điểm tiền vào tài khoản']
+  trang_thai trang_thai_thanh_toan_enum [not null, default: 'THANH_CONG', note: 'Trạng thái giao dịch']
+  ghi_chu text [note: 'Nội dung chuyển khoản đối soát']
+
+  Note: 'Nhật ký các giao dịch thu tiền qua VietQR'
+}
+
+Table hoan_tien {
+  ma_hoan_tien varchar(30) [pk, note: 'Mã hoàn tiền (HT00000001...)']
+  ma_dat_san varchar(30) [not null, ref: > dat_san.ma_dat_san, note: 'Đơn đặt được hoàn tiền']
+  ma_thanh_toan_goc varchar(30) [not null, ref: > thanh_toan.ma_thanh_toan, note: 'Giao dịch thanh toán gốc']
+  so_tien_hoan numeric(12,2) [not null, note: 'Số tiền hoàn lại cho khách (100% nếu >= 24h)']
+  ly_do_hoan text [not null, note: 'Lý do hủy đơn và hoàn tiền']
+  stk_nhan_tien varchar(30) [not null, note: 'Số tài khoản nhận tiền hoàn của khách']
+  ngan_hang varchar(100) [not null, note: 'Tên ngân hàng thụ hưởng']
+  ten_chu_tai_khoan varchar(100) [not null, note: 'Tên chủ tài khoản nhận tiền']
+  ma_giao_dich_ngan_hang varchar(100) [note: 'Mã giao dịch ngân hàng chuyển tiền hoàn']
+  thoi_gian_hoan timestamptz [default: `now()`, note: 'Thời điểm hoàn tiền']
+  trang_thai trang_thai_thanh_toan_enum [not null, default: 'THANH_CONG', note: 'Trạng thái hoàn tiền']
+  ghi_chu text [note: 'Ghi chú đối soát hoàn tiền']
+
+  Note: 'Quản lý các lệnh hoàn tiền tự động khi khách hủy sân trước >= 24h'
+}
+
+Table bien_nhan {
+  ma_bien_nhan varchar(30) [pk, note: 'Mã biên nhận (BN00000001...)']
+  ma_dat_san varchar(30) [not null, ref: > dat_san.ma_dat_san, note: 'Lượt đặt sân']
+  ma_thanh_toan varchar(30) [not null, ref: > thanh_toan.ma_thanh_toan, note: 'Giao dịch thanh toán tương ứng']
+  kenh_in varchar(20) [default: 'KHACH_HANG', note: 'Kênh in: KHACH_HANG hoặc TAI_QUAY']
+  nguoi_in varchar(100) [note: 'Tên người yêu cầu xuất biên nhận']
+  ngay_tao timestamptz [default: `now()`, note: 'Thời điểm tạo biên nhận']
+  ghi_chu text [note: 'Ghi chú biên nhận']
+
+  Note: 'Biên nhận / Hóa đơn điện tử cấp cho khách hàng sau khi thanh toán'
+}
+
+Table thiet_bi {
+  ma_thiet_bi varchar(30) [pk, note: 'Mã thiết bị (TB00000001...)']
+  ten_thiet_bi varchar(100) [not null, note: 'Tên thiết bị / tài sản']
+  ma_san varchar(30) [ref: > san.ma_san, note: 'Sân đang gắn thiết bị (NULL nếu để kho chung)']
+  so_seri varchar(50) [unique, note: 'Số Seri / Asset Tag']
+  trang_thai trang_thai_thiet_bi_enum [not null, default: 'san_sang', note: 'Trạng thái thiết bị']
+  nha_cung_cap varchar(100) [note: 'Đơn vị cung cấp / bảo hành']
+  sdt_ncc varchar(20) [note: 'Số điện thoại hỗ trợ kỹ thuật']
+  ngay_mua date [note: 'Ngày mua thiết bị']
+  han_bao_hanh date [note: 'Hạn bảo hành chính hãng']
+  thong_tin_bo_sung jsonb [default: `'{}'`, note: 'Metadata điều phối ca sân, lịch sử bàn giao']
+  da_xoa boolean [not null, default: false, note: 'Cờ xóa mềm tài sản']
+
+  Note: 'Cơ sở vật chất và trang thiết bị phục vụ thi đấu'
+}
+
+Table bang_gia_den_bu {
+  ma_danh_muc_den_bu varchar(30) [pk, note: 'Mã danh mục giá đền bù (DB00000001...)']
+  ten_vat_tu varchar(100) [not null, note: 'Tên vật tư / thiết bị quy chuẩn']
+  ma_bo_mon varchar(20) [ref: > bo_mon.ma_bo_mon, note: 'Bộ môn áp dụng (NULL nếu dùng chung toàn cơ sở)']
+  don_gia_den_bu numeric(12,2) [not null, note: 'Đơn giá niêm yết bồi thường (VNĐ)']
+  don_vi_tinh varchar(20) [not null, note: 'Đơn vị tính: chiếc, tấm, quả, bộ, m2...']
+  mo_ta_hu_hai text [note: 'Mô tả dạng hư hại căn cứ thực tế']
+  da_an boolean [not null, default: false, note: 'Cờ ẩn danh mục giá cũ']
+
+  Note: 'Bảng giá niêm yết đền bù sự cố trang thiết bị minh bạch'
+}
+
+Table bao_cao_su_co {
+  ma_su_co varchar(30) [pk, note: 'Mã biên bản sự cố (SC00000001...)']
+  ma_dat_san varchar(30) [ref: > dat_san.ma_dat_san, note: 'Thuộc ca đặt sân (NULL nếu phát hiện ngoài ca)']
+  ma_nhan_vien varchar(30) [not null, ref: > nhan_vien.ma_nhan_vien, note: 'Nhân viên lập biên bản']
+  nguyen_nhan nguyen_nhan_su_co_enum [not null, note: 'Nguyên nhân: Do khách làm hỏng hoặc Bảo hành sân']
+  tong_tien_den_bu numeric(12,2) [not null, default: 0, note: 'Tổng tiền bồi thường phải thu (0đ nếu do sân/NCC)']
+  trang_thai_xu_ly trang_thai_su_co_enum [not null, default: 'CHO_XU_LY', note: 'Tiến độ xử lý sự cố']
+  thong_tin_bo_sung jsonb [default: `'{}'`, note: 'Hình ảnh hiện trường, nhật ký sửa chữa timeline, mã checkout']
+  ngay_tao timestamptz [default: `now()`, note: 'Thời điểm lập biên bản']
+
+  Note: 'Biên bản ghi nhận sự cố hư hại cơ sở vật chất'
+}
+
+Table chi_tiet_su_co {
+  ma_chi_tiet varchar(30) [pk, note: 'Mã chi tiết sự cố (CT00000001...)']
+  ma_su_co varchar(30) [not null, ref: > bao_cao_su_co.ma_su_co, note: 'Thuộc biên bản sự cố']
+  ma_thiet_bi varchar(30) [ref: > thiet_bi.ma_thiet_bi, note: 'Thiết bị cụ thể bị hư hại']
+  ma_danh_muc_den_bu varchar(30) [not null, ref: > bang_gia_den_bu.ma_danh_muc_den_bu, note: 'Căn cứ bảng giá đền bù niêm yết']
+  don_gia_ap_dung numeric(12,2) [not null, note: 'Đơn giá niêm yết áp dụng tại thời điểm lập biên bản']
+  so_luong_hu_hai int [not null, default: 1, note: 'Số lượng vật tư hư hỏng']
+  thanh_tien numeric(12,2) [not null, note: 'Thành tiền = don_gia_ap_dung * so_luong_hu_hai']
+  muc_do_hu_hai varchar(50) [note: 'Mức độ: Nhe, TrungBinh, NghiemTrong']
+  mo_ta_chi_tiet text [note: 'Mô tả chi tiết hiện trường hư hỏng']
+
+  Note: 'Chi tiết các hạng mục hư hại trong từng biên bản sự cố'
+}
+
+Table ca_truc {
+  id varchar(30) [pk, note: 'Mã phân ca trực (SHIFT-001...)']
+  ma_nhan_vien varchar(30) [not null, ref: > nhan_vien.ma_nhan_vien, note: 'Nhân viên trực ca']
+  ngay_truc date [not null, note: 'Ngày trực (YYYY-MM-DD)']
+  thu_trong_tuan varchar(20) [note: 'Thứ trong tuần']
+  loai_ca varchar(20) [not null, note: 'Ca 1 (06:00-12:00), Ca 2 (12:00-18:00), Ca 3 (18:00-23:00)']
+  khung_gio varchar(30) [note: 'Khoảng thời gian ca trực']
+  khu_vuc varchar(50) [note: 'Khu vực phụ trách (Khu A, Khu B, Khu C)']
+  trang_thai varchar(20) [default: 'scheduled', note: 'scheduled, in_progress, completed, cancelled']
+  ghi_chu text [note: 'Ghi chú phân ca']
+  ngay_tao timestamptz [default: `now()`]
+
+  Note: 'Phân ca trực và lịch làm việc của nhân viên vận hành sân'
+}

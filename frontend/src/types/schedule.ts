@@ -9,7 +9,7 @@ export type BookingDetail = {
   court: string;
   courtCode?: string;
   sport: string;
-  sportId?: 'badminton' | 'volleyball' | 'football';
+  sportId?: 'badminton' | 'volleyball' | 'football' | string;
   time: string;
   startH?: number;
   startM?: number;

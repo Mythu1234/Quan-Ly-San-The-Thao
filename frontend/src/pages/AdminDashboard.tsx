@@ -173,8 +173,8 @@ export default function AdminDashboard({ onLogout, currentUser }: { onLogout: ()
   const handleDeleteEmployee = (id: string, name: string, reason?: string) => {
     setPopup({
       type: 'danger',
-      title: 'Vô hiệu hóa nhân viên (UC-11)',
-      message: `Bạn có chắc chắn muốn vô hiệu hóa tài khoản của nhân viên "${name}" khỏi hệ thống không? (Hệ thống sẽ chuyển trạng thái sang Đã nghỉ việc và bảo lưu toàn bộ lịch sử theo quy tắc Soft Delete).`,
+      title: 'Vô hiệu hóa nhân viên',
+      message: `Bạn có chắc chắn muốn vô hiệu hóa tài khoản của nhân viên "${name}" không?`,
       confirmText: 'Xác nhận vô hiệu hóa',
       cancelText: 'Hủy bỏ',
       onConfirm: async () => {

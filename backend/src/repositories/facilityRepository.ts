@@ -5,7 +5,45 @@ import type { CheckoutResult } from '../types/checkout.js';
 const equipmentSelect = '*';
 const incidentSelect = '*,nhan_vien(ma_nhan_vien,ho_ten,so_dien_thoai,vai_tro),dat_san(ngay_dat,san(*)),chi_tiet_su_co(*,thiet_bi(*),bang_gia_den_bu(*))';
 const statusLabels: Record<string,string> = {san_sang:'Sẵn sàng',dang_su_dung:'Đang sử dụng',bao_tri:'Bảo trì',hong:'Hỏng'};
-const sportId = (name = ''): 'badminton'|'volleyball'|'football' => /chuyền/i.test(name)?'volleyball':/đá/i.test(name)?'football':'badminton';
+const sportId = (name = ''): string => {
+  if (/chuyền/i.test(name)) return 'volleyball';
+  if (/đá/i.test(name)) return 'football';
+  if (/lông/i.test(name)) return 'badminton';
+  if (/pickleball/i.test(name)) return 'pickleball';
+  if (/tennis|quần vợt/i.test(name)) return 'tennis';
+  if (/bóng rổ/i.test(name)) return 'basketball';
+  return name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/[^a-z0-9]/g, '_').replace(/^_+|_+$/g, '') || 'sport';
+};
+const extractPrefix = (name = ''): string => {
+  if (/lông/i.test(name)) return 'CL';
+  if (/chuyền/i.test(name)) return 'BC';
+  if (/đá/i.test(name)) return 'BD';
+  if (/pickleball/i.test(name)) return 'PB';
+  if (/tennis|quần vợt/i.test(name)) return 'TN';
+  const clean = name.trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd');
+  const words = clean.split(/\s+/).filter(Boolean);
+  if (words.length >= 2) return words.map((w) => w[0].toUpperCase()).slice(0, 3).join('');
+  if (words.length === 1 && words[0].length >= 2) return words[0].slice(0, 2).toUpperCase();
+  return 'SN';
+};
+const detectSportIcon = (name = ''): string => {
+  const lower = name.toLowerCase();
+  if (lower.includes('pickleball')) return '🏓';
+  if (lower.includes('tennis') || lower.includes('quần vợt')) return '🎾';
+  if (lower.includes('bóng rổ') || lower.includes('basketball')) return '🏀';
+  if (lower.includes('bàn') || lower.includes('ping pong')) return '🏓';
+  if (lower.includes('bơi') || lower.includes('swim')) return '🏊';
+  if (lower.includes('chạy') || lower.includes('điền kinh')) return '🏃';
+  if (lower.includes('golf')) return '⛳';
+  if (lower.includes('bóng chày') || lower.includes('baseball')) return '⚾';
+  if (lower.includes('võ') || lower.includes('karate') || lower.includes('taekwondo') || lower.includes('judo')) return '🥋';
+  if (lower.includes('bóng ném')) return '🤾';
+  if (lower.includes('billiards') || lower.includes('bida')) return '🎱';
+  if (lower.includes('cầu lông') || lower.includes('badminton')) return '🏸';
+  if (lower.includes('bóng đá') || lower.includes('football') || lower.includes('soccer')) return '⚽';
+  if (lower.includes('bóng chuyền') || lower.includes('volleyball')) return '🏐';
+  return '🏅';
+};
 const displayDate = (value?: string) => value ? value.slice(0,10).split('-').reverse().join('/') : '';
 export function databaseError(error: {code?:string;message:string}): never {
   if (['PGRST202','PGRST204','42703','42883'].includes(error.code || '')) {
@@ -15,9 +53,29 @@ export function databaseError(error: {code?:string;message:string}): never {
   throw Object.assign(new Error(error.message),{status:error.code==='23505'?409:400});
 }
 export function mapCourt(row: any): CourtStatusItem {
-  const code = row.ten_san?.match(/(?:CL|BC|BD)[-_]\d{2}/)?.[0] || row.ma_san;
-  return {...row.thong_tin_bo_sung,id:row.ma_san,code,name:row.ten_san,courtNumber:Number(code.match(/\d+$/)?.[0]||0),
-    sportId:sportId(row.bo_mon?.ten_bo_mon),isLocked:['bao_tri','tam_dong'].includes(row.trang_thai)};
+  const codeMatch = row.ten_san?.match(/(?:Sân\s+)?([A-Za-z0-9]+)[-_](\d{1,3})/i);
+  const code = codeMatch ? `${codeMatch[1].toUpperCase()}-${codeMatch[2].padStart(2, '0')}` : row.ma_san;
+  const pfx = codeMatch ? codeMatch[1].toUpperCase() : '';
+  const prefixToSport: Record<string, string> = {
+    CL: 'badminton',
+    BC: 'volleyball',
+    BD: 'football',
+    PB: 'pickleball',
+    TN: 'tennis',
+  };
+  const detectedSportId = row.bo_mon?.ten_bo_mon
+    ? sportId(row.bo_mon.ten_bo_mon)
+    : (prefixToSport[pfx] || sportId(row.ten_san) || 'sport');
+
+  return {
+    ...row.thong_tin_bo_sung,
+    id: row.ma_san,
+    code,
+    name: row.ten_san,
+    courtNumber: Number(code.match(/\d+$/)?.[0] || 0),
+    sportId: detectedSportId,
+    isLocked: ['bao_tri', 'tam_dong'].includes(row.trang_thai),
+  };
 }
 export function mapEquipment(row: any): FacilityEquipment {
   const extra = row.thong_tin_bo_sung || {};
@@ -90,6 +148,178 @@ export class FacilityRepository {
     return (data || []).map(mapCourt);
   }
   async getCourtById(id:string) {return (await this.getAllCourts()).find(row=>row.id===id)||null;}
+
+  async getAllSports() {
+    const { data, error } = await supabase.from('bo_mon').select('*').order('ma_bo_mon');
+    if (error) databaseError(error);
+    return (data || []).map((row: any) => ({
+      id: sportId(row.ten_bo_mon),
+      dbId: row.ma_bo_mon,
+      name: row.ten_bo_mon,
+      pricePerHour: Number(row.don_gia_gio) || 120000,
+      prefix: extractPrefix(row.ten_bo_mon),
+      icon: detectSportIcon(row.ten_bo_mon),
+      description: row.mo_ta,
+    }));
+  }
+
+  async createSportWithCourts(params: {
+    name: string;
+    pricePerHour: number;
+    prefix?: string;
+    initialCourtCount: number;
+  }) {
+    const trimmedName = params.name.trim();
+    if (!trimmedName) throw Object.assign(new Error('Tên bộ môn không được để trống!'), { status: 400 });
+
+    const { data: existingList } = await supabase.from('bo_mon').select('ma_bo_mon,ten_bo_mon');
+    const existing = (existingList || []).find(
+      (b: any) => b.ten_bo_mon.toLowerCase() === trimmedName.toLowerCase()
+    );
+    if (existing) {
+      throw Object.assign(new Error(`Bộ môn "${trimmedName}" đã tồn tại trên Supabase!`), { status: 400 });
+    }
+
+    let maxBmNum = 0;
+    (existingList || []).forEach((b: any) => {
+      const match = String(b.ma_bo_mon).match(/(\d+)$/);
+      if (match) {
+        const n = parseInt(match[1], 10);
+        if (n > maxBmNum) maxBmNum = n;
+      }
+    });
+    const nextBmCode = `BM${(maxBmNum + 1).toString().padStart(8, '0')}`;
+
+    const { data: newBm, error: bmError } = await supabase.from('bo_mon').insert({
+      ma_bo_mon: nextBmCode,
+      ten_bo_mon: trimmedName,
+      don_gia_gio: params.pricePerHour,
+      mo_ta: `Bộ môn ${trimmedName}`,
+    }).select().single();
+
+    if (bmError) databaseError(bmError);
+
+    const prefix = (params.prefix?.trim().toUpperCase() || extractPrefix(trimmedName)).replace(/[^A-Z0-9]/g, '');
+    const count = Math.max(0, Math.min(params.initialCourtCount || 0, 50));
+    const createdCourts = [];
+
+    if (count > 0) {
+      const { data: existingCourts } = await supabase.from('san').select('ma_san');
+      let maxSanNum = 0;
+      (existingCourts || []).forEach((s: any) => {
+        const match = String(s.ma_san).match(/(\d+)$/);
+        if (match) {
+          const n = parseInt(match[1], 10);
+          if (n > maxSanNum) maxSanNum = n;
+        }
+      });
+
+      const courtsToInsert = [];
+      for (let i = 1; i <= count; i++) {
+        const nextSanNum = maxSanNum + i;
+        const ma_san = `SAN${nextSanNum.toString().padStart(8, '0')}`;
+        const numStr = i.toString().padStart(2, '0');
+        const ten_san = `Sân ${prefix}-${numStr}`;
+        courtsToInsert.push({
+          ma_san,
+          ten_san,
+          ma_bo_mon: nextBmCode,
+          trang_thai: 'san_sang',
+          thong_tin_bo_sung: {},
+        });
+      }
+
+      const { data: insertedCourts, error: courtsError } = await supabase.from('san').insert(courtsToInsert).select('*,bo_mon(*)');
+      if (courtsError) databaseError(courtsError);
+      createdCourts.push(...(insertedCourts || []));
+    }
+
+    return {
+      sport: {
+        id: sportId(trimmedName),
+        dbId: nextBmCode,
+        name: trimmedName,
+        pricePerHour: params.pricePerHour,
+        prefix,
+        icon: detectSportIcon(trimmedName),
+      },
+      createdCourts: createdCourts.map(mapCourt),
+    };
+  }
+
+  async createCourtsForSport(params: {
+    sportId: string;
+    quantity: number;
+    pricePerHour?: number;
+  }) {
+    const qty = Math.max(1, Math.min(params.quantity || 1, 50));
+
+    const { data: allSports } = await supabase.from('bo_mon').select('*');
+    const matchedBm = (allSports || []).find((b: any) => {
+      const slug = sportId(b.ten_bo_mon);
+      return slug === params.sportId || b.ma_bo_mon === params.sportId;
+    });
+
+    if (!matchedBm) {
+      throw Object.assign(new Error(`Không tìm thấy bộ môn tương ứng trên Supabase!`), { status: 404 });
+    }
+
+    const { data: existingSportCourts } = await supabase
+      .from('san')
+      .select('ma_san,ten_san')
+      .eq('ma_bo_mon', matchedBm.ma_bo_mon);
+
+    const prefix = extractPrefix(matchedBm.ten_bo_mon);
+    let maxIndex = 0;
+    (existingSportCourts || []).forEach((c: any) => {
+      const match = String(c.ten_san).match(/(\d+)$/);
+      if (match) {
+        const n = parseInt(match[1], 10);
+        if (n > maxIndex) maxIndex = n;
+      }
+    });
+
+    const { data: allCourts } = await supabase.from('san').select('ma_san');
+    let maxSanNum = 0;
+    (allCourts || []).forEach((s: any) => {
+      const match = String(s.ma_san).match(/(\d+)$/);
+      if (match) {
+        const n = parseInt(match[1], 10);
+        if (n > maxSanNum) maxSanNum = n;
+      }
+    });
+
+    const courtsToInsert = [];
+    for (let i = 1; i <= qty; i++) {
+      const nextSanNum = maxSanNum + i;
+      const ma_san = `SAN${nextSanNum.toString().padStart(8, '0')}`;
+      const nextIndex = maxIndex + i;
+      const numStr = nextIndex.toString().padStart(2, '0');
+      const ten_san = `Sân ${prefix}-${numStr}`;
+
+      courtsToInsert.push({
+        ma_san,
+        ten_san,
+        ma_bo_mon: matchedBm.ma_bo_mon,
+        trang_thai: 'san_sang',
+        thong_tin_bo_sung: {},
+      });
+    }
+
+    const { data: inserted, error: insertError } = await supabase.from('san').insert(courtsToInsert).select('*,bo_mon(*)');
+    if (insertError) databaseError(insertError);
+
+    return {
+      sport: matchedBm,
+      createdCourts: (inserted || []).map(mapCourt),
+    };
+  }
+
+  async deleteCourt(id: string) {
+    const { data, error } = await supabase.from('san').delete().eq('ma_san', id).select('ma_san');
+    if (error) databaseError(error);
+    return !!data?.length;
+  }
   async updateCourtLock(id:string,isLocked:boolean,reason?:string,lockedBy='Admin') {
     const old=await this.getCourtById(id);
     if(!old)return null;

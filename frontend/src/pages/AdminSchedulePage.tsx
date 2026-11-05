@@ -5,11 +5,21 @@ import {
   AlertTriangle, ArrowLeft, ArrowRightLeft, Ban, Calendar, CalendarClock,
   Check, CheckCircle2, RefreshCw, ChevronDown, ChevronLeft, ChevronRight, CircleX, XCircle,
   Clock3, Cloud, CreditCard, Info, LayoutGrid, MapPin, Phone,
-  Bell, Download, Printer, ReceiptText, Search, ShieldCheck, Undo2, UserRound, X, Zap
+  Bell, Download, Printer, ReceiptText, Search, ShieldCheck, Undo2, UserRound, X, Zap, PlusCircle
 } from 'lucide-react';
+import AdminAddSportAndCourtModal from '../components/admin/AdminAddSportAndCourtModal';
+import {
+  type SportCategoryItem,
+  getAdminSports,
+  getAdminCourts,
+  syncCourtsWithBackend,
+  COURTS_UPDATED_EVENT,
+  DEFAULT_ADMIN_COURTS,
+} from '../utils/dynamicCourtStorage';
 import QrCodeArtwork from '../components/QrCodeArtwork';
 import CheckoutSettlementView from '../components/admin/CheckoutSettlementView';
 import AdminBookingDialog from '../components/admin/AdminBookingDialog';
+import { courtHoldService } from '../services/courtHoldService';
 import type { FacilityEquipment, FacilityIncident } from '../types/admin';
 import type { IncidentReporter } from '../utils/incidentStorage';
 import type { CheckoutRequest, CheckoutResult } from '../utils/checkoutSettlement';
@@ -44,33 +54,13 @@ export interface AdminCourtItem {
   id: string;
   code: string;
   name: string;
-  sportId: 'badminton' | 'volleyball' | 'football';
+  sportId: string;
   sportName: string;
   pricePerHour: number;
   priceLabel: string;
 }
 
-export const STANDARD_ADMIN_COURTS: AdminCourtItem[] = [
-  // 5 Sân Cầu lông (CL-01 -> CL-05): 120.000 VND / giờ
-  { id: 'SAN_CL_01', code: 'CL-01', name: 'Sân CL-01', sportId: 'badminton', sportName: 'Cầu Lông', pricePerHour: 120000, priceLabel: '120k/h' },
-  { id: 'SAN_CL_02', code: 'CL-02', name: 'Sân CL-02', sportId: 'badminton', sportName: 'Cầu Lông', pricePerHour: 120000, priceLabel: '120k/h' },
-  { id: 'SAN_CL_03', code: 'CL-03', name: 'Sân CL-03', sportId: 'badminton', sportName: 'Cầu Lông', pricePerHour: 120000, priceLabel: '120k/h' },
-  { id: 'SAN_CL_04', code: 'CL-04', name: 'Sân CL-04', sportId: 'badminton', sportName: 'Cầu Lông', pricePerHour: 120000, priceLabel: '120k/h' },
-  { id: 'SAN_CL_05', code: 'CL-05', name: 'Sân CL-05', sportId: 'badminton', sportName: 'Cầu Lông', pricePerHour: 120000, priceLabel: '120k/h' },
-
-  // 5 Sân Bóng chuyền (BC-01 -> BC-05): 150.000 VND / giờ
-  { id: 'SAN_BC_01', code: 'BC-01', name: 'Sân BC-01', sportId: 'volleyball', sportName: 'Bóng Chuyền', pricePerHour: 150000, priceLabel: '150k/h' },
-  { id: 'SAN_BC_02', code: 'BC-02', name: 'Sân BC-02', sportId: 'volleyball', sportName: 'Bóng Chuyền', pricePerHour: 150000, priceLabel: '150k/h' },
-  { id: 'SAN_BC_03', code: 'BC-03', name: 'Sân BC-03', sportId: 'volleyball', sportName: 'Bóng Chuyền', pricePerHour: 150000, priceLabel: '150k/h' },
-  { id: 'SAN_BC_04', code: 'BC-04', name: 'Sân BC-04', sportId: 'volleyball', sportName: 'Bóng Chuyền', pricePerHour: 150000, priceLabel: '150k/h' },
-  { id: 'SAN_BC_05', code: 'BC-05', name: 'Sân BC-05', sportId: 'volleyball', sportName: 'Bóng Chuyền', pricePerHour: 150000, priceLabel: '150k/h' },
-
-  // 4 Sân Bóng đá mini (BD-01 -> BD-04): 200.000 VND / giờ
-  { id: 'SAN_BD_01', code: 'BD-01', name: 'Sân BD-01', sportId: 'football', sportName: 'Bóng Đá Mini', pricePerHour: 200000, priceLabel: '200k/h' },
-  { id: 'SAN_BD_02', code: 'BD-02', name: 'Sân BD-02', sportId: 'football', sportName: 'Bóng Đá Mini', pricePerHour: 200000, priceLabel: '200k/h' },
-  { id: 'SAN_BD_03', code: 'BD-03', name: 'Sân BD-03', sportId: 'football', sportName: 'Bóng Đá Mini', pricePerHour: 200000, priceLabel: '200k/h' },
-  { id: 'SAN_BD_04', code: 'BD-04', name: 'Sân BD-04', sportId: 'football', sportName: 'Bóng Đá Mini', pricePerHour: 200000, priceLabel: '200k/h' },
-];
+export const STANDARD_ADMIN_COURTS: AdminCourtItem[] = DEFAULT_ADMIN_COURTS;
 
 type AdminSchedulePageProps = {
   onCheckoutModeChange?: (isCheckoutMode: boolean) => void;
@@ -121,6 +111,17 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
     policyMessage?: string;
   } | null>(null);
 
+  // Custom modal popup thay thế window.alert mặc định của trình duyệt
+  const [schedulePopup, setSchedulePopup] = useState<{
+    type?: 'warning' | 'info' | 'danger' | 'success';
+    title: string;
+    message: string;
+  } | null>(null);
+
+  const showAlert = (title: string, message: string, type: 'warning' | 'info' | 'danger' | 'success' = 'warning') => {
+    setSchedulePopup({ title, message, type });
+  };
+
   useEffect(() => {
     if (cancelPopup && cancelPopup.type === 'cancel-success') {
       const timer = setTimeout(() => {
@@ -130,6 +131,32 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
     }
   }, [cancelPopup]);
 
+  const [adminCourts, setAdminCourts] = useState<AdminCourtItem[]>(() => getAdminCourts());
+  const [adminSports, setAdminSports] = useState<SportCategoryItem[]>(() => getAdminSports());
+  const [showAddSportCourtModal, setShowAddSportCourtModal] = useState<boolean>(false);
+  const [addSuccessToast, setAddSuccessToast] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (addSuccessToast) {
+      const timer = setTimeout(() => setAddSuccessToast(null), 3500);
+      return () => clearTimeout(timer);
+    }
+  }, [addSuccessToast]);
+
+  useEffect(() => {
+    // Tự động đồng bộ danh sách sân thực tế từ Supabase khi mở màn hình
+    void syncCourtsWithBackend();
+
+    const handleCourtsUpdated = () => {
+      setAdminCourts(getAdminCourts());
+      setAdminSports(getAdminSports());
+    };
+    window.addEventListener(COURTS_UPDATED_EVENT, handleCourtsUpdated);
+    return () => {
+      window.removeEventListener(COURTS_UPDATED_EVENT, handleCourtsUpdated);
+    };
+  }, []);
+
   const [currentTime, setCurrentTime] = useState(getVietnamTime);
   const previousTodayRef = useRef(currentTime);
   const [selectedDate, setSelectedDate] = useState<Date>(() =>
@@ -137,8 +164,22 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
   const [calendarMonth, setCalendarMonth] = useState<Date>(() =>
     new Date(currentTime.getFullYear(), currentTime.getMonth(), 1));
+  const [courtView, setCourtView] = useState<string>('all');
   const [intervalMode, setIntervalMode] = useState<30 | 60>(60);
-  const [courtView, setCourtView] = useState<'all' | 'badminton' | 'volleyball' | 'football'>('all');
+  const [, setHoldsTicker] = useState(0);
+
+  useEffect(() => {
+    const unsub = courtHoldService.subscribe(() => {
+      setHoldsTicker((t) => t + 1);
+    });
+    const ticker = setInterval(() => {
+      setHoldsTicker((t) => t + 1);
+    }, 1000);
+    return () => {
+      unsub();
+      clearInterval(ticker);
+    };
+  }, []);
 
   useEffect(() => {
     const updateClock = () => {
@@ -300,43 +341,25 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
 
   // Filtered Courts
   const displayedCourts = useMemo(() => {
-    const base = courtView === 'all' ? STANDARD_ADMIN_COURTS : STANDARD_ADMIN_COURTS.filter((c) => c.sportId === courtView);
-    return calendarBookingDate(selectedDate)<calendarBookingDate(currentTime)?base:base.filter(c => !isCourtLocked(c.code));
-  }, [courtView, courtStatuses, sharedCourtStatuses, selectedDate, currentTime]);
+    const base = courtView === 'all' ? adminCourts : adminCourts.filter((c) => c.sportId === courtView);
+    return calendarBookingDate(selectedDate) < calendarBookingDate(currentTime) ? base : base.filter((c) => !isCourtLocked(c.code));
+  }, [courtView, courtStatuses, sharedCourtStatuses, selectedDate, currentTime, adminCourts]);
 
   // Group displayed courts by Sport for clear visual separation
   const sportGroups = useMemo(() => {
-    const sports: Array<{
-      id: 'badminton' | 'volleyball' | 'football';
-      name: string;
-      icon: string;
-      priceText: string;
-      courts: AdminCourtItem[];
-    }> = [
-      {
-        id: 'badminton',
-        name: 'Cầu Lông',
-        icon: '🏸',
-        priceText: '120.000 VND/h',
-        courts: displayedCourts.filter((c) => c.sportId === 'badminton'),
-      },
-      {
-        id: 'volleyball',
-        name: 'Bóng Chuyền',
-        icon: '🏐',
-        priceText: '150.000 VND/h',
-        courts: displayedCourts.filter((c) => c.sportId === 'volleyball'),
-      },
-      {
-        id: 'football',
-        name: 'Bóng Đá Mini',
-        icon: '⚽',
-        priceText: '200.000 VND/h',
-        courts: displayedCourts.filter((c) => c.sportId === 'football'),
-      },
-    ];
-    return sports.filter((g) => g.courts.length > 0);
-  }, [displayedCourts]);
+    return adminSports
+      .map((sp) => {
+        const courtsInSport = displayedCourts.filter((c) => c.sportId === sp.id);
+        return {
+          id: sp.id,
+          name: sp.name,
+          icon: sp.icon,
+          priceText: `${sp.pricePerHour.toLocaleString('vi-VN')} VND/h`,
+          courts: courtsInSport,
+        };
+      })
+      .filter((g) => g.courts.length > 0);
+  }, [displayedCourts, adminSports]);
 
   // Position today's timeline near the current Vietnam time when opening or changing views.
   useEffect(() => {
@@ -519,12 +542,20 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
     }
   };
 
+  const [, setAdminHoldTrigger] = useState(0);
+  useEffect(() => {
+    return courtHoldService.subscribe(() => {
+      setAdminHoldTrigger((v) => v + 1);
+    });
+  }, []);
+
   const adminBookingConflict = useMemo(() => {
     if (!bookingCourt || !bookingStartTime || !bookingDuration) return null;
     const reqStart = parseTimeToMinutes(bookingStartTime);
     const reqEnd = reqStart + bookingDuration;
 
-    return adminBookings.find((b) => {
+    // 1. Kiểm tra với lịch đã đặt
+    const booked = adminBookings.find((b) => {
       // Bỏ qua đơn đã hủy
       if (b.status === 'ĐÃ HỦY' || b.status === 'Đã hủy') return false;
       if (b.courtCode !== bookingCourt.code && b.court !== bookingCourt.name) return false;
@@ -532,7 +563,28 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
       const bEnd = (b.endH ?? 0) * 60 + (b.endM ?? 0);
       return Math.max(reqStart, bStart) < Math.min(reqEnd, bEnd);
     });
-  }, [bookingCourt, bookingStartTime, bookingDuration, adminBookings]);
+
+    if (booked) return booked;
+
+    // 2. Kiểm tra xem có khách khác đang tạm giữ ưu tiên không
+    const bDate = calendarBookingDate(selectedDate);
+    const held = courtHoldService.isSlotHeldByAnother(
+      bookingCourt.name,
+      bDate,
+      bookingStartTime,
+      bookingDuration,
+      adminPaymentSessionId
+    );
+
+    if (held) {
+      return {
+        customerName: 'Khách khác (đang tạm giữ thanh toán)',
+        time: `${held.startTime} (${held.duration}p)`,
+      } as any;
+    }
+
+    return null;
+  }, [bookingCourt, bookingStartTime, bookingDuration, adminBookings, selectedDate, adminPaymentSessionId]);
 
   const validStartTimeOptions = useMemo(() => {
     if (!isToday(selectedDate)) {
@@ -561,11 +613,11 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
 
   const handleOpenBookingModal = (court: AdminCourtItem, time: string, duration: number = 60) => {
     if (isCourtLocked(court.code)) {
-      window.alert('Sân đang bị khóa bảo trì, vui lòng chọn sân khác.');
+      showAlert('Sân đang bảo trì', 'Sân đang bị khóa bảo trì, vui lòng chọn sân khác.', 'warning');
       return;
     }
     if (isPastDate(selectedDate, currentTime)) {
-      window.alert('Không thể đặt sân cho ngày trong quá khứ! Vui lòng chọn ngày hiện tại hoặc tương lai.');
+      showAlert('Ngày không hợp lệ', 'Không thể đặt sân cho ngày trong quá khứ! Vui lòng chọn ngày hiện tại hoặc tương lai.', 'warning');
       return;
     }
 
@@ -575,10 +627,30 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
     if (isTodaySelected && parseTimeToMinutes(time) <= currentMins) {
       const nextSlot = START_TIME_OPTIONS.find((t) => parseTimeToMinutes(t) > currentMins);
       if (!nextSlot) {
-        window.alert('Hôm nay đã hết khung giờ khả dụng để đặt sân (Nhà thi đấu đóng cửa lúc 23:00). Vui lòng chọn ngày tiếp theo!');
+        showAlert(
+          'Hết khung giờ khả dụng hôm nay',
+          'Hôm nay đã hết khung giờ khả dụng để đặt sân (Nhà thi đấu đóng cửa lúc 23:00).\n\nVui lòng chọn ngày tiếp theo trên thanh lịch để tiếp tục đặt chỗ!',
+          'warning'
+        );
         return;
       }
       chosenStart = nextSlot;
+    }
+
+    const held = courtHoldService.isSlotHeldByAnother(
+      court.name,
+      calendarBookingDate(selectedDate),
+      chosenStart,
+      duration,
+      adminPaymentSessionId
+    );
+    if (held) {
+      showAlert(
+        'Khung giờ đang được tạm giữ!',
+        `Khung giờ ${chosenStart} trên ${court.name} đang có khách khác giữ chỗ để quét mã VietQR.\n\nHệ thống đang chờ khách hoàn tất thanh toán (trong thời gian ưu tiên giữ sân). Vui lòng chọn khung giờ khác hoặc quay lại sau ít phút!`,
+        'warning'
+      );
+      return;
     }
 
     setBookingCourt(court);
@@ -630,7 +702,7 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
     e.preventDefault();
     if (!bookingCourt) return;
     if (isCourtLocked(bookingCourt.code)) {
-      window.alert('Sân đang bị khóa, vui lòng chọn sân khác.');
+      showAlert('Sân đang bị khóa', 'Sân đang bị khóa, vui lòng chọn sân khác.', 'warning');
       return;
     }
 
@@ -668,9 +740,24 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
       status: 'Đã đặt',
     };
 
+    const newSession = 'PAY_ADMIN_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
+    const bDate = pendingBooking.bookingDate || calendarBookingDate(selectedDate);
     setBookingSaveError('');
     setPendingBookingData(pendingBooking);
-    setAdminPaymentSessionId('PAY_ADMIN_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6));
+    setAdminPaymentSessionId(newSession);
+    setAdminPaymentCountdown(60);
+
+    courtHoldService.holdSlot({
+      sessionId: newSession,
+      courtName: bookingCourt.name,
+      bookingDate: bDate,
+      startTime: bookingStartTime,
+      duration: bookingDuration,
+      customerName: bookingCustomerName,
+      customerPhone: bookingCustomerPhone,
+      holdSeconds: 60,
+    });
+
     setShowPaymentModal(true);
   };
 
@@ -678,7 +765,37 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
     if (bookingSaving) return;
     if (!pendingBookingData) return;
     if (isCourtLocked(pendingBookingData.courtCode || pendingBookingData.court)) {
-      window.alert('Sân đang bị khóa, không thể xác nhận đặt sân.');
+      showAlert('Sân đang bị khóa', 'Sân đang bị khóa, không thể xác nhận đặt sân.', 'warning');
+      return;
+    }
+
+    const startMins = (pendingBookingData.startH ?? 0) * 60 + (pendingBookingData.startM ?? 0);
+    const endMins = (pendingBookingData.endH ?? 0) * 60 + (pendingBookingData.endM ?? 0);
+    const sH = Math.floor(startMins / 60).toString().padStart(2, '0');
+    const sM = (startMins % 60).toString().padStart(2, '0');
+    const eH = Math.floor(endMins / 60).toString().padStart(2, '0');
+    const eM = (endMins % 60).toString().padStart(2, '0');
+    const bDate = pendingBookingData.bookingDate || calendarBookingDate(selectedDate);
+
+    // 1. Kiểm tra tranh chấp thực tế trên Database (Ai thanh toán trước thì tính cho khách đó)
+    const conflictCheck = await courtHoldService.checkRealBookingConflict(
+      pendingBookingData.court,
+      bDate,
+      `${sH}:${sM}`,
+      endMins - startMins
+    );
+
+    if (conflictCheck.hasConflict) {
+      setShowPaymentModal(false);
+      setPendingBookingData(null);
+      setAdminPaymentCountdown(60);
+      courtHoldService.releaseSlot(adminPaymentSessionId);
+      await refreshSharedBookings();
+      showAlert(
+        'Khung giờ đã có người thanh toán trước!',
+        `Xung đột: ${conflictCheck.message || 'Khung giờ này vừa có khách khác hoàn tất thanh toán trước.'}\n\nDo đã hết thời gian ưu tiên giữ sân nên hệ thống ưu tiên khách thanh toán trước. Vui lòng chọn khung giờ khác!`,
+        'danger'
+      );
       return;
     }
 
@@ -686,18 +803,11 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
     setBookingSaveError('');
     // Đồng bộ đơn đặt mới lên Supabase Online
     try {
-      const startMins = (pendingBookingData.startH ?? 0) * 60 + (pendingBookingData.startM ?? 0);
-      const endMins = (pendingBookingData.endH ?? 0) * 60 + (pendingBookingData.endM ?? 0);
-      const sH = Math.floor(startMins / 60).toString().padStart(2, '0');
-      const sM = (startMins % 60).toString().padStart(2, '0');
-      const eH = Math.floor(endMins / 60).toString().padStart(2, '0');
-      const eM = (endMins % 60).toString().padStart(2, '0');
-
       const autoBankCode = `VQR${Date.now().toString().slice(-8)}`;
 
       const saved = await bookingApiService.createBooking({
         courtCode: pendingBookingData.courtCode || pendingBookingData.court,
-        bookingDate: pendingBookingData.bookingDate || calendarBookingDate(selectedDate),
+        bookingDate: bDate,
         startTime: `${sH}:${sM}`,
         endTime: `${eH}:${eM}`,
         customerName: pendingBookingData.customerName,
@@ -708,23 +818,25 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
         bankTransactionCode: autoBankCode,
         paymentConfirmed: true,
       });
+      courtHoldService.releaseSlot(adminPaymentSessionId);
       await refreshSharedBookings();
       setPaymentSuccessBooking(saved.booking);
       setShowPaymentModal(false);
       setBookingCourt(null);
-    } catch (err) {
+    } catch (err: any) {
       console.warn('Chưa lưu được lượt đặt và thanh toán:', err);
+      setBookingSaveError(err?.message || 'Chưa lưu được lượt đặt.');
     } finally {
       setBookingSaving(false);
     }
   };
 
-  // URL xác nhận thanh toán mô phỏng cho điện thoại quét QR
+  // URL xác nhận thanh toán mô phỏng cho điện thoại quét QR (sử dụng IP Wi-Fi thực tế của máy)
   const adminMobilePaymentUrl = useMemo(() => {
     if (!showPaymentModal || !pendingBookingData || !adminPaymentSessionId) return '';
-    let host = typeof window !== 'undefined' ? window.location.hostname : '192.168.1.81';
+    let host = typeof window !== 'undefined' ? window.location.hostname : '192.168.1.65';
     if (host === 'localhost' || host === '127.0.0.1') {
-      host = '192.168.1.81';
+      host = '192.168.1.65'; // IP mạng Wi-Fi thực tế của máy tính
     }
     const port = typeof window !== 'undefined' && window.location.port ? ':' + window.location.port : '';
     const protocol = typeof window !== 'undefined' ? window.location.protocol : 'http:';
@@ -738,6 +850,22 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
       name: pendingBookingData.customerName,
     });
     return protocol + '//' + host + port + '/?' + q.toString();
+  }, [showPaymentModal, pendingBookingData, adminPaymentSessionId]);
+
+  // URL mở trực tiếp trên trình duyệt máy tính mà không bị lỗi kết nối IP
+  const adminLocalSimulatorUrl = useMemo(() => {
+    if (!showPaymentModal || !pendingBookingData || !adminPaymentSessionId) return '';
+    const q = new URLSearchParams({
+      view: 'phone-payment',
+      session: adminPaymentSessionId,
+      court: pendingBookingData.court,
+      amount: pendingBookingData.total.replace(/\D/g, ''),
+      phone: pendingBookingData.phone,
+      time: pendingBookingData.time,
+      name: pendingBookingData.customerName,
+    });
+    const origin = typeof window !== 'undefined' ? window.location.origin : '';
+    return origin ? `${origin}/?${q.toString()}` : `/?${q.toString()}`;
   }, [showPaymentModal, pendingBookingData, adminPaymentSessionId]);
 
   // Lắng nghe tín hiệu xác nhận từ điện thoại qua Supabase Realtime & LocalStorage
@@ -788,6 +916,7 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
     setAdminPaymentCountdown(60);
     setAdminPaymentTechnicalError(null);
     setAdminPaymentNotification(null);
+    courtHoldService.releaseSlot(adminPaymentSessionId);
   };
 
   const handleRetryAdminPayment = () => {
@@ -800,26 +929,25 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
     setShowPaymentModal(false);
     setPendingBookingData(null);
     setAdminPaymentCountdown(60);
+    courtHoldService.releaseSlot(adminPaymentSessionId);
   };
 
   const handleTriggerAdmin10MinTimeout = () => {
-    setShowPaymentModal(false);
-    setPendingBookingData(null);
-    setAdminPaymentCountdown(60);
-    setAdminPaymentTechnicalError(null);
+    courtHoldService.releaseSlot(adminPaymentSessionId);
     setAdminPaymentNotification(null);
   };
 
-  // Tự động kiểm tra thời gian thanh toán theo TOBE_CHAY.bpmn (40s nhắc nhở, 1 phút hết hạn)
+  // Tự động kiểm tra thời gian thanh toán theo TOBE_CHAY.bpmn (40s nhắc nhở, 1 phút hết hạn giữ ưu tiên)
   useEffect(() => {
     if (!showPaymentModal || adminPaymentTechnicalError || showAdminCancelSubprocessModal) {
       return;
     }
-    // Khi trôi qua 40s (còn 20s: adminPaymentCountdown === 20): tự động kích hoạt Boundary Timer nhắc nhở
+    // Khi trôi qua 40s (giả lập 8 phút trong BPMN, còn 20s: adminPaymentCountdown === 20): tự động kích hoạt Boundary Timer nhắc nhở
     if (adminPaymentCountdown === 20 && !adminPaymentNotification) {
-      setAdminPaymentNotification('🔔 Nhắc nhở thanh toán (sau 40s): Sân đang tạm giữ sắp hết hạn trong 20 giây, vui lòng hoàn tất chuyển khoản VietQR!');
+      setAdminPaymentNotification('Nhắc nhở thanh toán: Sân tạm giữ sẽ hết hạn trong 20 giây tới, vui lòng quét mã QR để hoàn tất!');
     }
-    // Khi hết 1 phút (60s): tự động kích hoạt Boundary Timer hết hạn giữ sân
+    // Khi hết 1 phút (60s): Hết thời gian ưu tiên giữ sân
+    // Giải phóng lượt giữ độc quyền nhưng KHÔNG đóng modal, khách/nhân viên vẫn có thể thanh toán tiếp nếu chưa ai đặt trước!
     if (adminPaymentCountdown <= 0) {
       handleTriggerAdmin10MinTimeout();
       return;
@@ -877,7 +1005,7 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
     const origStartMin = (transferBooking.startH ?? 0) * 60 + (transferBooking.startM ?? 0);
     const isSameSlotAsOriginal = startMin === origStartMin;
 
-    const sameSportCourts = STANDARD_ADMIN_COURTS.filter((c) => {
+    const sameSportCourts = adminCourts.filter((c) => {
       if (c.sportId !== transferBooking.sportId) return false;
       // Nếu là cùng khung giờ cũ: ẩn sân hiện tại (vì điều chuyển cùng giờ thì phải chọn sân khác)
       // Nếu là khung giờ khác: cho phép cả sân hiện tại (khách đổi giờ thi đấu trên chính sân đó!)
@@ -2282,52 +2410,54 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
             </div>
           )}
 
-          {/* Sport Filter Tabs */}
-          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pt-0.5">
-            <button
-              type="button"
-              onClick={() => setCourtView('all')}
-              className={`px-3 py-1.5 rounded-full text-xs font-black whitespace-nowrap transition-all cursor-pointer ${
-                courtView === 'all'
-                  ? 'bg-slate-900 text-white shadow-xs'
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-              }`}
-            >
-              Tất cả 14 sân
-            </button>
-            <button
-              type="button"
-              onClick={() => setCourtView('badminton')}
-              className={`px-3 py-1.5 rounded-full text-xs font-black whitespace-nowrap transition-all cursor-pointer ${
-                courtView === 'badminton'
-                  ? 'bg-emerald-600 text-white shadow-xs shadow-emerald-600/30'
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-              }`}
-            >
-              Cầu lông (5 sân)
-            </button>
-            <button
-              type="button"
-              onClick={() => setCourtView('volleyball')}
-              className={`px-3 py-1.5 rounded-full text-xs font-black whitespace-nowrap transition-all cursor-pointer ${
-                courtView === 'volleyball'
-                  ? 'bg-emerald-600 text-white shadow-xs shadow-emerald-600/30'
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-              }`}
-            >
-              Bóng chuyền (5 sân)
-            </button>
-            <button
-              type="button"
-              onClick={() => setCourtView('football')}
-              className={`px-3 py-1.5 rounded-full text-xs font-black whitespace-nowrap transition-all cursor-pointer ${
-                courtView === 'football'
-                  ? 'bg-emerald-600 text-white shadow-xs shadow-emerald-600/30'
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-              }`}
-            >
-              Bóng đá mini (4 sân)
-            </button>
+          {/* Sport Filter Tabs & Add Sport/Court Button */}
+          <div className="flex items-center gap-2 pt-0.5 pb-0.5">
+            {/* Dải nút bộ môn cuộn ngang với min-w-0 */}
+            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar flex-1 min-w-0 py-0.5">
+              <button
+                type="button"
+                onClick={() => setCourtView('all')}
+                className={`px-3 py-1.5 rounded-full text-xs font-black whitespace-nowrap transition-all cursor-pointer shrink-0 ${
+                  courtView === 'all'
+                    ? 'bg-slate-900 text-white shadow-xs'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                Tất cả {adminCourts.length} sân
+              </button>
+              {adminSports.map((sp) => {
+                const sportCourtsCount = adminCourts.filter((c) => c.sportId === sp.id).length;
+                const isSelected = courtView === sp.id;
+                return (
+                  <button
+                    key={sp.id}
+                    type="button"
+                    onClick={() => setCourtView(sp.id)}
+                    className={`px-3 py-1.5 rounded-full text-xs font-black whitespace-nowrap transition-all cursor-pointer shrink-0 flex items-center gap-1 ${
+                      isSelected
+                        ? 'bg-emerald-600 text-white shadow-xs shadow-emerald-600/30'
+                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }`}
+                  >
+                    <span>{sp.icon}</span>
+                    <span>{sp.name} ({sportCourtsCount} sân)</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Nút Thêm Sân & Bộ Môn GẮN CỨNG cố định bên phải (không bị chạy khi cuộn) */}
+            <div className="shrink-0 pl-1 border-l border-slate-200">
+              <button
+                type="button"
+                onClick={() => setShowAddSportCourtModal(true)}
+                className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-emerald-700 hover:bg-emerald-800 active:scale-95 text-white text-xs font-black shadow-xs shadow-emerald-700/30 transition cursor-pointer whitespace-nowrap"
+                title="Thêm sân mới hoặc tạo bộ môn mới"
+              >
+                <PlusCircle className="w-3.5 h-3.5" />
+                <span>Thêm sân / Bộ môn</span>
+              </button>
+            </div>
           </div>
 
           {/* Sub-toolbar: Interval Toggle & Legends */}
@@ -2453,6 +2583,9 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
                           {timelineTimes.map((time) => {
                             const cellStart = parseTimeToMinutes(time);
                             if(isPastDate(selectedDate,currentTime))return <div key={time} style={{width:`${slotWidth}px`}} className="shrink-0 border-r border-slate-200/50 bg-slate-100/50" title={`${court.name}: Ngày đã qua, chỉ xem lịch sử`}/>;
+                            
+                            const curDateStr = calendarBookingDate(selectedDate);
+
                             if (intervalMode === 60) {
                               const bFirst = isSlotCovered(court.code, cellStart, cellStart + 30);
                               const bSecond = isSlotCovered(court.code, cellStart + 30, cellStart + 60);
@@ -2469,9 +2602,30 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
                                 );
                               }
 
+                              const secondHalfTime = `${time.slice(0, 2)}:30`;
+                              const heldFirst = courtHoldService.isSlotHeldByAnother(court.name, curDateStr, time, 30, adminPaymentSessionId);
+                              const heldSecond = courtHoldService.isSlotHeldByAnother(court.name, curDateStr, secondHalfTime, 30, adminPaymentSessionId);
+                              const heldFull = courtHoldService.isSlotHeldByAnother(court.name, curDateStr, time, 60, adminPaymentSessionId);
+
                               if (bFirst && !bSecond) {
-                                // First 30 mins occupied, second 30 mins is TRỐNG
-                                const secondHalfTime = `${time.slice(0, 2)}:30`;
+                                // First 30 mins occupied, second 30 mins
+                                if (heldSecond) {
+                                  return (
+                                    <div key={time} style={{ width: `${slotWidth}px` }} className="shrink-0 flex border-r border-slate-200/50">
+                                      <div style={{ width: `${slotWidth / 2}px` }} className="h-full bg-slate-100/70 flex items-center justify-center border-r border-slate-200/40 select-none">
+                                        <span className="h-2 w-px bg-slate-200" />
+                                      </div>
+                                      <div 
+                                        style={{ width: `${slotWidth / 2}px` }} 
+                                        onClick={() => showAlert('Khung giờ đang được tạm giữ!', `Khung giờ ${secondHalfTime} trên ${court.name} đang có khách khác tạm giữ thanh toán!\n\nVui lòng chọn khung giờ khác hoặc chờ hết thời gian giữ sân.`, 'warning')}
+                                        className="h-full bg-amber-100/90 hover:bg-amber-200 flex flex-col items-center justify-center text-center p-0.5 select-none transition cursor-pointer"
+                                        title={`${court.name}: Khung giờ ${secondHalfTime} đang có khách tạm giữ`}
+                                      >
+                                        <span className="text-[8px] font-black text-amber-900 leading-none">🔒 Giữ</span>
+                                      </div>
+                                    </div>
+                                  );
+                                }
                                 return (
                                   <div key={time} style={{ width: `${slotWidth}px` }} className="shrink-0 flex border-r border-slate-200/50">
                                     <div style={{ width: `${slotWidth / 2}px` }} className="h-full bg-slate-100/70 flex items-center justify-center border-r border-slate-200/40 select-none">
@@ -2490,7 +2644,24 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
                               }
 
                               if (!bFirst && bSecond) {
-                                // First 30 mins TRỐNG, second 30 mins occupied
+                                // First 30 mins, second 30 mins occupied
+                                if (heldFirst) {
+                                  return (
+                                    <div key={time} style={{ width: `${slotWidth}px` }} className="shrink-0 flex border-r border-slate-200/50">
+                                      <div 
+                                        style={{ width: `${slotWidth / 2}px` }} 
+                                        onClick={() => showAlert('Khung giờ đang được tạm giữ!', `Khung giờ ${time} trên ${court.name} đang có khách khác tạm giữ thanh toán!\n\nVui lòng chọn khung giờ khác hoặc chờ hết thời gian giữ sân.`, 'warning')}
+                                        className="h-full bg-amber-100/90 hover:bg-amber-200 flex flex-col items-center justify-center text-center p-0.5 select-none transition cursor-pointer border-r border-amber-300"
+                                        title={`${court.name}: Khung giờ ${time} đang có khách tạm giữ`}
+                                      >
+                                        <span className="text-[8px] font-black text-amber-900 leading-none">🔒 Giữ</span>
+                                      </div>
+                                      <div style={{ width: `${slotWidth / 2}px` }} className="h-full bg-slate-100/70 flex items-center justify-center select-none">
+                                        <span className="h-2 w-px bg-slate-200" />
+                                      </div>
+                                    </div>
+                                  );
+                                }
                                 return (
                                   <div key={time} style={{ width: `${slotWidth}px` }} className="shrink-0 flex border-r border-slate-200/50">
                                     <div 
@@ -2504,6 +2675,29 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
                                     <div style={{ width: `${slotWidth / 2}px` }} className="h-full bg-slate-100/70 flex items-center justify-center select-none">
                                       <span className="h-2 w-px bg-slate-200" />
                                     </div>
+                                  </div>
+                                );
+                              }
+
+                              // Cả 60 phút không có booking: Kiểm tra xem có đang bị tạm giữ không
+                              if (heldFull || heldFirst || heldSecond) {
+                                const holdObj = heldFull || heldFirst || heldSecond;
+                                return (
+                                  <div
+                                    key={time}
+                                    style={{ width: `${slotWidth}px` }}
+                                    onClick={() => {
+                                      showAlert('Khung giờ đang có người thanh toán!', `Khung giờ ${time} trên ${court.name} đang được một khách hàng khác tạm giữ thanh toán!\n\nHệ thống đang chờ khách hoàn tất thanh toán VietQR. Vui lòng chọn khung giờ khác hoặc chờ hết thời gian giữ sân.`, 'warning');
+                                    }}
+                                    className="shrink-0 border-r border-amber-300 bg-amber-100/90 hover:bg-amber-200 flex flex-col items-center justify-center text-center p-1 select-none transition cursor-pointer"
+                                    title={`${court.name}: Khung giờ ${time} đang có người thực hiện thanh toán VietQR`}
+                                  >
+                                    <span className="text-[8.5px] font-black text-amber-950 uppercase leading-none bg-amber-200 px-1 py-0.5 rounded border border-amber-300 shadow-2xs flex items-center gap-0.5">
+                                      🔒 ĐANG GIỮ
+                                    </span>
+                                    <span className="text-[7px] font-bold text-amber-800 leading-tight mt-0.5 truncate max-w-full px-0.5 text-center">
+                                      {holdObj?.customerName ? holdObj.customerName.slice(0, 8) : 'Đang thanh toán'}
+                                    </span>
                                   </div>
                                 );
                               }
@@ -2549,6 +2743,25 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
                                     className="shrink-0 border-r border-slate-200/50 bg-slate-100/70 flex items-center justify-center select-none"
                                   >
                                     <span className="h-2 w-px bg-slate-200" />
+                                  </div>
+                                );
+                              }
+
+                              const held30 = courtHoldService.isSlotHeldByAnother(court.name, curDateStr, time, 30, adminPaymentSessionId);
+                              if (held30) {
+                                return (
+                                  <div
+                                    key={time}
+                                    style={{ width: `${slotWidth}px` }}
+                                    onClick={() => {
+                                      showAlert('Khung giờ đang được tạm giữ!', `Khung giờ ${time} trên ${court.name} đang được khách khác tạm giữ thanh toán!\n\nHệ thống đang chờ khách hoàn tất quét mã VietQR (trong 10 phút). Vui lòng chọn khung giờ khác hoặc chờ hết thời gian giữ sân.`, 'warning');
+                                    }}
+                                    className="shrink-0 border-r border-amber-300 bg-amber-100/90 hover:bg-amber-200 flex flex-col items-center justify-center text-center p-1 select-none transition cursor-pointer"
+                                    title={`${court.name}: Khung giờ ${time} đang có khách tạm giữ thanh toán (trong 10 phút)!`}
+                                  >
+                                    <span className="text-[8.5px] font-black text-amber-950 uppercase leading-none bg-amber-200 px-1 py-0.5 rounded border border-amber-300">
+                                      🔒 ĐANG GIỮ
+                                    </span>
                                   </div>
                                 );
                               }
@@ -3052,29 +3265,44 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
       {/* 🟡 MODAL THANH TOÁN (PAYMENT BOTTOM SHEET) - CHUẨN THEO TOBE_CHAY.bpmn */}
       {showPaymentModal && pendingBookingData && (
         <div className="fixed inset-0 z-[160] flex items-end sm:items-center justify-center bg-slate-900/60 p-0 sm:p-4 backdrop-blur-sm animate-in fade-in duration-300">
-          <div className="w-full max-w-md rounded-t-3xl sm:rounded-3xl bg-white p-6 shadow-2xl animate-in slide-in-from-bottom-8 duration-300 flex flex-col items-center max-h-[94vh] overflow-y-auto">
+          <div className="w-full max-w-sm rounded-t-3xl sm:rounded-3xl bg-white p-5 shadow-2xl animate-in slide-in-from-bottom-8 duration-300 flex flex-col items-center max-h-[94vh] overflow-y-auto">
             <div className="w-12 h-1.5 bg-slate-200 rounded-full mb-4 sm:hidden"></div>
             
-            {/* Trạng thái Tạm giữ sân (Activity_056bcoz) */}
-            <div className="w-full mb-3 flex items-center justify-between bg-emerald-50 border border-emerald-300 rounded-xl px-3 py-1.5 text-[11px] text-emerald-900 font-bold">
-              <span className="flex items-center gap-1.5">
-                <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                Đang tạm giữ {pendingBookingData.court}
-              </span>
-              <span className="text-[10px] font-semibold flex items-center gap-1">
-                <span className="text-emerald-800">Tạm giữ sân:</span>
-                <span className={`font-mono font-bold px-1.5 py-0.5 rounded transition ${
-                  adminPaymentCountdown <= 20
-                    ? 'bg-amber-100 text-amber-800 animate-pulse ring-1 ring-amber-300'
-                    : 'bg-emerald-100/90 text-emerald-900'
-                }`}>
-                  {Math.floor(adminPaymentCountdown / 60)}:{(adminPaymentCountdown % 60).toString().padStart(2, '0')}
+            {/* Trạng thái Tạm giữ sân */}
+            {adminPaymentCountdown > 0 ? (
+              <div className="w-full mb-3 flex items-center justify-between bg-emerald-50 border border-emerald-300 rounded-xl px-3 py-1.5 text-[11px] text-emerald-900 font-bold">
+                <span className="flex items-center gap-1.5">
+                  <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                  Đang tạm giữ {pendingBookingData.court}
                 </span>
-              </span>
-            </div>
+                <span className="text-[10px] font-semibold flex items-center gap-1">
+                  <span className="text-emerald-800">Tạm giữ ưu tiên:</span>
+                  <span className={`font-mono font-bold px-1.5 py-0.5 rounded transition ${
+                    adminPaymentCountdown <= 20
+                      ? 'bg-amber-100 text-amber-800 animate-pulse ring-1 ring-amber-300'
+                      : 'bg-emerald-100/90 text-emerald-900'
+                  }`}>
+                    {Math.floor(adminPaymentCountdown / 60)}:{(adminPaymentCountdown % 60).toString().padStart(2, '0')}
+                  </span>
+                </span>
+              </div>
+            ) : (
+              <div className="w-full mb-3 flex items-start gap-2.5 bg-amber-50 border border-amber-300 rounded-xl p-2.5 text-[11px] text-amber-900 leading-tight animate-in fade-in">
+                <Clock3 className="h-4 w-4 text-amber-700 shrink-0 mt-0.5" />
+                <div>
+                  <div className="flex items-center gap-1.5">
+                    <p className="font-extrabold text-amber-950">Hết thời gian ưu tiên giữ sân</p>
+                    <span className="rounded bg-amber-200/80 px-1 py-0.2 text-[9px] font-black text-amber-900">VẪN THANH TOÁN ĐƯỢC</span>
+                  </div>
+                  <p className="text-[10px] text-amber-800 mt-1 font-medium">
+                    Nếu có khách khác thanh toán trước, hệ thống sẽ ưu tiên khách thanh toán trước.
+                  </p>
+                </div>
+              </div>
+            )}
 
-            {/* Thông báo nhắc nhở sau 20s (Event_1510897 -> Activity_0xxhd0u) */}
-            {adminPaymentNotification && (
+            {/* Thông báo nhắc nhở sau 20s (chỉ hiển thị khi còn trong thời gian giữ sân adminPaymentCountdown > 0) */}
+            {adminPaymentNotification && adminPaymentCountdown > 0 && (
               <div className="w-full mb-3 rounded-xl bg-amber-500 text-white p-2.5 text-xs font-bold flex items-center justify-between shadow-md animate-in slide-in-from-top-2">
                 <div className="flex items-center gap-2">
                   <Bell className="h-4 w-4 shrink-0" />
@@ -3135,7 +3363,7 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
                   <div className="mt-2 text-center">
                     <p className="text-[11px] font-bold text-slate-700">📱 Lấy điện thoại quét mã QR để chuyển tiền</p>
                     <a
-                      href={adminMobilePaymentUrl}
+                      href={adminLocalSimulatorUrl || adminMobilePaymentUrl}
                       target="_blank"
                       rel="noreferrer"
                       className="inline-block mt-0.5 text-[10px] font-bold text-blue-600 hover:text-blue-800 underline"
@@ -3189,25 +3417,18 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
       {showAdminCancelSubprocessModal && pendingBookingData && (
         <div className="fixed inset-0 z-[170] flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="w-full max-w-sm rounded-3xl border border-amber-300 bg-white p-5 shadow-2xl space-y-4 animate-in zoom-in-95 duration-150">
-            <div className="flex items-center gap-3 border-b border-slate-100 pb-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-amber-100 text-amber-700">
+            <div className="flex flex-col items-center justify-center text-center border-b border-slate-100 pb-3 gap-2">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-amber-100 text-amber-700">
                 <AlertTriangle className="h-5 w-5" />
               </div>
               <div>
                 <h4 className="text-sm font-black text-slate-900">Xác nhận hủy thanh toán</h4>
-                <p className="text-[10px] font-bold text-amber-700 uppercase tracking-wide">Quy trình phụ (Event Sub-process)</p>
+                <p className="text-[11px] text-slate-500 mt-0.5">Hủy yêu cầu đặt sân</p>
               </div>
             </div>
 
-            <div className="rounded-xl bg-amber-50/70 p-3 text-xs text-amber-900 border border-amber-200/70 space-y-2 leading-relaxed">
-              <p className="font-semibold">
-                Xác nhận hủy giao dịch và thoát? Hệ thống sẽ kích hoạt quy trình phụ để xử lý:
-              </p>
-              <ul className="list-disc pl-4 space-y-1 text-[11px] text-amber-800">
-                <li>Hủy yêu cầu đặt sân hiện tại</li>
-                <li>Giải phóng khung giờ <strong className="font-bold">{pendingBookingData.time} ({pendingBookingData.court})</strong> trên lịch sân</li>
-                <li>Ghi nhận phiên đặt sân bị hủy vào hệ thống</li>
-              </ul>
+            <div className="rounded-xl bg-amber-50/70 p-3.5 text-sm font-semibold text-amber-900 border border-amber-200/70 text-center">
+              Bạn xác nhận muốn hủy không?
             </div>
 
             <div className="grid grid-cols-2 gap-2 pt-1">
@@ -3223,7 +3444,7 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
                 onClick={handleExecuteAdminCancelSubprocess}
                 className="rounded-xl bg-red-600 py-2.5 text-xs font-bold text-white shadow-md hover:bg-red-700 active:scale-95 transition cursor-pointer"
               >
-                Xác nhận hủy yêu cầu
+                Xác nhận hủy
               </button>
             </div>
           </div>
@@ -3661,6 +3882,69 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
           </div>
         </div>
       )}
+
+      {/* 🟣 CUSTOM POPUP MODAL THAY THẾ WINDOW.ALERT MẶC ĐỊNH */}
+      {schedulePopup && (
+        <div className="fixed inset-0 z-[300] flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="w-full max-w-sm rounded-3xl bg-white p-6 shadow-2xl animate-in zoom-in-95 duration-200 text-center border border-slate-100">
+            {schedulePopup.type === 'danger' ? (
+              <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 border border-rose-100 flex items-center justify-center mx-auto mb-3 shadow-2xs">
+                <CircleX className="w-6 h-6 stroke-[2.2]" />
+              </div>
+            ) : schedulePopup.type === 'success' ? (
+              <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 border border-emerald-100 flex items-center justify-center mx-auto mb-3 shadow-2xs">
+                <CheckCircle2 className="w-6 h-6 stroke-[2.2]" />
+              </div>
+            ) : (
+              <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 border border-amber-100 flex items-center justify-center mx-auto mb-3 shadow-2xs">
+                <AlertTriangle className="w-6 h-6 stroke-[2.2]" />
+              </div>
+            )}
+
+            <h3 className="text-base font-black text-slate-900 uppercase tracking-tight">
+              {schedulePopup.title}
+            </h3>
+            <p className="mt-2 text-xs text-slate-600 leading-relaxed font-medium whitespace-pre-line">
+              {schedulePopup.message}
+            </p>
+
+            <div className="mt-5">
+              <button
+                type="button"
+                onClick={() => setSchedulePopup(null)}
+                className="w-full py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-xs font-bold text-white shadow-sm active:scale-95 transition cursor-pointer"
+              >
+                Đã hiểu
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Toast thông báo nhẹ nhàng ở góc màn hình khi thêm sân / bộ môn (không giật màn hình, không mở modal đè) */}
+      {addSuccessToast && (
+        <div className="fixed top-5 right-5 z-[400] flex items-center gap-2.5 px-4 py-3 rounded-2xl bg-emerald-800 text-white shadow-2xl border border-emerald-600/50 text-xs font-bold animate-in slide-in-from-top-3 fade-in duration-200">
+          <CheckCircle2 className="w-4 h-4 text-emerald-300 shrink-0" />
+          <span>{addSuccessToast}</span>
+          <button
+            type="button"
+            onClick={() => setAddSuccessToast(null)}
+            className="ml-2 text-emerald-300 hover:text-white cursor-pointer font-bold"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
+      {/* Modal Thêm Sân & Bộ Môn cho Chủ */}
+      <AdminAddSportAndCourtModal
+        isOpen={showAddSportCourtModal}
+        onClose={() => setShowAddSportCourtModal(false)}
+        onSuccess={(msg, sportId) => {
+          setAddSuccessToast(msg);
+          if (sportId) setCourtView(sportId);
+        }}
+      />
     </>
   );
 }

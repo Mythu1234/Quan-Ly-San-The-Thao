@@ -3,6 +3,9 @@ import {staffAuthService} from '../services/staffAuthService.js';
 import {staffDirectoryService as directory} from '../services/staffDirectoryService.js';
 const router=Router();
 router.post('/login',async(req,res,next)=>{try{res.json({success:true,data:await staffAuthService.login(req.body.identifier,req.body.password)});}catch(error){next(error);}});
+router.post('/forgot-password/send-otp',async(req,res,next)=>{try{res.json({success:true,data:await staffAuthService.sendForgotOtp(req.body.phone)});}catch(error){next(error);}});
+router.post('/forgot-password/verify-otp',async(req,res,next)=>{try{res.json({success:true,data:await staffAuthService.verifyForgotOtp(req.body.phone,req.body.otp)});}catch(error){next(error);}});
+router.post('/forgot-password/reset',async(req,res,next)=>{try{res.json({success:true,data:await staffAuthService.resetPassword(req.body.phone,req.body.otp,req.body.newPassword)});}catch(error){next(error);}});
 router.post('/:id/password',async(req,res,next)=>{try{res.json({success:true,data:await staffAuthService.changePassword(String(req.params.id),req.body.currentPassword,req.body.newPassword)});}catch(error){next(error);}});
 router.get('/stats',async(_req,res,next)=>{try{const rows=await directory.list();res.json({success:true,data:{total:rows.length,active:rows.filter(row=>row.status==='active').length,inactive:rows.filter(row=>row.status==='inactive').length}});}catch(error){next(error);}});
 router.get('/',async(req,res,next)=>{try{

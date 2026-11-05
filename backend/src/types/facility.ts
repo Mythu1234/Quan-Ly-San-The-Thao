@@ -78,7 +78,7 @@ export interface UpdateEquipmentDTO {
 
 export interface CourtStatusItem {
   code?: string;
-  sportId?: 'badminton' | 'volleyball' | 'football';
+  sportId?: 'badminton' | 'volleyball' | 'football' | string;
   id: string;               // SAN-01 .. SAN-08
   courtNumber: number;      // 1 .. 8
   name: string;             // Sân 01 (Tiêu chuẩn A)...
