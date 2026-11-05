@@ -45,7 +45,7 @@ test('lookup filters Supabase by exact booking code or phone, with no demo fallb
 test('lookup uses stored amounts/status and Vietnam time instead of fixed sample values',()=>{
   const row=map(fixture,new Date('2026-11-03T05:00:00Z'));
   assert.equal(row.hoursUntilStart,24);assert.equal(row.total,'120.000đ');assert.equal(row.paidAmount,'120.000đ');
-  assert.equal(row.remaining,'0đ');assert.equal(row.status,'ĐÃ XÁC NHẬN');assert.equal(row.canCancel,false);
+  assert.equal(row.remaining,'0đ');assert.equal(row.status,'ĐÃ XÁC NHẬN');assert.equal(row.canCancel,true);
   const cancelled=map({...fixture,trang_thai:'DA_HUY',hoan_tien:[{so_tien_hoan:120000,trang_thai:'THANH_CONG'},{so_tien_hoan:50000,trang_thai:'THAT_BAI'}]});
   assert.equal(cancelled.refundAmount,'120.000đ');assert.equal(cancelled.refundStatus,'Đã hoàn tiền');
 });
