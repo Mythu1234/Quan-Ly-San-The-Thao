@@ -1,6 +1,7 @@
 import { supabase } from '../lib/supabaseClient';
 import { downloadBookingReceipt, printBookingReceipt, type BookingReceiptData } from '../utils/bookingReceipt';
 import { useMemo, useRef, useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import {
   AlertTriangle, ArrowLeft, ArrowRightLeft, Ban, Calendar, CalendarClock,
   Check, CheckCircle2, RefreshCw, ChevronDown, ChevronLeft, ChevronRight, CircleX, XCircle,
@@ -1854,7 +1855,8 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
     const reasonLength = cancelReason.length;
 
     return (
-      <div className="flex-1 min-h-0 overflow-y-auto bg-[#f7f6ff] px-3 py-3">
+      <div className="no-scrollbar min-h-0 flex-1 overflow-y-auto overscroll-contain bg-[#f7f6ff] px-3 py-2">
+        <div className="mx-auto w-full max-w-sm">
         <button
           type="button"
           onClick={() => {
@@ -1867,8 +1869,8 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
           Quay lại lịch sân
         </button>
 
-        <div className="mb-3 flex items-center justify-between gap-2">
-          <h2 className="min-w-0 text-[17px] font-black uppercase tracking-tight text-slate-950">Hủy lịch đặt sân</h2>
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <h2 className="min-w-0 text-[15px] font-black uppercase tracking-tight text-slate-950">Hủy lịch đặt sân</h2>
           <span className="shrink-0 rounded-full bg-slate-200 px-2.5 py-1 text-[10px] font-black text-slate-600">
             Mã đặt: {cancelBooking.code}
           </span>
@@ -1891,11 +1893,11 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
           return null; // Giữ 1 thông báo chi tiết kèm số tiền hoàn ở phía dưới để tránh trùng lặp
         })()}
 
-        <section className="mb-3 rounded-2xl bg-white p-3.5 shadow-xs border border-slate-200 space-y-2.5">
+        <section className="mb-2 space-y-2 rounded-2xl border border-slate-200 bg-white p-2.5 shadow-xs">
           {/* Sân & Trạng thái */}
-          <div className="flex items-center justify-between gap-3 pb-2.5 border-b border-slate-100">
+          <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-2">
             <div className="flex items-center gap-2.5 min-w-0">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-600 text-white font-black text-xs shadow-xs">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-600 text-xs font-black text-white shadow-xs">
                 {cancelBooking.courtCode || cancelBooking.court.replace(/^Sân\s*/i, '')}
               </div>
               <div className="min-w-0">
@@ -1913,7 +1915,7 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
           </div>
 
           {/* Khách hàng - Hàng ngang thoáng đãng */}
-          <div className="flex items-center justify-between rounded-xl bg-slate-50 p-2.5 border border-slate-100">
+          <div className="flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50 p-2">
             <div className="flex items-center gap-2.5 min-w-0">
               <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-[12px] font-black text-emerald-800">
                 {cancelBooking.customerName.trim().charAt(0)}
@@ -1953,8 +1955,8 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
           </div>
         </section>
 
-        <section className="mb-3 rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-100">
-          <div className="mb-3 flex items-center justify-between gap-3">
+        <section className="mb-2 rounded-xl bg-white p-3 shadow-sm ring-1 ring-slate-100">
+          <div className="mb-2 flex items-center justify-between gap-2">
             <label className="text-[12px] font-black text-slate-900">
               Lý do hủy lịch <span className="text-red-600">*</span>
               <span className="ml-1 text-[11px] font-semibold text-slate-500">(Bắt buộc từ khách)</span>
@@ -1962,13 +1964,13 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
             <span className="shrink-0 text-[11px] font-black text-slate-600">{reasonLength}/200</span>
           </div>
 
-          <div className="mb-3 flex flex-wrap gap-2">
+          <div className="mb-2 flex flex-wrap gap-1.5">
             {reasonOptions.map(({ label, icon: Icon, value }) => (
               <button
                 key={label}
                 type="button"
                 onClick={() => setCancelReason(value)}
-                className="flex h-7 items-center gap-1.5 rounded-full bg-indigo-50 px-2.5 text-[11px] font-black text-slate-600 active:scale-95"
+                className="flex h-6 items-center gap-1 rounded-full bg-indigo-50 px-2 text-[11px] font-black text-slate-600 active:scale-95"
               >
                 <Icon className="h-4 w-4" />
                 {label}
@@ -1980,7 +1982,7 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
             value={cancelReason}
             maxLength={200}
             onChange={(event) => setCancelReason(event.target.value)}
-            className="h-24 w-full resize-none rounded-lg border border-indigo-50 bg-indigo-50 p-3 text-[13px] font-medium leading-relaxed text-slate-900 outline-none focus:border-emerald-200 focus:bg-white"
+            className="no-scrollbar h-16 w-full resize-none rounded-lg border border-indigo-50 bg-indigo-50 p-2.5 text-xs font-medium leading-relaxed text-slate-900 outline-none focus:border-emerald-200 focus:bg-white"
             placeholder="Nhập lý do khách yêu cầu hủy lịch..."
           />
         </section>
@@ -1989,14 +1991,14 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
           const val = getCancelValidation(cancelBooking);
           if (!val.canCancel) {
             return (
-              <section className="mb-4 rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-100">
-                <div className="mb-3 flex items-start gap-3 rounded-lg bg-red-50 p-3">
+              <section className="mb-2 rounded-xl bg-white p-3 shadow-sm ring-1 ring-slate-100">
+                <div className="mb-2 flex items-start gap-2 rounded-lg bg-red-50 p-2.5">
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-100 text-red-700">
                     <AlertTriangle className="h-5 w-5" />
                   </div>
                   <div>
-                    <h3 className="text-[14px] font-black text-red-950">Không thể hủy lịch đặt này</h3>
-                    <p className="mt-1 text-[12px] font-medium leading-relaxed text-red-700">
+                    <h3 className="text-xs font-black text-red-950">Không thể hủy lịch đặt này</h3>
+                    <p className="mt-1 text-[11px] font-medium leading-relaxed text-red-700">
                       {val.message || 'Lịch đặt sân trong quá khứ hoặc đang sử dụng không thể hủy.'}
                     </p>
                   </div>
@@ -2004,7 +2006,7 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
                 <button
                   type="button"
                   disabled
-                  className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-slate-200 text-[14px] font-black text-slate-400 cursor-not-allowed"
+                  className="flex h-10 w-full cursor-not-allowed items-center justify-center gap-2 rounded-xl bg-slate-200 text-xs font-black text-slate-400"
                 >
                   <Ban className="h-5 w-5" />
                   Không thể hủy sân
@@ -2014,14 +2016,14 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
           }
           const isEligible24h = val.isEligibleRefund;
           return isEligible24h ? (
-            <section className="mb-4 rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-100">
-              <div className="mb-3 flex items-start gap-3 rounded-lg bg-emerald-50 p-3">
+            <section className="mb-2 rounded-xl bg-white p-3 shadow-sm ring-1 ring-slate-100">
+              <div className="mb-2 flex items-start gap-2 rounded-lg bg-emerald-50 p-2.5">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
                   <CheckCircle2 className="h-5 w-5" />
                 </div>
                 <div>
-                  <h3 className="text-[14px] font-black text-slate-950">Hủy trước ≥ 24h: Đủ điều kiện hoàn tiền</h3>
-                  <p className="mt-1 text-[12px] font-medium leading-relaxed text-slate-600">
+                  <h3 className="text-xs font-black text-slate-950">Hủy trước ≥ 24h: Đủ điều kiện hoàn tiền</h3>
+                  <p className="mt-1 text-[11px] font-medium leading-relaxed text-slate-600">
                     Hệ thống sẽ <strong className="text-emerald-700">tự động hoàn tiền</strong> ({cancelBooking.total}) qua cổng thanh toán và <strong className="text-emerald-700">giải phóng sân ngay lập tức</strong>.
                   </p>
                 </div>
@@ -2065,21 +2067,21 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
                     });
                   }, 1500);
                 }}
-                className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-[14px] font-black text-white shadow-sm active:scale-[0.99] cursor-pointer"
+                className="flex h-10 w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-emerald-600 text-xs font-black text-white shadow-sm hover:bg-emerald-700 active:scale-[0.99]"
               >
                 <CheckCircle2 className="h-5 w-5" />
                 Xác nhận hủy sân & Hoàn tiền
               </button>
             </section>
           ) : (
-            <section className="mb-4 rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-100">
-              <div className="mb-3 flex items-start gap-3 rounded-lg bg-red-50 p-3">
+            <section className="mb-2 rounded-xl bg-white p-3 shadow-sm ring-1 ring-slate-100">
+              <div className="mb-2 flex items-start gap-2 rounded-lg bg-red-50 p-2.5">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-100 text-red-700">
                   <AlertTriangle className="h-5 w-5" />
                 </div>
                 <div>
-                  <h3 className="text-[14px] font-black text-red-950">Hủy dưới 24h: Không được hoàn tiền</h3>
-                  <p className="mt-1 text-[12px] font-medium leading-relaxed text-red-700">
+                  <h3 className="text-xs font-black text-red-950">Hủy dưới 24h: Không được hoàn tiền</h3>
+                  <p className="mt-1 text-[11px] font-medium leading-relaxed text-red-700">
                     Theo quy định của sân, lịch đặt hủy trong vòng dưới 24 giờ sẽ <strong>không được hoàn tiền (0 VND)</strong>. Thao tác này chỉ giải phóng sân cho khách khác đặt.
                   </p>
                 </div>
@@ -2116,7 +2118,7 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
                     policyMessage: 'Đơn không được hoàn tiền do hủy dưới 24 giờ.',
                   });
                 }}
-                className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-red-600 hover:bg-red-700 text-[14px] font-black text-white shadow-sm active:scale-[0.99] cursor-pointer"
+                className="flex h-10 w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-red-600 text-xs font-black text-white shadow-sm hover:bg-red-700 active:scale-[0.99]"
               >
                 <Ban className="h-5 w-5" />
                 Hủy sân (Không hoàn tiền)
@@ -2124,6 +2126,7 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
             </section>
           );
         })()}
+        </div>
       </div>
     );
   }
@@ -3626,40 +3629,40 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
         </div>
       )}
       {/* 🟢 MODAL ĐIỀU CHUYỂN SÂN & ĐỔI KHUNG GIỜ THI ĐẤU */}
-      {transferBooking && (
-        <div className="fixed inset-0 z-[150] flex items-end sm:items-center justify-center bg-slate-900/60 p-0 sm:p-4 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="w-full max-w-md rounded-t-3xl sm:rounded-3xl bg-white p-5 shadow-2xl animate-in slide-in-from-bottom-6 duration-200 max-h-[92vh] overflow-y-auto space-y-4 border border-slate-100 flex flex-col">
-            <div className="w-12 h-1.5 bg-slate-200 rounded-full mb-1 mx-auto sm:hidden shrink-0"></div>
-
+      {transferBooking && createPortal(
+        <div className="fixed inset-0 z-[150] flex items-center justify-center bg-slate-900/30 p-3 backdrop-blur-[2px] animate-in fade-in duration-200">
+          <div role="dialog" aria-modal="true" aria-labelledby="transfer-booking-title" className="flex max-h-[calc(100dvh-2rem)] w-full max-w-sm flex-col overflow-hidden rounded-3xl border border-slate-100 bg-white p-4 shadow-2xl animate-in slide-in-from-bottom-6 duration-200">
             {/* Header */}
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100 shrink-0">
-              <div className="flex items-center gap-2.5">
-                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-amber-100 text-amber-800">
-                  <ArrowRightLeft className="h-5 w-5" />
+            <div className="flex shrink-0 items-center justify-between gap-2 border-b border-slate-100 pb-2.5">
+              <div className="flex min-w-0 items-center gap-2">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-800">
+                  <ArrowRightLeft className="h-4 w-4" />
                 </div>
-                <div>
-                  <h3 className="text-sm font-black text-slate-900 uppercase tracking-wide">
+                <div className="min-w-0">
+                  <h3 id="transfer-booking-title" className="text-xs font-black uppercase text-slate-900">
                     Điều chuyển sân & Khung giờ
                   </h3>
-                  <p className="text-[11px] text-slate-500 font-medium">
+                  <p className="text-[10px] font-medium text-slate-500">
                     Đổi sân thi đấu hoặc dời khung giờ linh hoạt theo yêu cầu
                   </p>
                 </div>
               </div>
               <button
                 type="button"
+                aria-label="Đóng điều chuyển sân"
                 onClick={() => setTransferBooking(null)}
-                className="h-8 w-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200 active:scale-95 cursor-pointer"
+                className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 active:scale-95"
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
 
+            <div className="no-scrollbar min-h-0 space-y-3 overflow-y-auto overscroll-contain py-3">
             {/* Thông tin đơn đặt hiện tại */}
-            <div className="rounded-2xl bg-slate-50 p-3.5 space-y-2 border border-slate-200 text-xs">
-              <div className="flex justify-between items-center">
+            <div className="space-y-1.5 rounded-2xl border border-slate-200 bg-slate-50 p-3 text-[11px]">
+              <div className="flex items-center justify-between gap-2">
                 <span className="text-slate-500">Khách hàng:</span>
-                <span className="font-extrabold text-slate-900">{transferBooking.customerName} ({transferBooking.phone})</span>
+                <span className="min-w-0 text-right font-extrabold break-words text-slate-900">{transferBooking.customerName} ({transferBooking.phone})</span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-slate-500">Sân hiện tại:</span>
@@ -3682,7 +3685,7 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
             </div>
 
             {/* Chọn khung giờ thi đấu mới */}
-            <div className="space-y-1.5 rounded-2xl bg-amber-50/40 p-3 border border-amber-200/80">
+            <div className="space-y-1.5 rounded-2xl border border-amber-200/80 bg-amber-50/40 p-2.5">
               <div className="flex items-center justify-between">
                 <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
                   <Clock3 className="h-3.5 w-3.5 text-amber-700" />
@@ -3761,7 +3764,7 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
                 </span>
               </div>
 
-              <div className="grid grid-cols-2 gap-2.5 max-h-52 overflow-y-auto p-1">
+              <div className="no-scrollbar grid max-h-44 grid-cols-2 gap-2 overflow-y-auto overscroll-contain p-1">
                 {candidateCourtsForTransfer.map((court) => {
                   const isSelected = selectedTargetCourt?.id === court.id;
                   return (
@@ -3770,7 +3773,7 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
                       type="button"
                       disabled={court.isOccupied}
                       onClick={() => setSelectedTargetCourt(court)}
-                      className={`relative flex flex-col p-3 rounded-2xl border-2 text-left transition-all outline-none ${
+                      className={`relative flex flex-col rounded-xl border-2 p-2.5 text-left transition-all outline-none ${
                         court.isOccupied
                           ? 'border-slate-200 bg-slate-100 opacity-60 cursor-not-allowed z-0'
                           : isSelected
@@ -3806,9 +3809,10 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
                 <p>{transferSuccessMsg}</p>
               </div>
             )}
+            </div>
 
             {/* Actions */}
-            <div className="flex gap-2 pt-2 border-t border-slate-100">
+            <div className="flex shrink-0 gap-2 border-t border-slate-100 pt-2.5">
               <button
                 type="button"
                 onClick={() => setTransferBooking(null)}
@@ -3839,7 +3843,8 @@ export default function AdminSchedulePage({ onCheckoutModeChange, equipments, in
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
 
       {/* 🟣 POPUP MODAL HOÀN TIỀN / HỦY SÂN (ĐỒNG BỘ 100% FORM VỚI BÊN KHÁCH HÀNG TRANG CHỦ) */}

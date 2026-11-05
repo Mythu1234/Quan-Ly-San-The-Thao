@@ -1,4 +1,5 @@
 import type { FormEvent } from 'react';
+import { createPortal } from 'react-dom';
 import { AlertTriangle, ArrowRight, Calendar, CheckCircle2, Clock3, User, X } from 'lucide-react';
 
 interface Props {
@@ -32,8 +33,9 @@ export default function AdminBookingDialog(props: Props) {
   const totalPrice = Math.round((court.pricePerHour * props.duration) / 60);
   const formattedPrice = `${totalPrice.toLocaleString('vi-VN')}đ`;
 
-  return (
-    <div className="fixed inset-y-0 left-1/2 z-[150] flex w-full max-w-sm -translate-x-1/2 items-end justify-center bg-slate-900/60 p-2 backdrop-blur-sm sm:items-center sm:p-4">
+  return createPortal(
+    <div className="fixed inset-0 z-[150] flex items-center justify-center bg-slate-900/30">
+      <div className="w-full max-w-md p-2 sm:p-4">
       <div
         role="dialog"
         aria-modal="true"
@@ -251,6 +253,8 @@ export default function AdminBookingDialog(props: Props) {
           </div>
         </form>
       </div>
-    </div>
+      </div>
+    </div>,
+    document.body,
   );
 }
